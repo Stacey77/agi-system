@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: agi-system
+  namespace: agi-system
+  labels:
+    app: agi-system
+spec:
+  type: ClusterIP
+  selector:
+    app: agi-system
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8000

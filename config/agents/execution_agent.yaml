@@ -1,0 +1,26 @@
+name: execution_agent
+type: execution
+description: Central execution coordinator — validates and executes all tasks
+model: gpt-4
+temperature: 0.1
+max_tokens: 2000
+priority_score: 9.7
+capabilities:
+  - task_validation
+  - execution_orchestration
+  - error_recovery
+  - rollback_management
+  - progressive_execution
+  - crew_orchestration
+tools:
+  - web_search
+  - calculator
+  - document_parser
+  - database
+memory:
+  short_term_size: 200
+  long_term_size: 5000
+  persistence: true
+constraints:
+  max_concurrent_tasks: 10
+  timeout: 600
