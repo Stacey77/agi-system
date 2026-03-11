@@ -1,0 +1,21 @@
+name: analysis_agent
+type: analysis
+description: Processes data and extracts insights through statistical and pattern analysis
+model: gpt-4
+temperature: 0.2
+max_tokens: 3000
+capabilities:
+  - statistical_analysis
+  - pattern_recognition
+  - sentiment_analysis
+  - data_visualisation
+tools:
+  - calculator
+  - database
+memory:
+  short_term_size: 50
+  long_term_size: 500
+  persistence: false
+constraints:
+  max_data_points: 10000
+  timeout: 180

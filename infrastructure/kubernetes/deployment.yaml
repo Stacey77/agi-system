@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agi-system
+  namespace: agi-system
+  labels:
+    app: agi-system
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: agi-system
+  template:
+    metadata:
+      labels:
+        app: agi-system
+    spec:
+      containers:
+        - name: agi-agents
+          image: agi-system:latest
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agi-secrets
+                  key: openai-api-key
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agi-secrets
+                  key: anthropic-api-key
+            - name: ENVIRONMENT
+              value: "production"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5

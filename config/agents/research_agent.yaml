@@ -1,0 +1,22 @@
+name: research_agent
+type: research
+description: Gathers information from multiple sources including web, academic, and databases
+model: gpt-4
+temperature: 0.5
+max_tokens: 4000
+capabilities:
+  - web_search
+  - academic_search
+  - source_quality_assessment
+  - parallel_search
+tools:
+  - web_search
+  - document_parser
+  - database
+memory:
+  short_term_size: 100
+  long_term_size: 1000
+  persistence: true
+constraints:
+  max_sources: 20
+  timeout: 300

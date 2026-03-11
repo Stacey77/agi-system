@@ -1,0 +1,20 @@
+name: planning_agent
+type: planning
+description: Decomposes high-level objectives into executable step-by-step plans
+model: gpt-4
+temperature: 0.3
+max_tokens: 2000
+capabilities:
+  - task_decomposition
+  - dependency_analysis
+  - plan_validation
+  - adaptive_planning
+tools:
+  - web_search
+memory:
+  short_term_size: 50
+  long_term_size: 500
+  persistence: false
+constraints:
+  max_steps: 20
+  timeout: 120

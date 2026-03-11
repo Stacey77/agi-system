@@ -1,0 +1,21 @@
+name: writing_agent
+type: writing
+description: Generates high-quality content through outline-draft-edit pipeline
+model: gpt-4
+temperature: 0.7
+max_tokens: 8000
+capabilities:
+  - content_generation
+  - style_adaptation
+  - research_integration
+  - citation_management
+tools:
+  - web_search
+  - document_parser
+memory:
+  short_term_size: 100
+  long_term_size: 2000
+  persistence: false
+constraints:
+  max_word_count: 10000
+  timeout: 600

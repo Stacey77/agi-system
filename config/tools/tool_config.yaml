@@ -1,0 +1,27 @@
+tools:
+  web_search:
+    enabled: true
+    provider: mock
+    api_key: ${SEARCH_API_KEY}
+    rate_limit: 100
+    rate_limit_period: 3600
+    category: information_retrieval
+
+  calculator:
+    enabled: true
+    category: analytical
+
+  document_parser:
+    enabled: true
+    supported_formats:
+      - pdf
+      - docx
+      - xlsx
+      - txt
+    category: information_retrieval
+
+  database:
+    enabled: true
+    database_url: ${DATABASE_URL}
+    pool_size: 5
+    category: integration

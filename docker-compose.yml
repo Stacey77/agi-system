@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+  agents-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.agents
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://user:password@postgres:5432/agi_system}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    depends_on:
+      - redis
+      - vector-db
+    volumes:
+      - agent-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.api
+    ports:
+      - "8080:8080"
+    environment:
+      - ENVIRONMENT=development
+      - AGENTS_SERVICE_URL=http://agents-service:8000
+    depends_on:
+      agents-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  vector-db:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+volumes:
+  agent-data:
+  chroma-data:
+  redis-data:
