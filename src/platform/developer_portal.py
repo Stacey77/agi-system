@@ -103,7 +103,7 @@ _DEFAULT_SERVICES: List[Dict[str, Any]] = [
     {
         "name": "Platform Tooling API",
         "description": "Platform tool landscape and discovery",
-        "tier": PortalTier.BOTH if False else PortalTier.INTERNAL,
+        "tier": PortalTier.INTERNAL,
         "version": "v1",
         "api_base_url": "/api/v1/platform/tools",
         "docs_url": "/docs",
