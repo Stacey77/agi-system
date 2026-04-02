@@ -106,13 +106,13 @@ class TestCrewEndpoints:
     def test_run_crew(self, client):
         response = client.post(
             "/api/v1/crews/run",
-            json={"objective": "Research and summarise AI trends"},
+            json={"objective": "Research and summarize AI trends"},
         )
         assert response.status_code == 200
         data = response.json()
         assert "success" in data
         assert "output" in data
-        assert data["objective"] == "Research and summarise AI trends"
+        assert data["objective"] == "Research and summarize AI trends"
 
     def test_run_crew_with_explicit_tasks(self, client):
         response = client.post(

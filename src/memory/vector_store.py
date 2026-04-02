@@ -29,7 +29,8 @@ class _OfflineEmbeddingFunction:
         result = []
         for text in input:
             digest = hashlib.md5(text.encode("utf-8")).digest()
-            # Normalise bytes to [-1, 1]
+            # Normalise each byte (0–255) to the range [-1, 1] so that all
+            # embedding dimensions have the same scale regardless of input.
             vec = [(b / 127.5) - 1.0 for b in digest[:_EMBEDDING_DIM]]
             result.append(vec)
         return result
