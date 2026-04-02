@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from src.agents.base_agent import AgentConfig, BaseAgent
+from src.integrations.langchain_integration import create_langchain_chain
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,9 @@ class PlanningAgent(BaseAgent):
         execution_agent: Optional[Any] = None,
     ) -> None:
         super().__init__(config, execution_agent)
+        self._chain = create_langchain_chain(
+            role="planning", temperature=config.temperature
+        )
 
     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Process a planning task — decompose objective into steps."""

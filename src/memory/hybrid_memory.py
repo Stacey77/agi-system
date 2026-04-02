@@ -65,7 +65,9 @@ class HybridMemory:
             )
         store = self._agent_stores[agent_id]
         doc_id = f"{agent_id}_{len(self._agent_contexts.get(agent_id, []))}"
-        store.add_documents([content], ids=[doc_id], metadatas=[metadata or {}])
+        # ChromaDB requires non-empty metadata dicts; supply a sentinel if none provided.
+        effective_metadata = metadata if metadata else {"_source": agent_id}
+        store.add_documents([content], ids=[doc_id], metadatas=[effective_metadata])
 
         # Also keep a lightweight in-memory cache
         if agent_id not in self._agent_contexts:

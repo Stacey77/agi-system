@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from src.agents.base_agent import AgentConfig, BaseAgent
+from src.integrations.langchain_integration import create_langchain_chain
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,9 @@ class WritingAgent(BaseAgent):
         execution_agent: Optional[Any] = None,
     ) -> None:
         super().__init__(config, execution_agent)
+        self._chain = create_langchain_chain(
+            role="writing", temperature=config.temperature
+        )
 
     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Process a writing task."""
@@ -108,16 +112,23 @@ class WritingAgent(BaseAgent):
         tone: str,
         audience: str,
     ) -> List[Dict[str, Any]]:
-        return [
-            {
-                "heading": heading,
-                "content": (
+        sections = []
+        for heading in outline:
+            try:
+                content = self._chain.run(
+                    topic=topic,
+                    tone=tone,
+                    audience=audience,
+                    section=heading,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("LangChain section draft skipped: %s", exc)
+                content = (
                     f"[{tone.upper()} | {audience}] "
                     f"Content for '{heading}' related to {topic}."
-                ),
-            }
-            for heading in outline
-        ]
+                )
+            sections.append({"heading": heading, "content": content})
+        return sections
 
     def _assemble_content(self, sections: List[Dict[str, Any]]) -> str:
         parts: List[str] = []

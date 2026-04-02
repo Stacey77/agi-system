@@ -32,8 +32,21 @@ A production-ready AGI-type system for building smart chatbots, writing assistan
 
 ## Dual-Framework Strategy
 
-- **LangChain**: Foundation layer providing tools, memory chains, and LLM integrations
-- **CrewAI**: Multi-agent coordination, task delegation, and crew orchestration
+- **LangChain**: Foundation layer providing tools, memory chains, and LLM integrations.
+  Each agent type has a dedicated prompt template; the `LangChainAgentChain` wraps any
+  OpenAI/Anthropic-compatible LLM and gracefully falls back to a mock response when no
+  credentials are configured.
+- **CrewAI**: Multi-agent coordination, task delegation, and crew orchestration.
+  The `CrewBuilder` converts registered `AgentConfig` objects into CrewAI `Agent` / `Task`
+  objects and runs them via `Crew.kickoff()`.  Falls back to mock output when CrewAI
+  dependencies or LLM credentials are absent.
+
+## Integrations
+
+| Module | Purpose |
+|--------|---------|
+| `src/integrations/langchain_integration.py` | `LangChainLLMProvider`, `AgentPromptBuilder`, `LangChainAgentChain` |
+| `src/integrations/crewai_integration.py` | `CrewAIAgentBuilder`, `CrewAITaskBuilder`, `CrewBuilder` |
 
 ## Agents
 
@@ -102,6 +115,28 @@ curl -X POST http://localhost:8000/api/v1/agents/research_agent/execute \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{"task": "Find recent papers on transformer architectures"}'
+```
+
+### Run a CrewAI Crew
+
+```bash
+curl -X POST http://localhost:8000/api/v1/crews/run \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "objective": "Research and summarise recent AI developments",
+    "agent_names": ["research_agent", "writing_agent"],
+    "tasks": [
+      {"description": "Research recent AI papers and news"},
+      {"description": "Write a concise summary report"}
+    ]
+  }'
+```
+
+### List Crew-Capable Agents
+
+```bash
+curl http://localhost:8000/api/v1/crews/agents
 ```
 
 ### Health Check

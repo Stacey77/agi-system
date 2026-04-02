@@ -1,0 +1,21 @@
+name: review_agent
+type: review
+description: Quality assurance, fact-checking, and self-correction for agent outputs
+model: gpt-4
+temperature: 0.1
+max_tokens: 2000
+capabilities:
+  - quality_assurance
+  - fact_checking
+  - self_correction
+  - completeness_assessment
+tools:
+  - web_search
+  - document_parser
+memory:
+  short_term_size: 50
+  long_term_size: 200
+  persistence: false
+constraints:
+  min_quality_score: 0.6
+  timeout: 120

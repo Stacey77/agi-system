@@ -93,3 +93,40 @@ class TestTaskEndpoints:
     def test_unknown_task_returns_404(self, client):
         response = client.get("/api/v1/tasks/nonexistent-task-id")
         assert response.status_code == 404
+
+
+class TestCrewEndpoints:
+    def test_list_crew_agents(self, client):
+        response = client.get("/api/v1/crews/agents")
+        assert response.status_code == 200
+        agents = response.json()
+        assert isinstance(agents, list)
+        assert len(agents) > 0
+
+    def test_run_crew(self, client):
+        response = client.post(
+            "/api/v1/crews/run",
+            json={"objective": "Research and summarise AI trends"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "success" in data
+        assert "output" in data
+        assert data["objective"] == "Research and summarise AI trends"
+
+    def test_run_crew_with_explicit_tasks(self, client):
+        response = client.post(
+            "/api/v1/crews/run",
+            json={
+                "objective": "Build a report",
+                "agent_names": ["research_agent", "writing_agent"],
+                "tasks": [
+                    {"description": "Gather data on AI"},
+                    {"description": "Draft a report"},
+                ],
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["task_outputs"]) == 2
+

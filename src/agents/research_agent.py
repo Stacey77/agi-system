@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from src.agents.base_agent import AgentConfig, BaseAgent
+from src.integrations.langchain_integration import create_langchain_chain
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,9 @@ class ResearchAgent(BaseAgent):
         execution_agent: Optional[Any] = None,
     ) -> None:
         super().__init__(config, execution_agent)
+        self._chain = create_langchain_chain(
+            role="research", temperature=config.temperature
+        )
 
     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Process a research task."""
@@ -51,7 +55,7 @@ class ResearchAgent(BaseAgent):
         return result
 
     async def conduct_research(self, query: str) -> ResearchResult:
-        """Conduct parallel research across multiple tools."""
+        """Conduct parallel research across multiple tools, then synthesise with LangChain."""
         search_tools = [t for t in self.config.tools if "search" in t.lower()]
         if not search_tools:
             search_tools = ["web_search"]
@@ -69,7 +73,7 @@ class ResearchAgent(BaseAgent):
                 sources.extend(r)
 
         quality = self._assess_quality(sources)
-        summary = self._build_summary(query, sources)
+        summary = self._synthesise_summary(query, sources)
 
         return ResearchResult(
             query=query,
@@ -103,10 +107,19 @@ class ResearchAgent(BaseAgent):
             return 0.0
         return min(1.0, len(sources) / 5.0)
 
-    def _build_summary(
+    def _synthesise_summary(
         self, query: str, sources: List[Dict[str, Any]]
     ) -> str:
+        """Build a summary, using the LangChain chain when available."""
         if not sources:
-            return f"No results found for: {query}"
-        snippets = [s.get("snippet", "") for s in sources[:3] if s.get("snippet")]
-        return f"Research on '{query}': " + " ".join(snippets)
+            raw_context = "No sources found."
+        else:
+            snippets = [s.get("snippet", "") for s in sources[:5] if s.get("snippet")]
+            raw_context = " ".join(snippets) if snippets else "Sources gathered but no snippets available."
+
+        # Attempt LangChain synthesis
+        try:
+            return self._chain.run(query=query, context=raw_context)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("LangChain synthesis skipped: %s", exc)
+            return f"Research on '{query}': {raw_context}"
