@@ -20,6 +20,9 @@ class AgentType(str, Enum):
     WRITING = "writing"
     EXECUTION = "execution"
     REVIEW = "review"
+    IDE = "ide"
+    CDE = "cde"
+    KALLY = "kally"
 
 
 @dataclass

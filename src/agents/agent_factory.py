@@ -10,10 +10,13 @@ import yaml
 
 from src.agents.analysis_agent import AnalysisAgent
 from src.agents.base_agent import AgentConfig, AgentType, BaseAgent
+from src.agents.kally_agent import KallyAgent
 from src.agents.planning_agent import PlanningAgent
 from src.agents.research_agent import ResearchAgent
 from src.agents.review_agent import ReviewAgent
 from src.agents.writing_agent import WritingAgent
+from src.cde.cde_agent import CDEAgent
+from src.ide.ide_agent import IDEAgent
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +26,9 @@ _AGENT_CLASSES = {
     AgentType.ANALYSIS: AnalysisAgent,
     AgentType.WRITING: WritingAgent,
     AgentType.REVIEW: ReviewAgent,
+    AgentType.IDE: IDEAgent,
+    AgentType.CDE: CDEAgent,
+    AgentType.KALLY: KallyAgent,
 }
 
 # Config directory relative to project root
