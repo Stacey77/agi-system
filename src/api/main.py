@@ -12,10 +12,18 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.agents.agent_factory import AgentFactory
 from src.agents.base_agent import AgentConfig, AgentType
+from src.agents.kally_agent import KallyAgent
 from src.api.endpoints import agents, health, tasks
+from src.api.endpoints.cde import router as cde_router
+from src.api.endpoints.ide import router as ide_router
+from src.api.endpoints.platform import router as platform_router
 from src.api.middleware.auth import APIKeyMiddleware
+from src.cde.cde_agent import CDEAgent
 from src.execution.execution_agent import ExecutionAgent
 from src.execution.execution_engine import ExecutionEngine
+from src.ide.ide_agent import IDEAgent
+from src.platform.developer_portal import DeveloperPortal
+from src.platform.tool_landscape import ToolLandscape
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +44,43 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _register_default_agents(factory, execution_agent)
     app.state.agent_factory = factory
 
-    logger.info("AGI System initialised with %d agents", len(factory.list_agents()))
+    # Vibecoding IDE
+    ide_config = AgentConfig(
+        name="ide_agent",
+        agent_type=AgentType.IDE,
+        description="AI-powered coding assistant for the vibecoding IDE",
+        capabilities=["code_completion", "code_explanation", "refactoring", "bug_fixing"],
+    )
+    app.state.ide_agent = IDEAgent(config=ide_config, execution_agent=execution_agent)
+
+    # Cloud Development Environment
+    cde_config = AgentConfig(
+        name="cde_agent",
+        agent_type=AgentType.CDE,
+        description="Cloud development environment lifecycle manager",
+        capabilities=["env_provisioning", "env_management"],
+    )
+    app.state.cde_agent = CDEAgent(config=cde_config, execution_agent=execution_agent)
+
+    # Platform tooling landscape
+    app.state.tool_landscape = ToolLandscape(load_defaults=True)
+
+    # Internal/External developer portal
+    app.state.developer_portal = DeveloperPortal(load_defaults=True)
+
+    # Kally AI closed-loop agent
+    kally_config = AgentConfig(
+        name="kally_agent",
+        agent_type=AgentType.KALLY,
+        description="Kally AI — closed-loop feedback and continuous improvement",
+        capabilities=["signal_ingestion", "anomaly_detection", "auto_correction"],
+    )
+    app.state.kally_agent = KallyAgent(config=kally_config, execution_agent=execution_agent)
+
+    logger.info(
+        "AGI System initialised with %d agents + IDE + CDE + Kally AI + Platform",
+        len(factory.list_agents()),
+    )
     yield
 
     logger.info("AGI System shutting down...")
@@ -109,6 +153,9 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(agents.router)
     app.include_router(tasks.router)
+    app.include_router(ide_router)
+    app.include_router(cde_router)
+    app.include_router(platform_router)
 
     return app
 
