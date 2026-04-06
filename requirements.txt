@@ -1,3 +1,4 @@
+aiofiles>=23.0.0
 langchain>=0.1.0
 langchain-community>=0.0.10
 crewai>=0.1.0
