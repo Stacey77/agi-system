@@ -2,10 +2,40 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import struct
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+class _OfflineEmbeddingFunction:
+    """Hash-based embedding function that requires no network access or model downloads."""
+
+    _DIM = 64  # fixed embedding dimension
+
+    def name(self) -> str:  # noqa: D401
+        return "offline_hash"
+
+    def embed_query(self, input: List[str]) -> List[List[float]]:  # noqa: A001
+        return self(input)
+
+    def __call__(self, input: List[str]) -> List[List[float]]:  # noqa: A001
+        embeddings: List[List[float]] = []
+        for text in input:
+            floats: List[float] = []
+            seed = text.encode()
+            chunk = 0
+            while len(floats) < self._DIM:
+                digest = hashlib.sha256(seed + struct.pack("I", chunk)).digest()
+                for i in range(0, len(digest) - 3, 4):
+                    floats.append(struct.unpack("f", digest[i : i + 4])[0])
+                    if len(floats) == self._DIM:
+                        break
+                chunk += 1
+            embeddings.append(floats[: self._DIM])
+        return embeddings
 
 
 class VectorStore:
@@ -32,12 +62,14 @@ class VectorStore:
         try:
             import chromadb  # type: ignore[import]
 
+            ef = _OfflineEmbeddingFunction()
             if self._persist_directory:
                 self._client = chromadb.PersistentClient(path=self._persist_directory)
             else:
-                self._client = chromadb.Client()
+                self._client = chromadb.EphemeralClient()
             self._collection = self._client.get_or_create_collection(
-                self._collection_name
+                self._collection_name,
+                embedding_function=ef,  # type: ignore[arg-type]
             )
             logger.info("VectorStore: ChromaDB collection '%s' ready", self._collection_name)
         except ImportError:
@@ -67,10 +99,12 @@ class VectorStore:
                     }
                 )
             return
+        # ChromaDB requires every metadata dict to be non-empty.
+        normalized = [m or {"_type": "document"} for m in (metadatas or [{} for _ in documents])]
         self._collection.add(  # type: ignore[union-attr]
             documents=documents,
             ids=ids,
-            metadatas=metadatas or [{} for _ in documents],
+            metadatas=normalized,
         )
         logger.debug("VectorStore: added %d documents", len(documents))
 

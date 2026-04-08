@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AGI System</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f1117;
+      --surface:  #1a1d27;
+      --border:   #2a2d3a;
+      --accent:   #6c8ef7;
+      --accent2:  #a78bfa;
+      --success:  #34d399;
+      --warn:     #fbbf24;
+      --danger:   #f87171;
+      --text:     #e2e8f0;
+      --muted:    #7c8591;
+      --radius:   8px;
+      --mono:     "JetBrains Mono", "Fira Code", monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    header h1 { font-size: 18px; font-weight: 700; letter-spacing: -.3px; }
+    header h1 span { color: var(--accent); }
+    .header-controls { display: flex; gap: 8px; align-items: center; margin-left: auto; flex-wrap: wrap; }
+    .header-controls input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 5px 10px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      width: 200px;
+    }
+    #health-badge {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--border);
+      color: var(--muted);
+    }
+    #health-badge.healthy { background: rgba(52,211,153,.15); color: var(--success); }
+    #health-badge.degraded { background: rgba(251,191,36,.15); color: var(--warn); }
+    #health-badge.error { background: rgba(248,113,113,.15); color: var(--danger); }
+
+    /* ── Tabs ── */
+    nav {
+      display: flex;
+      gap: 2px;
+      padding: 0 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    nav button {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      transition: color .15s;
+    }
+    nav button:hover { color: var(--text); }
+    nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Main layout ── */
+    main { padding: 24px; max-width: 1100px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* ── Form controls ── */
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+    input[type="text"], input[type="number"], select, textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-family: inherit;
+      margin-bottom: 12px;
+    }
+    textarea { resize: vertical; min-height: 80px; font-family: var(--mono); font-size: 12px; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .row > * { flex: 1; min-width: 160px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px;
+      border: none; border-radius: var(--radius);
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: var(--border); color: var(--text); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+
+    /* ── Status chips ── */
+    .chip {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .chip-green  { background: rgba(52,211,153,.15); color: var(--success); }
+    .chip-yellow { background: rgba(251,191,36,.15);  color: var(--warn); }
+    .chip-red    { background: rgba(248,113,113,.15); color: var(--danger); }
+    .chip-blue   { background: rgba(108,142,247,.15); color: var(--accent); }
+    .chip-gray   { background: var(--border);         color: var(--muted); }
+
+    /* ── Output box ── */
+    .output {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      font-family: var(--mono);
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 300px;
+      overflow-y: auto;
+      color: #a3e4b7;
+      margin-top: 12px;
+      display: none;
+    }
+    .output.visible { display: block; }
+    .output.error { color: var(--danger); }
+
+    /* ── Table ── */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 8px 10px; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+    td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.02); }
+
+    /* ── Grid ── */
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+
+    /* ── Component health ── */
+    .health-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+    .health-item {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      min-width: 180px;
+    }
+    .health-item .hi-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .health-item .hi-val { font-size: 13px; font-weight: 600; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Section header ── */
+    .section-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px;
+    }
+    .section-header h2 { font-size: 15px; font-weight: 600; }
+    .section-header .count {
+      background: var(--border);
+      color: var(--muted);
+      border-radius: 12px;
+      padding: 1px 8px;
+      font-size: 11px;
+    }
+
+    /* ── Empty state ── */
+    .empty { color: var(--muted); text-align: center; padding: 32px; font-size: 13px; }
+
+    /* ── Tags ── */
+    .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .tag {
+      background: var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════ Header ═══════════════════════ -->
+<header>
+  <h1>AGI <span>System</span></h1>
+  <div class="header-controls">
+    <div>
+      <input id="base-url" type="text" placeholder="http://localhost:8000" value="http://localhost:8000" title="API base URL" />
+    </div>
+    <div>
+      <input id="api-key" type="text" placeholder="API Key (optional)" title="X-API-Key header" />
+    </div>
+    <span id="health-badge">●&nbsp;checking…</span>
+  </div>
+</header>
+
+<!-- ═══════════════════════ Nav ═══════════════════════ -->
+<nav id="tab-nav">
+  <button class="active" data-tab="health">Health</button>
+  <button data-tab="agents">Agents</button>
+  <button data-tab="tasks">Tasks</button>
+  <button data-tab="ide">IDE</button>
+  <button data-tab="cde">CDE</button>
+  <button data-tab="platform">Platform</button>
+  <button data-tab="kally">Kally AI</button>
+</nav>
+
+<!-- ═══════════════════════ Main ═══════════════════════ -->
+<main>
+
+  <!-- ── Health ── -->
+  <div id="tab-health" class="tab-panel active">
+    <div class="card">
+      <div class="card-title">System health</div>
+      <div id="health-status" class="health-grid"><div class="spinner"></div></div>
+      <div class="btn-group" style="margin-top:16px">
+        <button class="btn btn-secondary" onclick="loadHealth()">↺ Refresh</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Agents ── -->
+  <div id="tab-agents" class="tab-panel">
+    <div class="card">
+      <div class="section-header">
+        <h2>Registered agents</h2>
+        <span class="count" id="agent-count">–</span>
+        <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadAgents()">↺ Refresh</button>
+      </div>
+      <div id="agents-table"><div class="spinner"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Execute agent task</div>
+      <label>Agent name</label>
+      <input id="exec-agent" type="text" placeholder="e.g. research_agent" />
+      <label>Task</label>
+      <textarea id="exec-task" placeholder="Describe the task…"></textarea>
+      <label>Extra parameters (JSON object)</label>
+      <textarea id="exec-params" placeholder='{"key": "value"}' style="min-height:50px"></textarea>
+      <button class="btn btn-primary" onclick="executeAgent(event)">▶ Execute</button>
+      <div id="exec-output" class="output"></div>
+    </div>
+  </div>
+
+  <!-- ── Tasks ── -->
+  <div id="tab-tasks" class="tab-panel">
+    <div class="card">
+      <div class="card-title">Submit task</div>
+      <label>Objective</label>
+      <textarea id="task-objective" placeholder="Research and summarise recent AI developments…"></textarea>
+      <label>Parameters (JSON object)</label>
+      <textarea id="task-params" placeholder='{}' style="min-height:50px"></textarea>
+      <button class="btn btn-primary" onclick="submitTask(event)">▶ Submit</button>
+      <div id="task-submit-output" class="output"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Look up task</div>
+      <label>Task ID</label>
+      <input id="task-lookup-id" type="text" placeholder="uuid…" />
+      <div class="btn-group">
+        <button class="btn btn-secondary" onclick="getTask(event)">Get status</button>
+        <button class="btn btn-danger btn-sm" onclick="cancelTask(event)">Cancel</button>
+      </div>
+      <div id="task-lookup-output" class="output"></div>
+    </div>
+  </div>
+
+  <!-- ── IDE ── -->
+  <div id="tab-ide" class="tab-panel">
+    <div class="card">
+      <div class="section-header">
+        <h2>IDE sessions</h2>
+        <span class="count" id="ide-session-count">–</span>
+        <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadIDESessions()">↺ Refresh</button>
+      </div>
+      <div id="ide-sessions-table"><div class="spinner"></div></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">New session</div>
+        <label>Language</label>
+        <select id="ide-lang">
+          <option>python</option><option>javascript</option><option>typescript</option>
+          <option>go</option><option>rust</option><option>java</option>
+        </select>
+        <label>Context</label>
+        <textarea id="ide-context" placeholder="Any initial context…" style="min-height:50px"></textarea>
+        <button class="btn btn-primary" onclick="createIDESession(event)">Create session</button>
+        <div id="ide-create-output" class="output"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Code action</div>
+        <label>Action</label>
+        <select id="ide-action">
+          <option>complete</option><option>explain</option><option>refactor</option>
+          <option>fix</option><option>generate</option><option>review</option>
+        </select>
+        <label>Prompt / code snippet</label>
+        <textarea id="ide-prompt" placeholder="Write a function that…"></textarea>
+        <label>Session ID (optional)</label>
+        <input id="ide-session-id" type="text" placeholder="session-uuid" />
+        <button class="btn btn-primary" onclick="runCodeAction(event)">▶ Run action</button>
+        <div id="ide-action-output" class="output"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CDE ── -->
+  <div id="tab-cde" class="tab-panel">
+    <div class="card">
+      <div class="section-header">
+        <h2>Environments</h2>
+        <span class="count" id="cde-env-count">–</span>
+        <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadCDEEnvironments()">↺ Refresh</button>
+      </div>
+      <div id="cde-envs-table"><div class="spinner"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Provision environment</div>
+      <div class="row">
+        <div>
+          <label>Name</label>
+          <input id="cde-name" type="text" placeholder="my-cde" value="my-cde" />
+        </div>
+        <div>
+          <label>Runtime</label>
+          <select id="cde-runtime">
+            <option>python</option><option>node</option><option>go</option><option>rust</option>
+          </select>
+        </div>
+        <div>
+          <label>Owner</label>
+          <input id="cde-owner" type="text" placeholder="alice" />
+        </div>
+      </div>
+      <label>Repository URL (optional)</label>
+      <input id="cde-repo" type="text" placeholder="https://github.com/org/repo" />
+      <button class="btn btn-primary" onclick="createCDE(event)">▶ Provision</button>
+      <div id="cde-create-output" class="output"></div>
+    </div>
+  </div>
+
+  <!-- ── Platform ── -->
+  <div id="tab-platform" class="tab-panel">
+    <div class="grid-2">
+      <div class="card">
+        <div class="section-header">
+          <h2>Tool landscape</h2>
+          <span class="count" id="tools-count">–</span>
+          <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadTools()">↺</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="tools-search" type="text" placeholder="Search tools…" style="margin-bottom:0;flex:1" oninput="searchTools(this.value)" />
+        </div>
+        <div id="tools-table" style="max-height:320px;overflow-y:auto"><div class="spinner"></div></div>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <h2>Developer portal</h2>
+          <span class="count" id="services-count">–</span>
+          <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadServices()">↺</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="services-search" type="text" placeholder="Search services…" style="margin-bottom:0;flex:1" oninput="searchServices(this.value)" />
+        </div>
+        <div id="services-table" style="max-height:320px;overflow-y:auto"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Register tool</div>
+      <div class="row">
+        <div>
+          <label>Name</label>
+          <input id="reg-tool-name" type="text" placeholder="my-tool" />
+        </div>
+        <div>
+          <label>Category</label>
+          <select id="reg-tool-cat">
+            <option value="search">search</option><option value="compute">compute</option>
+            <option value="storage">storage</option><option value="ml">ml</option>
+            <option value="devops">devops</option><option value="monitoring">monitoring</option>
+            <option value="communication">communication</option><option value="other">other</option>
+          </select>
+        </div>
+        <div>
+          <label>Tier</label>
+          <select id="reg-tool-tier">
+            <option value="internal">internal</option><option value="external">external</option>
+            <option value="both">both</option>
+          </select>
+        </div>
+      </div>
+      <label>Description</label>
+      <input id="reg-tool-desc" type="text" placeholder="Brief description…" />
+      <button class="btn btn-primary" onclick="registerTool(event)">Register tool</button>
+      <div id="reg-tool-output" class="output"></div>
+    </div>
+  </div>
+
+  <!-- ── Kally AI ── -->
+  <div id="tab-kally" class="tab-panel">
+    <div class="card">
+      <div class="card-title">Kally AI — closed-loop feedback</div>
+      <div class="btn-group">
+        <button class="btn btn-secondary" onclick="kallyReport(event)">📊 Report</button>
+        <button class="btn btn-secondary" onclick="kallyAnalyse(event)">🔍 Analyse</button>
+        <button class="btn btn-danger btn-sm" onclick="kallyReset(event)">Reset</button>
+      </div>
+      <div id="kally-output" class="output"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Ingest signal</div>
+      <div class="row">
+        <div>
+          <label>Source</label>
+          <input id="sig-source" type="text" placeholder="api-gateway" />
+        </div>
+        <div>
+          <label>Metric</label>
+          <input id="sig-metric" type="text" placeholder="error_rate" />
+        </div>
+        <div>
+          <label>Value</label>
+          <input id="sig-value" type="number" placeholder="0.42" step="any" />
+        </div>
+        <div>
+          <label>Threshold</label>
+          <input id="sig-threshold" type="number" placeholder="0.1" step="any" />
+        </div>
+        <div>
+          <label>Severity</label>
+          <select id="sig-severity">
+            <option>info</option><option>warning</option><option>critical</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="ingestSignal(event)">▶ Ingest</button>
+      <div id="sig-output" class="output"></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ────────────────────────── Helpers ──────────────────────────
+
+function base() { return (document.getElementById('base-url').value || '').replace(/\/$/, ''); }
+function apiKey() { return document.getElementById('api-key').value.trim(); }
+
+async function apiFetch(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  const key = apiKey();
+  if (key) headers['X-API-Key'] = key;
+  const res = await fetch(base() + path, { ...opts, headers });
+  const data = await res.json().catch(() => ({ detail: res.statusText }));
+  if (!res.ok) throw Object.assign(new Error(data.detail || res.statusText), { data });
+  return data;
+}
+
+function show(el, content, isError = false) {
+  el.textContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+  el.classList.add('visible');
+  el.classList.toggle('error', isError);
+}
+
+async function run(btnEl, fn) {
+  const orig = btnEl.innerHTML;
+  btnEl.disabled = true;
+  btnEl.innerHTML = '<span class="spinner"></span>';
+  try { await fn(); } finally { btnEl.disabled = false; btnEl.innerHTML = orig; }
+}
+
+function statusChip(s) {
+  if (!s) return '';
+  const map = { healthy:'green', ready:'green', running:'green', active:'green',
+                 degraded:'yellow', pending:'yellow', queued:'yellow', starting:'yellow',
+                 failed:'red', error:'red', unhealthy:'red', cancelled:'red',
+                 stopped:'gray', closed:'gray', completed:'blue' };
+  const cls = map[String(s).toLowerCase()] || 'gray';
+  return `<span class="chip chip-${cls}">${s}</span>`;
+}
+
+// ────────────────────────── Tabs ──────────────────────────
+
+const tabLoaders = {};
+document.getElementById('tab-nav').addEventListener('click', e => {
+  const btn = e.target.closest('[data-tab]');
+  if (!btn) return;
+  document.querySelectorAll('#tab-nav button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  if (tabLoaders[btn.dataset.tab]) tabLoaders[btn.dataset.tab]();
+});
+
+// ────────────────────────── Health ──────────────────────────
+
+async function loadHealth() {
+  const badge = document.getElementById('health-badge');
+  const grid  = document.getElementById('health-status');
+  grid.innerHTML = '<div class="spinner"></div>';
+  badge.className = '';
+  badge.textContent = '● checking…';
+  try {
+    const data = await apiFetch('/health/detailed');
+    badge.className = data.status === 'healthy' ? 'healthy' : 'degraded';
+    badge.textContent = '● ' + (data.status || 'unknown');
+    const comps = data.components || {};
+    grid.innerHTML = Object.entries(comps).map(([k, v]) => {
+      const ok = v === 'healthy';
+      return `<div class="health-item">
+        <div class="hi-label">${k.replace(/_/g,' ')}</div>
+        <div class="hi-val" style="color:var(--${ok?'success':'danger'})">${v}</div>
+      </div>`;
+    }).join('') || '<div class="health-item"><div class="hi-val" style="color:var(--success)">healthy</div></div>';
+  } catch (err) {
+    badge.className = 'error';
+    badge.textContent = '● error';
+    grid.innerHTML = `<span style="color:var(--danger)">${err.message}</span>`;
+  }
+}
+
+// ────────────────────────── Agents ──────────────────────────
+
+async function loadAgents() {
+  const container = document.getElementById('agents-table');
+  const countEl   = document.getElementById('agent-count');
+  container.innerHTML = '<div class="spinner"></div>';
+  try {
+    const agents = await apiFetch('/api/v1/agents/');
+    countEl.textContent = agents.length;
+    if (!agents.length) { container.innerHTML = '<div class="empty">No agents registered</div>'; return; }
+    container.innerHTML = `<table>
+      <thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Capabilities</th></tr></thead>
+      <tbody>${agents.map(a => `<tr>
+        <td><strong>${a.name}</strong></td>
+        <td><code style="font-size:11px">${a.type || '–'}</code></td>
+        <td>${statusChip(a.status)}</td>
+        <td><div class="tags">${(a.capabilities||[]).map(c=>`<span class="tag">${c}</span>`).join('')}</div></td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--danger)">${err.message}</div>`;
+  }
+}
+
+async function executeAgent(event) {
+  const btn  = event.target;
+  const name = document.getElementById('exec-agent').value.trim();
+  const task = document.getElementById('exec-task').value.trim();
+  const out  = document.getElementById('exec-output');
+  if (!name || !task) { show(out, 'Agent name and task are required.', true); return; }
+  let params = {};
+  try { params = JSON.parse(document.getElementById('exec-params').value || '{}'); } catch { show(out, 'Invalid JSON in parameters.', true); return; }
+  await run(btn, async () => {
+    try { show(out, await apiFetch(`/api/v1/agents/${encodeURIComponent(name)}/execute`, { method:'POST', body: JSON.stringify({ task, parameters: params }) })); }
+    catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+// ────────────────────────── Tasks ──────────────────────────
+
+async function submitTask(event) {
+  const btn = event.target;
+  const out = document.getElementById('task-submit-output');
+  const obj = document.getElementById('task-objective').value.trim();
+  if (!obj) { show(out, 'Objective is required.', true); return; }
+  let params = {};
+  try { params = JSON.parse(document.getElementById('task-params').value || '{}'); } catch { show(out, 'Invalid JSON in parameters.', true); return; }
+  await run(btn, async () => {
+    try {
+      const r = await apiFetch('/api/v1/tasks/', { method:'POST', body: JSON.stringify({ objective: obj, parameters: params }) });
+      document.getElementById('task-lookup-id').value = r.task_id || '';
+      show(out, r);
+    } catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+async function getTask(event) {
+  const btn = event.target;
+  const id  = document.getElementById('task-lookup-id').value.trim();
+  const out = document.getElementById('task-lookup-output');
+  if (!id) { show(out, 'Task ID is required.', true); return; }
+  await run(btn, async () => {
+    try { show(out, await apiFetch(`/api/v1/tasks/${encodeURIComponent(id)}`)); }
+    catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+async function cancelTask(event) {
+  const btn = event.target;
+  const id  = document.getElementById('task-lookup-id').value.trim();
+  const out = document.getElementById('task-lookup-output');
+  if (!id) { show(out, 'Task ID is required.', true); return; }
+  await run(btn, async () => {
+    try { show(out, await apiFetch(`/api/v1/tasks/${encodeURIComponent(id)}`, { method:'DELETE' })); }
+    catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+// ────────────────────────── IDE ──────────────────────────
+
+async function loadIDESessions() {
+  const container = document.getElementById('ide-sessions-table');
+  const countEl   = document.getElementById('ide-session-count');
+  container.innerHTML = '<div class="spinner"></div>';
+  try {
+    const data = await apiFetch('/api/v1/ide/sessions');
+    const sessions = data.sessions || [];
+    countEl.textContent = `${data.active||0} active / ${data.total||0} total`;
+    if (!sessions.length) { container.innerHTML = '<div class="empty">No sessions yet</div>'; return; }
+    container.innerHTML = `<table>
+      <thead><tr><th>ID</th><th>Language</th><th>Status</th><th>Created</th></tr></thead>
+      <tbody>${sessions.map(s => `<tr>
+        <td><code style="font-size:11px">${s.session_id||s.id||'–'}</code></td>
+        <td>${s.language||'–'}</td>
+        <td>${statusChip(s.status)}</td>
+        <td>${s.created_at ? new Date(s.created_at).toLocaleString() : '–'}</td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--danger)">${err.message}</div>`;
+  }
+}
+
+async function createIDESession(event) {
+  const btn  = event.target;
+  const out  = document.getElementById('ide-create-output');
+  await run(btn, async () => {
+    try {
+      const r = await apiFetch('/api/v1/ide/sessions', { method:'POST', body: JSON.stringify({
+        language: document.getElementById('ide-lang').value,
+        context:  document.getElementById('ide-context').value,
+      })});
+      const sid = (r.session || {}).session_id || (r.session || {}).id;
+      if (sid) document.getElementById('ide-session-id').value = sid;
+      show(out, r);
+      loadIDESessions();
+    } catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+async function runCodeAction(event) {
+  const btn = event.target;
+  const out = document.getElementById('ide-action-output');
+  const prompt = document.getElementById('ide-prompt').value.trim();
+  if (!prompt) { show(out, 'Prompt is required.', true); return; }
+  await run(btn, async () => {
+    try { show(out, await apiFetch('/api/v1/ide/actions', { method:'POST', body: JSON.stringify({
+      action:     document.getElementById('ide-action').value,
+      prompt,
+      language:   document.getElementById('ide-lang').value,
+      session_id: document.getElementById('ide-session-id').value.trim() || null,
+    })})); }
+    catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+// ────────────────────────── CDE ──────────────────────────
+
+async function loadCDEEnvironments() {
+  const container = document.getElementById('cde-envs-table');
+  const countEl   = document.getElementById('cde-env-count');
+  container.innerHTML = '<div class="spinner"></div>';
+  try {
+    const data = await apiFetch('/api/v1/cde/environments');
+    const envs = data.environments || [];
+    countEl.textContent = envs.length;
+    if (!envs.length) { container.innerHTML = '<div class="empty">No environments provisioned</div>'; return; }
+    container.innerHTML = `<table>
+      <thead><tr><th>ID</th><th>Name</th><th>Runtime</th><th>Status</th><th>Owner</th><th>Actions</th></tr></thead>
+      <tbody>${envs.map(e => `<tr>
+        <td><code style="font-size:11px">${e.env_id||e.id||'–'}</code></td>
+        <td>${e.name||'–'}</td>
+        <td>${e.runtime||'–'}</td>
+        <td>${statusChip(e.status)}</td>
+        <td>${e.owner||'–'}</td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="cdeAction('start','${e.env_id||e.id}')">Start</button>
+          <button class="btn btn-secondary btn-sm" onclick="cdeAction('stop','${e.env_id||e.id}')">Stop</button>
+          <button class="btn btn-danger btn-sm" onclick="cdeDelete('${e.env_id||e.id}')">Delete</button>
+        </td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--danger)">${err.message}</div>`;
+  }
+}
+
+async function createCDE(event) {
+  const btn = event.target;
+  const out = document.getElementById('cde-create-output');
+  await run(btn, async () => {
+    try {
+      const r = await apiFetch('/api/v1/cde/environments', { method:'POST', body: JSON.stringify({
+        name:           document.getElementById('cde-name').value,
+        runtime:        document.getElementById('cde-runtime').value,
+        owner:          document.getElementById('cde-owner').value,
+        repository_url: document.getElementById('cde-repo').value || null,
+      })});
+      show(out, r);
+      loadCDEEnvironments();
+    } catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+async function cdeAction(action, envId) {
+  try {
+    await apiFetch(`/api/v1/cde/environments/${encodeURIComponent(envId)}/${action}`, { method:'POST' });
+    loadCDEEnvironments();
+  } catch (err) { alert(err.message); }
+}
+
+async function cdeDelete(envId) {
+  if (!confirm(`Delete environment ${envId}?`)) return;
+  try {
+    await apiFetch(`/api/v1/cde/environments/${encodeURIComponent(envId)}`, { method:'DELETE' });
+    loadCDEEnvironments();
+  } catch (err) { alert(err.message); }
+}
+
+// ────────────────────────── Platform tools ──────────────────────────
+
+let _allTools = [];
+async function loadTools() {
+  const container = document.getElementById('tools-table');
+  const countEl   = document.getElementById('tools-count');
+  container.innerHTML = '<div class="spinner"></div>';
+  try {
+    const data = await apiFetch('/api/v1/platform/tools');
+    _allTools = data.tools || [];
+    countEl.textContent = data.total || 0;
+    renderTools(_allTools);
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--danger)">${err.message}</div>`;
+  }
+}
+
+function renderTools(tools) {
+  const container = document.getElementById('tools-table');
+  if (!tools.length) { container.innerHTML = '<div class="empty">No tools registered</div>'; return; }
+  container.innerHTML = `<table>
+    <thead><tr><th>Name</th><th>Category</th><th>Tier</th></tr></thead>
+    <tbody>${tools.map(t => `<tr>
+      <td><strong>${t.name}</strong><br/><span style="color:var(--muted);font-size:11px">${t.description||''}</span></td>
+      <td><span class="chip chip-blue">${t.category||'–'}</span></td>
+      <td>${t.tier||'–'}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+async function searchTools(q) {
+  if (!q.trim()) { renderTools(_allTools); return; }
+  try {
+    const data = await apiFetch(`/api/v1/platform/tools/search?q=${encodeURIComponent(q)}`);
+    renderTools(data.tools || []);
+  } catch { renderTools(_allTools.filter(t => t.name.includes(q))); }
+}
+
+let _allServices = [];
+async function loadServices() {
+  const container = document.getElementById('services-table');
+  const countEl   = document.getElementById('services-count');
+  container.innerHTML = '<div class="spinner"></div>';
+  try {
+    const data = await apiFetch('/api/v1/platform/portal/services');
+    _allServices = data.services || [];
+    countEl.textContent = data.total || 0;
+    renderServices(_allServices);
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--danger)">${err.message}</div>`;
+  }
+}
+
+function renderServices(services) {
+  const container = document.getElementById('services-table');
+  if (!services.length) { container.innerHTML = '<div class="empty">No services registered</div>'; return; }
+  container.innerHTML = `<table>
+    <thead><tr><th>Name</th><th>Tier</th><th>Status</th></tr></thead>
+    <tbody>${services.map(s => `<tr>
+      <td><strong>${s.name}</strong><br/><span style="color:var(--muted);font-size:11px">${s.description||''}</span></td>
+      <td><span class="chip chip-blue">${s.tier||'–'}</span></td>
+      <td>${statusChip(s.status||'healthy')}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+function searchServices(q) {
+  if (!q.trim()) { renderServices(_allServices); return; }
+  const lq = q.toLowerCase();
+  renderServices(_allServices.filter(s => s.name.toLowerCase().includes(lq) || (s.description||'').toLowerCase().includes(lq)));
+}
+
+async function registerTool(event) {
+  const btn = event.target;
+  const out = document.getElementById('reg-tool-output');
+  const name = document.getElementById('reg-tool-name').value.trim();
+  if (!name) { show(out, 'Name is required.', true); return; }
+  await run(btn, async () => {
+    try {
+      const r = await apiFetch('/api/v1/platform/tools', { method:'POST', body: JSON.stringify({
+        name,
+        description: document.getElementById('reg-tool-desc').value,
+        category:    document.getElementById('reg-tool-cat').value,
+        tier:        document.getElementById('reg-tool-tier').value,
+      })});
+      show(out, r);
+      loadTools();
+    } catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+// ────────────────────────── Kally ──────────────────────────
+
+async function kallyReport(event) {
+  const btn = event.target;
+  const out = document.getElementById('kally-output');
+  await run(btn, async () => {
+    try { show(out, await apiFetch('/api/v1/platform/kally/report')); }
+    catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+async function kallyAnalyse(event) {
+  const btn = event.target;
+  const out = document.getElementById('kally-output');
+  await run(btn, async () => {
+    try { show(out, await apiFetch('/api/v1/platform/kally/analyse', { method:'POST' })); }
+    catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+async function kallyReset(event) {
+  if (!confirm('Reset Kally signal buffer?')) return;
+  const btn = event.target;
+  const out = document.getElementById('kally-output');
+  await run(btn, async () => {
+    try { show(out, await apiFetch('/api/v1/platform/kally/reset', { method:'POST' })); }
+    catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+async function ingestSignal(event) {
+  const btn = event.target;
+  const out = document.getElementById('sig-output');
+  await run(btn, async () => {
+    try { show(out, await apiFetch('/api/v1/platform/kally/signals', { method:'POST', body: JSON.stringify({
+      source:    document.getElementById('sig-source').value,
+      metric:    document.getElementById('sig-metric').value,
+      value:     parseFloat(document.getElementById('sig-value').value) || 0,
+      threshold: parseFloat(document.getElementById('sig-threshold').value) || 0,
+      severity:  document.getElementById('sig-severity').value,
+    })})); }
+    catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+// ────────────────────────── Tab loaders ──────────────────────────
+
+tabLoaders['agents']   = loadAgents;
+tabLoaders['ide']      = loadIDESessions;
+tabLoaders['cde']      = loadCDEEnvironments;
+tabLoaders['platform'] = () => { loadTools(); loadServices(); };
+
+// ────────────────────────── Init ──────────────────────────
+
+loadHealth();
+</script>
+</body>
+</html>

@@ -9,6 +9,8 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.agents.agent_factory import AgentFactory
 from src.agents.base_agent import AgentConfig, AgentType
@@ -156,6 +158,14 @@ def create_app() -> FastAPI:
     app.include_router(ide_router)
     app.include_router(cde_router)
     app.include_router(platform_router)
+
+    # Static dashboard — served at / and /static
+    _static_dir = os.path.join(os.path.dirname(__file__), "static")
+    app.mount("/static", StaticFiles(directory=_static_dir), name="static")
+
+    @app.get("/", include_in_schema=False)
+    async def dashboard() -> FileResponse:
+        return FileResponse(os.path.join(_static_dir, "index.html"))
 
     return app
 

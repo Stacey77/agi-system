@@ -14,7 +14,7 @@ from starlette.types import ASGIApp
 logger = logging.getLogger(__name__)
 
 _AUTH_HEADER = "X-API-Key"
-_EXCLUDED_PATHS = {"/health", "/health/detailed", "/docs", "/openapi.json", "/redoc"}
+_EXCLUDED_PATHS = {"/health", "/health/detailed", "/docs", "/openapi.json", "/redoc", "/"}
 
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
@@ -25,8 +25,8 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         self._api_key = api_key or os.getenv("API_KEY", "")
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # Skip auth for excluded paths
-        if request.url.path in _EXCLUDED_PATHS:
+        # Skip auth for excluded paths (exact match) or static assets
+        if request.url.path in _EXCLUDED_PATHS or request.url.path.startswith("/static/"):
             return await call_next(request)
 
         # Skip auth if no key is configured (dev mode)
