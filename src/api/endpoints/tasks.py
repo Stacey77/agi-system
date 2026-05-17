@@ -1,20 +1,21 @@
-"""Task management endpoints."""
+"""Task management endpoints — async queue-backed submission with SSE progress."""
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
-import uuid
 from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+from src.tasks.queue import TaskRecord, TaskStatus
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/tasks", tags=["tasks"])
-
-# In-memory task store (production would use Redis/DB)
-_tasks: Dict[str, Dict[str, Any]] = {}
 
 
 class TaskSubmission(BaseModel):
@@ -24,58 +25,98 @@ class TaskSubmission(BaseModel):
 
 @router.post("/")
 async def submit_task(body: TaskSubmission, request: Request) -> Dict[str, Any]:
-    """Submit a complex task to the AGI system."""
-    task_id = str(uuid.uuid4())
-    _tasks[task_id] = {
-        "task_id": task_id,
-        "objective": body.objective,
-        "status": "pending",
-        "result": None,
-    }
+    """Submit a task to the async queue; returns task_id immediately."""
+    queue = getattr(request.app.state, "task_queue", None)
+    if queue is None:
+        raise HTTPException(status_code=503, detail="Task queue not initialised")
 
-    execution_agent = getattr(request.app.state, "execution_agent", None)
-    if execution_agent is None:
-        _tasks[task_id]["status"] = "queued"
-        return {"task_id": task_id, "status": "queued"}
-
-    _tasks[task_id]["status"] = "running"
-    try:
-        plan: Dict[str, Any] = {
-            "tasks": [
-                {
-                    "task_id": f"{task_id}_main",
-                    "action": "process",
-                    "objective": body.objective,
-                    **body.parameters,
-                }
-            ],
-            "dependencies": {},
-        }
-        result = await execution_agent.execute_plan(plan)
-        _tasks[task_id].update({"status": "completed", "result": result})
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Task '%s' failed: %s", task_id, exc)
-        _tasks[task_id].update({"status": "failed", "error": str(exc)})
-
-    return {"task_id": task_id, "status": _tasks[task_id]["status"]}
+    record = await queue.submit(body.objective, body.parameters)
+    return {"task_id": record.task_id, "status": record.status, "objective": record.objective}
 
 
 @router.get("/{task_id}")
-async def get_task(task_id: str) -> Dict[str, Any]:
-    """Get the status and result of a task."""
-    task = _tasks.get(task_id)
-    if task is None:
+async def get_task(task_id: str, request: Request) -> Dict[str, Any]:
+    """Get the current status and result of a task."""
+    queue = getattr(request.app.state, "task_queue", None)
+    if queue is None:
+        raise HTTPException(status_code=503, detail="Task queue not initialised")
+
+    record = queue.get(task_id)
+    if record is None:
         raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
-    return task
+    return record.to_dict()
+
+
+@router.get("/")
+async def list_tasks(request: Request) -> Dict[str, Any]:
+    """List all tasks with their statuses."""
+    queue = getattr(request.app.state, "task_queue", None)
+    if queue is None:
+        return {"tasks": [], "total": 0}
+
+    records = queue.list_all()
+    by_status: Dict[str, int] = {}
+    for r in records:
+        by_status[r.status] = by_status.get(r.status, 0) + 1
+
+    return {
+        "tasks": [r.to_dict() for r in records],
+        "total": len(records),
+        "by_status": by_status,
+    }
 
 
 @router.delete("/{task_id}")
-async def cancel_task(task_id: str) -> Dict[str, str]:
-    """Cancel a running task."""
-    task = _tasks.get(task_id)
-    if task is None:
-        raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
-    if task["status"] not in ("pending", "queued", "running"):
-        return {"message": f"Task '{task_id}' cannot be cancelled (status={task['status']})"}
-    _tasks[task_id]["status"] = "cancelled"
+async def cancel_task(task_id: str, request: Request) -> Dict[str, str]:
+    """Cancel a queued or running task."""
+    queue = getattr(request.app.state, "task_queue", None)
+    if queue is None:
+        raise HTTPException(status_code=503, detail="Task queue not initialised")
+
+    if not queue.cancel(task_id):
+        record = queue.get(task_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
+        return {"message": f"Task '{task_id}' cannot be cancelled (status={record.status})"}
     return {"message": f"Task '{task_id}' cancelled"}
+
+
+@router.get("/{task_id}/stream")
+async def stream_task_progress(task_id: str, request: Request) -> StreamingResponse:
+    """Stream task progress events via Server-Sent Events until completion."""
+    queue = getattr(request.app.state, "task_queue", None)
+    if queue is None:
+        raise HTTPException(status_code=503, detail="Task queue not initialised")
+
+    record = queue.get(task_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
+
+    async def _generate():
+        if record.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
+            yield f"data: {json.dumps(record.to_dict())}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+
+        sub_q = await queue.subscribe(task_id)
+        try:
+            yield f"data: {json.dumps(record.to_dict())}\n\n"
+            while True:
+                try:
+                    event = await asyncio.wait_for(sub_q.get(), timeout=30.0)
+                    yield f"data: {json.dumps(event)}\n\n"
+                    if event.get("status") in (
+                        TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED
+                    ):
+                        break
+                except asyncio.TimeoutError:
+                    yield "data: {\"heartbeat\": true}\n\n"
+        finally:
+            queue.unsubscribe(task_id, sub_q)
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

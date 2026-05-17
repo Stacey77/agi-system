@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -132,6 +133,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     app.state.kally_agent = KallyAgent(config=kally_config, execution_agent=execution_agent)
 
+    # Auth: key store and JWT manager
+    from src.auth.key_store import KeyStore
+    from src.auth.jwt_manager import JWTManager
+    app.state.key_store = KeyStore()
+    app.state.jwt_manager = JWTManager(
+        secret=os.getenv("JWT_SECRET", secrets.token_hex(32)),
+        expiry_seconds=int(os.getenv("JWT_EXPIRY_SECONDS", "3600")),
+    )
+
     # Wire the tool registry into all agents
     tool_registry = ToolRegistry()
     tool_registry.register_tool(
@@ -151,6 +161,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if planning_agent is not None:
         planning_agent.set_agent_factory(factory)
 
+    # Task queue
+    from src.tasks.queue import TaskQueue
+
+    async def _default_task_handler(record) -> None:
+        planning = factory.get_agent("planning_agent")
+        if planning is not None:
+            result = await planning.process_task({"objective": record.objective, "task_id": record.task_id})
+            record.result = result
+        else:
+            record.result = {"status": "completed", "summary": record.objective}
+
+    task_queue = TaskQueue()
+    await task_queue.start(_default_task_handler)
+    app.state.task_queue = task_queue
+
     logger.info(
         "AGI System initialised — %d agents, %d tools, IDE + CDE + Kally + Platform",
         len(factory.list_agents()),
@@ -158,6 +183,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     yield
 
+    await task_queue.stop()
     logger.info("AGI System shutting down...")
 
 
@@ -255,6 +281,9 @@ def create_app() -> FastAPI:
     app.include_router(webhooks_router)
     app.include_router(sessions_router)
     app.include_router(eval_router)
+
+    from src.api.endpoints.auth import router as auth_router
+    app.include_router(auth_router)
 
     # Static dashboard — served at / and /static
     _static_dir = os.path.join(os.path.dirname(__file__), "static")
