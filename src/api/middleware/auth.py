@@ -1,9 +1,8 @@
-"""API key authentication middleware."""
+"""API key / JWT authentication middleware."""
 
 from __future__ import annotations
 
 import logging
-import os
 from typing import Callable
 
 from fastapi import Request, Response
@@ -13,29 +12,43 @@ from starlette.types import ASGIApp
 
 logger = logging.getLogger(__name__)
 
-_AUTH_HEADER = "X-API-Key"
 _EXCLUDED_PATHS = {"/health", "/health/detailed", "/docs", "/openapi.json", "/redoc", "/"}
 
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
-    """Validates requests against a configured API key."""
+    """Validates requests via JWT bearer token or direct API key header."""
 
-    def __init__(self, app: ASGIApp, api_key: str | None = None) -> None:
+    def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
-        self._api_key = api_key or os.getenv("API_KEY", "")
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # Skip auth for excluded paths (exact match) or static assets
         if request.url.path in _EXCLUDED_PATHS or request.url.path.startswith("/static/"):
             return await call_next(request)
 
-        # Skip auth if no key is configured (dev mode)
-        if not self._api_key:
-            logger.debug("APIKeyMiddleware: no key configured — skipping auth")
+        key_store = getattr(request.app.state, "key_store", None)
+        jwt_manager = getattr(request.app.state, "jwt_manager", None)
+
+        if key_store is None or not key_store.list_keys():
+            logger.debug("APIKeyMiddleware: no keys configured — skipping auth (dev mode)")
             return await call_next(request)
 
-        provided_key = request.headers.get(_AUTH_HEADER, "")
-        if provided_key != self._api_key:
+        auth_role: str | None = None
+
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer ") and jwt_manager is not None:
+            token = auth_header[len("Bearer "):]
+            payload = jwt_manager.verify_token(token)
+            if payload:
+                auth_role = payload.get("role")
+
+        if auth_role is None:
+            x_api_key = request.headers.get("X-API-Key", "")
+            if x_api_key:
+                api_key = key_store.validate_key(x_api_key)
+                if api_key:
+                    auth_role = api_key.role.value
+
+        if auth_role is None:
             logger.warning(
                 "Unauthorised request to '%s' from %s",
                 request.url.path,
@@ -43,7 +56,8 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             )
             return JSONResponse(
                 status_code=401,
-                content={"detail": "Invalid or missing API key"},
+                content={"detail": "Invalid or missing credentials"},
             )
 
+        request.state.auth_role = auth_role
         return await call_next(request)

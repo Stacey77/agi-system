@@ -1,4 +1,4 @@
-name: Deploy AGI System
+name: CI/CD — AGI System
 
 on:
   push:
@@ -7,7 +7,9 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  # ── Job 1: Lint ────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (ruff)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -20,18 +22,94 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: ruff check
+        run: ruff check src/ tests/ --output-format=github
+
+      - name: ruff format check
+        run: ruff format src/ tests/ --check
+
+  # ── Job 2: Type-check ──────────────────────────────────────────────────────
+  typecheck:
+    name: Type-check (mypy)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install mypy and project dependencies
+        run: pip install mypy -r requirements.txt
+
+      - name: mypy
+        run: mypy src/ --ignore-missing-imports --no-strict-optional
+
+  # ── Job 3: Security ────────────────────────────────────────────────────────
+  security:
+    name: Security (bandit + safety)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install bandit and safety
+        run: pip install bandit safety
+
+      - name: bandit — static security analysis (medium+ severity)
+        run: bandit -r src/ -ll -q
+
+      - name: safety — dependency vulnerability check
+        run: safety check -r requirements.txt --ignore 70612
+        continue-on-error: true
+
+  # ── Job 4: Test ────────────────────────────────────────────────────────────
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    needs: lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
       - name: Cache pip dependencies
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements-dev.txt') }}
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('requirements.txt') }}
           restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run tests with coverage
         run: |
@@ -48,19 +126,59 @@ jobs:
           file: ./coverage.xml
           fail_ci_if_error: false
 
-  build-and-deploy:
+  # ── Job 5: Build container ─────────────────────────────────────────────────
+  build-container:
+    name: Build containers
     needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
-    if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install Podman
+        run: sudo apt-get install -y podman
+
+      - name: Build with Podman
+        run: podman build -t agi-system:ci -f Containerfile .
+
+      - name: Build with Docker (Dockerfile.agents)
+        run: docker build -t agi-system-agents:ci -f infrastructure/docker/Dockerfile.agents .
+
+  # ── Job 6: Helm lint ───────────────────────────────────────────────────────
+  helm-lint:
+    name: Helm lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: helm lint
+        run: helm lint infrastructure/helm/agi-system/
+
+      - name: helm template
+        run: >
+          helm template agi-system infrastructure/helm/agi-system/
+          --namespace agi-system
+
+  # ── Job 7: Publish ─────────────────────────────────────────────────────────
+  publish:
+    name: Publish images to GHCR
+    needs: [test, build-container]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -69,29 +187,55 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push agents image
-        uses: docker/build-push-action@v5
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push agi-system image (Containerfile)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Containerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/agi-system:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/agi-system:latest
+
+      - name: Build and push agi-system-agents image (Dockerfile.agents)
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: infrastructure/docker/Dockerfile.agents
           push: true
-          tags: ghcr.io/${{ github.repository }}/agents:${{ github.sha }}
+          tags: |
+            ghcr.io/${{ github.repository }}/agi-system-agents:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/agi-system-agents:latest
 
-      - name: Build and push API image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: infrastructure/docker/Dockerfile.api
-          push: true
-          tags: ghcr.io/${{ github.repository }}/api:${{ github.sha }}
+  # ── Job 8: Deploy ──────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Kubernetes
+    needs: publish
+    runs-on: ubuntu-latest
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      secrets.KUBECONFIG != ''
+    permissions:
+      contents: read
+    env:
+      KUBECONFIG: ${{ secrets.KUBECONFIG }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Deploy to Kubernetes
-        env:
-          KUBECONFIG: ${{ secrets.KUBECONFIG }}
+      - name: kubectl set image
         run: |
           kubectl set image deployment/agi-system \
-            agi-agents=ghcr.io/${{ github.repository }}/agents:${{ github.sha }} \
+            agi-system=ghcr.io/${{ github.repository }}/agi-system:${{ github.sha }} \
+            agi-agents=ghcr.io/${{ github.repository }}/agi-system-agents:${{ github.sha }} \
             --namespace=agi-system
+
+      - name: kubectl rollout status
+        run: |
           kubectl rollout status deployment/agi-system \
             --namespace=agi-system \
             --timeout=300s
