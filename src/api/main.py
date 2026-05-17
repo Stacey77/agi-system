@@ -270,9 +270,11 @@ def create_app() -> FastAPI:
     )
 
     # Middleware (applied in reverse — last added = outermost)
+    from src.api.middleware.request_id import RequestIDMiddleware
     app.add_middleware(MetricsMiddleware)
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(APIKeyMiddleware)
+    app.add_middleware(RequestIDMiddleware)
 
     # Prometheus metrics endpoint
     from fastapi import Response as FastAPIResponse
@@ -294,6 +296,9 @@ def create_app() -> FastAPI:
 
     from src.api.endpoints.auth import router as auth_router
     app.include_router(auth_router)
+
+    from src.api.endpoints.system import router as system_router
+    app.include_router(system_router)
 
     # Static dashboard — served at / and /static
     _static_dir = os.path.join(os.path.dirname(__file__), "static")
