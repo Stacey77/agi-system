@@ -178,7 +178,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     async def _default_task_handler(record) -> None:
         planning = factory.get_agent("planning_agent")
         if planning is not None:
+            await task_queue.update_progress(record.task_id, 10, "Decomposing objective…")
             result = await planning.process_task({"objective": record.objective, "task_id": record.task_id})
+            await task_queue.update_progress(record.task_id, 90, "Finalising result…")
             record.result = result
         else:
             record.result = {"status": "completed", "summary": record.objective}

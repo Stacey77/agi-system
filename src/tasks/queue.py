@@ -125,6 +125,18 @@ class TaskQueue:
         record.status = TaskStatus.CANCELLED
         return True
 
+    async def update_progress(self, task_id: str, progress: int, message: str = "") -> None:
+        """Push a progress update (0-100) from within a task handler."""
+        record = self._records.get(task_id)
+        if record is None or record.status != TaskStatus.RUNNING:
+            return
+        record.progress = max(0, min(100, progress))
+        if message:
+            if record.result is None:
+                record.result = {}
+            record.result["progress_message"] = message
+        await self._notify(task_id, "progress")
+
     async def subscribe(self, task_id: str) -> asyncio.Queue:
         """Return a queue that receives status updates for *task_id*."""
         q: asyncio.Queue = asyncio.Queue(maxsize=50)
