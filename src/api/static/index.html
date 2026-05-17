@@ -285,6 +285,13 @@
         <button class="btn btn-secondary" onclick="loadHealth()">↺ Refresh</button>
       </div>
     </div>
+    <div class="card" style="margin-top:16px">
+      <div class="section-header">
+        <h2>System info</h2>
+        <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadSystemInfo()">↺ Refresh</button>
+      </div>
+      <div id="system-info-content"><div class="spinner"></div></div>
+    </div>
   </div>
 
   <!-- ── Agents ── -->
@@ -799,17 +806,43 @@ async function loadHealth() {
     badge.className = data.status === 'healthy' ? 'healthy' : 'degraded';
     badge.textContent = '● ' + (data.status || 'unknown');
     const comps = data.components || {};
+    const uptime = data.uptime_seconds != null ? ` · uptime ${Math.floor(data.uptime_seconds)}s` : '';
     grid.innerHTML = Object.entries(comps).map(([k, v]) => {
-      const ok = v === 'healthy';
+      const status = typeof v === 'object' ? (v.status || 'unknown') : v;
+      const ok = ['healthy','mock_mode','not_configured'].includes(status);
+      const detail = typeof v === 'object'
+        ? Object.entries(v).filter(([ek])=>ek!=='status').map(([ek,ev])=>`<span style="opacity:.7">${ek}: ${JSON.stringify(ev)}</span>`).join(' ')
+        : '';
       return `<div class="health-item">
         <div class="hi-label">${k.replace(/_/g,' ')}</div>
-        <div class="hi-val" style="color:var(--${ok?'success':'danger'})">${v}</div>
+        <div class="hi-val" style="color:var(--${ok?'success':'danger'})">${status}</div>
+        ${detail ? `<div style="font-size:11px;margin-top:2px">${detail}</div>` : ''}
       </div>`;
-    }).join('') || '<div class="health-item"><div class="hi-val" style="color:var(--success)">healthy</div></div>';
+    }).join('') + (uptime ? `<div class="health-item" style="opacity:.6"><div class="hi-label">uptime</div><div class="hi-val">${Math.floor(data.uptime_seconds)}s</div></div>` : '');
   } catch (err) {
     badge.className = 'error';
     badge.textContent = '● error';
     grid.innerHTML = `<span style="color:var(--danger)">${err.message}</span>`;
+  }
+}
+
+async function loadSystemInfo() {
+  const el = document.getElementById('system-info-content');
+  el.innerHTML = '<div class="spinner"></div>';
+  try {
+    const d = await apiFetch('/api/v1/system/info');
+    el.innerHTML = `<table><tbody>
+      <tr><td style="width:160px;font-weight:600">Version</td><td>${d.version || '—'}</td></tr>
+      <tr><td style="font-weight:600">Python</td><td>${d.python || '—'}</td></tr>
+      <tr><td style="font-weight:600">LLM provider</td><td>${d.llm_provider || '—'}</td></tr>
+      <tr><td style="font-weight:600">Log format</td><td>${d.log_format || '—'}</td></tr>
+      <tr><td style="font-weight:600">Uptime</td><td>${Math.floor(d.uptime_seconds || 0)}s</td></tr>
+      <tr><td style="font-weight:600">Agents</td><td>${(d.agents||[]).join(', ') || '—'}</td></tr>
+      <tr><td style="font-weight:600">Tools</td><td>${(d.tools||[]).join(', ') || '—'}</td></tr>
+      <tr><td style="font-weight:600">Tasks</td><td>${JSON.stringify(d.tasks || {})}</td></tr>
+    </tbody></table>`;
+  } catch (err) {
+    el.innerHTML = `<span style="color:var(--danger)">${err.message}</span>`;
   }
 }
 
@@ -1552,6 +1585,7 @@ tabLoaders['eval']     = () => loadEvalBenchmarks();
 // ────────────────────────── Init ──────────────────────────
 
 loadHealth();
+loadSystemInfo();
 </script>
 </body>
 </html>
