@@ -56,14 +56,20 @@ class TaskQueue:
     Optionally persists records to SQLite via TaskPersistence.
     """
 
-    def __init__(self, persistence: Optional[Any] = None) -> None:
+    def __init__(
+        self,
+        persistence: Optional[Any] = None,
+        retention_seconds: float = 86400.0,  # 24 hours
+    ) -> None:
         self._records: Dict[str, TaskRecord] = {}
         self._queue: asyncio.Queue[str] = asyncio.Queue()
         self._handlers: Dict[str, Callable[..., Coroutine]] = {}
         self._redis: Optional[Any] = None
         self._worker_task: Optional[asyncio.Task] = None
+        self._cleanup_task: Optional[asyncio.Task] = None
         self._subscribers: Dict[str, List[asyncio.Queue]] = {}
         self._persistence = persistence
+        self._retention_seconds = retention_seconds
         if persistence is not None:
             self._records = persistence.load_all()
             logger.info("TaskQueue restored %d records from persistence", len(self._records))
@@ -75,15 +81,19 @@ class TaskQueue:
         if redis_url:
             await self._init_redis(redis_url)
         self._worker_task = asyncio.create_task(self._worker())
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
         logger.info("TaskQueue started (backend=%s)", "redis" if self._redis else "asyncio")
 
     async def stop(self) -> None:
-        if self._worker_task:
-            self._worker_task.cancel()
-            try:
-                await self._worker_task
-            except asyncio.CancelledError:
-                pass
+        for task in (self._worker_task, self._cleanup_task):
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+        self._worker_task = None
+        self._cleanup_task = None
         if self._redis:
             try:
                 await self._redis.aclose()
@@ -209,3 +219,22 @@ class TaskQueue:
                 q.put_nowait(payload)
             except asyncio.QueueFull:
                 pass
+
+    async def _cleanup_loop(self) -> None:
+        """Periodically remove terminal tasks older than retention_seconds."""
+        _TERMINAL = {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED}
+        while True:
+            try:
+                await asyncio.sleep(3600)  # run once per hour
+            except asyncio.CancelledError:
+                return
+            cutoff = time.time() - self._retention_seconds
+            to_delete = [
+                tid for tid, r in list(self._records.items())
+                if r.status in _TERMINAL and (r.completed_at or 0) < cutoff
+            ]
+            for tid in to_delete:
+                del self._records[tid]
+                self._subscribers.pop(tid, None)
+            if to_delete:
+                logger.info("TaskQueue cleanup: removed %d expired records", len(to_delete))
