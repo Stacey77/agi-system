@@ -90,10 +90,44 @@ async def stream_llm_response(llm: object, prompt: str) -> AsyncIterator[str]:
             yield delta
 
 
-async def invoke_llm(llm: object, system_prompt: str, user_prompt: str) -> str:
-    """Invoke an LLM with a system + user message pair and return the full response."""
+async def invoke_llm(
+    llm: object,
+    system_prompt: str,
+    user_prompt: str,
+    agent_name: str = "unknown",
+    task_id: Optional[str] = None,
+    tracker: Optional[object] = None,
+) -> str:
+    """Invoke an LLM with a system + user message pair and return the full response.
+
+    If *tracker* is provided, token usage is recorded after each call.
+    """
     from langchain_core.messages import HumanMessage, SystemMessage  # type: ignore
 
     messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
     response = await llm.ainvoke(messages)  # type: ignore[union-attr]
+
+    # Capture usage metadata if available and tracker provided
+    if tracker is not None:
+        usage = getattr(response, "usage_metadata", None) or getattr(response, "response_metadata", {})
+        model = getattr(llm, "model_name", getattr(llm, "model", "unknown"))
+        input_tokens = (
+            getattr(usage, "input_tokens", None)
+            or (usage.get("token_usage", {}) if isinstance(usage, dict) else {}).get("prompt_tokens", 0)
+        ) or 0
+        output_tokens = (
+            getattr(usage, "output_tokens", None)
+            or (usage.get("token_usage", {}) if isinstance(usage, dict) else {}).get("completion_tokens", 0)
+        ) or 0
+        try:
+            tracker.record(  # type: ignore[attr-defined]
+                agent_name=agent_name,
+                model=str(model),
+                input_tokens=int(input_tokens),
+                output_tokens=int(output_tokens),
+                task_id=task_id,
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
     return str(getattr(response, "content", response))

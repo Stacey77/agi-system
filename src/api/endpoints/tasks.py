@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -48,15 +48,22 @@ async def get_task(task_id: str, request: Request) -> Dict[str, Any]:
 
 
 @router.get("/")
-async def list_tasks(request: Request) -> Dict[str, Any]:
-    """List all tasks with their statuses."""
+async def list_tasks(
+    request: Request,
+    status: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> Dict[str, Any]:
+    """List tasks with optional status filter and pagination."""
     queue = getattr(request.app.state, "task_queue", None)
     if queue is None:
-        return {"tasks": [], "total": 0}
+        return {"tasks": [], "total": 0, "by_status": {}}
 
-    records = queue.list_all()
+    all_records = queue.list_all()
+
+    # Count by status across the full set
     by_status: Dict[str, int] = {}
-    for r in records:
+    for r in all_records:
         by_status[r.status] = by_status.get(r.status, 0) + 1
 
     # Push current counts to Prometheus gauges
@@ -66,9 +73,25 @@ async def list_tasks(request: Request) -> Dict[str, Any]:
     except Exception:  # noqa: BLE001
         pass
 
+    # Filter by status if requested
+    if status:
+        filtered = [r for r in all_records if r.status == status]
+    else:
+        filtered = all_records
+
+    # Sort newest-first by created_at
+    filtered.sort(key=lambda r: r.created_at, reverse=True)
+
+    # Paginate
+    limit = max(1, min(limit, 500))  # clamp 1–500
+    page = filtered[offset : offset + limit]
+
     return {
-        "tasks": [r.to_dict() for r in records],
-        "total": len(records),
+        "tasks": [r.to_dict() for r in page],
+        "total": len(filtered),
+        "total_all": len(all_records),
+        "limit": limit,
+        "offset": offset,
         "by_status": by_status,
     }
 
