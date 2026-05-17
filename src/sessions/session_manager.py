@@ -15,8 +15,12 @@ class AgentSession:
 
 
 class SessionManager:
-    def __init__(self) -> None:
-        self._sessions: Dict[str, AgentSession] = {}
+    def __init__(self, store: Optional[Any] = None) -> None:
+        self._store = store
+        if store is not None:
+            self._sessions: Dict[str, AgentSession] = store.load_all()
+        else:
+            self._sessions = {}
 
     def create_session(self, agent_name: str) -> AgentSession:
         session_id = str(uuid.uuid4())
@@ -26,6 +30,8 @@ class SessionManager:
             created_at=datetime.now(timezone.utc).isoformat(),
         )
         self._sessions[session_id] = session
+        if self._store:
+            self._store.save(session)
         return session
 
     def get_session(self, session_id: str) -> Optional[AgentSession]:
@@ -38,9 +44,13 @@ class SessionManager:
         if session_id not in self._sessions:
             return False
         del self._sessions[session_id]
+        if self._store:
+            self._store.delete(session_id)
         return True
 
     def add_message(self, session_id: str, role: str, content: str) -> None:
         session = self._sessions.get(session_id)
         if session is not None:
             session.messages.append({"role": role, "content": content})
+            if self._store:
+                self._store.save(session)

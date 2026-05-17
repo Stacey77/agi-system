@@ -123,8 +123,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Webhook dispatcher
     app.state.webhook_dispatcher = WebhookDispatcher()
 
-    # Session manager
-    app.state.session_manager = SessionManager()
+    # Session manager with optional SQLite persistence
+    from src.sessions.session_store import SessionStore
+    session_store = SessionStore(db_path=cfg.task_db_path.replace("tasks.db", "sessions.db"))
+    app.state.session_manager = SessionManager(store=session_store)
+    app.state.session_store = session_store
 
     # Eval results store
     app.state.eval_results = {}
@@ -194,6 +197,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     await task_queue.stop()
     task_persistence.close()
+    session_store.close()
     logger.info("AGI System shutting down...")
 
 
