@@ -18,6 +18,7 @@ from src.agents.kally_agent import KallyAgent
 from src.llm.provider import LLMProvider, create_llm
 from src.api.endpoints import agents, health, tasks
 from src.api.endpoints.cde import router as cde_router
+from src.api.endpoints.crew import router as crew_router
 from src.api.endpoints.ide import router as ide_router
 from src.api.endpoints.platform import router as platform_router
 from src.api.middleware.auth import APIKeyMiddleware
@@ -66,8 +67,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Initialise agent factory and default agents
     factory = AgentFactory(execution_agent=execution_agent, llm=llm)
-    _register_default_agents(factory, execution_agent)
+    _register_default_agents(factory, execution_agent, llm)
     app.state.agent_factory = factory
+
+    # Initialise crew orchestrator
+    from src.crew.orchestrator import CrewOrchestrator
+    app.state.crew_orchestrator = CrewOrchestrator(agent_factory=factory, llm=llm)
 
     # Vibecoding IDE
     ide_config = AgentConfig(
@@ -102,6 +107,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     app.state.kally_agent = KallyAgent(config=kally_config, execution_agent=execution_agent)
 
+    # Wire the agent factory into the planning agent for delegation
+    planning_agent = factory.get_agent("planning_agent")
+    if planning_agent is not None:
+        planning_agent.set_agent_factory(factory)
+
     logger.info(
         "AGI System initialised with %d agents + IDE + CDE + Kally AI + Platform",
         len(factory.list_agents()),
@@ -112,7 +122,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 def _register_default_agents(
-    factory: AgentFactory, execution_agent: ExecutionAgent
+    factory: AgentFactory, execution_agent: ExecutionAgent, llm: object = None
 ) -> None:
     default_configs = [
         AgentConfig(
@@ -190,6 +200,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(agents.router)
     app.include_router(tasks.router)
+    app.include_router(crew_router)
     app.include_router(ide_router)
     app.include_router(cde_router)
     app.include_router(platform_router)

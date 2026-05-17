@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -89,6 +89,61 @@ async def stream_agent_task(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.websocket("/{agent_name}/ws")
+async def websocket_agent_task(agent_name: str, websocket: WebSocket) -> None:
+    """Stream agent output over a WebSocket connection.
+
+    The client sends a JSON object ``{"task": "...", "parameters": {...}}``
+    and receives text chunks followed by a final ``[DONE]`` message.
+    """
+    factory = getattr(websocket.app.state, "agent_factory", None)
+    agent = factory.get_agent(agent_name) if factory else None
+
+    await websocket.accept()
+
+    if agent is None:
+        await websocket.send_json({"error": f"Agent '{agent_name}' not found"})
+        await websocket.close(code=1008)
+        return
+
+    try:
+        data = await websocket.receive_json()
+        task_dict = {"task": data.get("task", ""), **data.get("parameters", {})}
+        async for chunk in agent.stream_task(task_dict):
+            await websocket.send_text(chunk)
+        await websocket.send_text("[DONE]")
+    except WebSocketDisconnect:
+        logger.info("WebSocket client disconnected from agent '%s'", agent_name)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("WebSocket error for agent '%s': %s", agent_name, exc)
+        try:
+            await websocket.send_json({"error": str(exc)})
+        except Exception:  # noqa: BLE001
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+@router.get("/{agent_name}/memory")
+async def agent_memory_recall(
+    agent_name: str, query: str, request: Request, k: int = 3
+) -> Dict[str, Any]:
+    """Recall past tasks similar to *query* from the agent's persistent memory."""
+    factory = getattr(request.app.state, "agent_factory", None)
+    if factory is None:
+        raise HTTPException(status_code=503, detail="Agent system not initialised")
+
+    agent = factory.get_agent(agent_name)
+    if agent is None:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_name}' not found")
+
+    recalled = agent.recall_similar_tasks(query, k=k)
+    return {"agent": agent_name, "query": query, "results": recalled}
 
 
 @router.get("/{agent_name}/status")
