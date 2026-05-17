@@ -70,6 +70,7 @@ class TaskQueue:
         self._subscribers: Dict[str, List[asyncio.Queue]] = {}
         self._persistence = persistence
         self._retention_seconds = retention_seconds
+        self._stop_event: asyncio.Event = asyncio.Event()
         if persistence is not None:
             self._records = persistence.load_all()
             logger.info("TaskQueue restored %d records from persistence", len(self._records))
@@ -77,6 +78,7 @@ class TaskQueue:
     async def start(self, handler: Callable[[TaskRecord], Coroutine]) -> None:
         """Start background worker with *handler* called for each task."""
         self._default_handler = handler
+        self._stop_event.clear()
         redis_url = os.getenv("REDIS_URL", "")
         if redis_url:
             await self._init_redis(redis_url)
@@ -85,12 +87,15 @@ class TaskQueue:
         logger.info("TaskQueue started (backend=%s)", "redis" if self._redis else "asyncio")
 
     async def stop(self) -> None:
+        self._stop_event.set()
+        # Unblock queue.get() by putting a sentinel value
+        await self._queue.put("__stop__")
         for task in (self._worker_task, self._cleanup_task):
             if task:
                 task.cancel()
                 try:
-                    await task
-                except asyncio.CancelledError:
+                    await asyncio.wait_for(asyncio.shield(task), timeout=5.0)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
                     pass
         self._worker_task = None
         self._cleanup_task = None
@@ -183,7 +188,7 @@ class TaskQueue:
 
     async def _worker(self) -> None:
         logger.info("TaskQueue worker started")
-        while True:
+        while not self._stop_event.is_set():
             try:
                 task_id = await asyncio.wait_for(self._dequeue(), timeout=2.0)
             except asyncio.CancelledError:
@@ -196,6 +201,10 @@ class TaskQueue:
                 logger.error("TaskQueue dequeue error: %s", exc)
                 await asyncio.sleep(1)
                 continue
+
+            if task_id == "__stop__" or self._stop_event.is_set():
+                logger.info("TaskQueue worker stopping")
+                return
 
             record = self._records.get(task_id)
             if record is None or record.status == TaskStatus.CANCELLED:
@@ -235,9 +244,13 @@ class TaskQueue:
     async def _cleanup_loop(self) -> None:
         """Periodically remove terminal tasks older than retention_seconds."""
         _TERMINAL = {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED}
-        while True:
+        while not self._stop_event.is_set():
             try:
-                await asyncio.sleep(3600)  # run once per hour
+                # Wait for stop signal or for the retention interval to elapse
+                await asyncio.wait_for(self._stop_event.wait(), timeout=3600)
+                return  # stop event fired
+            except asyncio.TimeoutError:
+                pass  # retention interval elapsed; run cleanup below
             except asyncio.CancelledError:
                 return
             cutoff = time.time() - self._retention_seconds
