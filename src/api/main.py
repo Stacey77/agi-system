@@ -41,6 +41,8 @@ from src.execution.execution_engine import ExecutionEngine
 from src.ide.ide_agent import IDEAgent
 from src.platform.developer_portal import DeveloperPortal
 from src.platform.tool_landscape import ToolLandscape
+from src.config import get_settings
+from src.logging_config import configure_logging
 
 logger = logging.getLogger(__name__)
 
@@ -66,11 +68,14 @@ def _init_llm() -> object:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialise and tear down application-level resources."""
+    cfg = get_settings()
+    configure_logging(level=cfg.log_level, fmt=cfg.log_format)
     logger.info("AGI System starting up...")
+    app.state.settings = cfg
 
     # Optional OpenTelemetry tracing
     from src.api.middleware.tracing import setup_tracing
-    setup_tracing(service_name=os.getenv("OTEL_SERVICE_NAME", "agi-system"))
+    setup_tracing(service_name=cfg.otel_service_name)
 
     # Initialise LLM
     llm = _init_llm()
@@ -161,8 +166,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if planning_agent is not None:
         planning_agent.set_agent_factory(factory)
 
-    # Task queue
+    # Task queue with optional SQLite persistence
     from src.tasks.queue import TaskQueue
+    from src.tasks.persistence import TaskPersistence
+
+    task_persistence = TaskPersistence(db_path=cfg.task_db_path)
 
     async def _default_task_handler(record) -> None:
         planning = factory.get_agent("planning_agent")
@@ -172,9 +180,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         else:
             record.result = {"status": "completed", "summary": record.objective}
 
-    task_queue = TaskQueue()
+    task_queue = TaskQueue(persistence=task_persistence)
     await task_queue.start(_default_task_handler)
     app.state.task_queue = task_queue
+    app.state.task_persistence = task_persistence
 
     logger.info(
         "AGI System initialised — %d agents, %d tools, IDE + CDE + Kally + Platform",
@@ -184,6 +193,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
     await task_queue.stop()
+    task_persistence.close()
     logger.info("AGI System shutting down...")
 
 
@@ -250,7 +260,7 @@ def create_app() -> FastAPI:
     )
 
     # CORS
-    allowed_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+    allowed_origins = get_settings().cors_origins_list()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,

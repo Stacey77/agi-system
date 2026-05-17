@@ -53,15 +53,20 @@ class TaskQueue:
 
     Uses Redis when REDIS_URL is configured; otherwise falls back to an
     in-process asyncio.Queue so the system works without any external deps.
+    Optionally persists records to SQLite via TaskPersistence.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, persistence: Optional[Any] = None) -> None:
         self._records: Dict[str, TaskRecord] = {}
         self._queue: asyncio.Queue[str] = asyncio.Queue()
         self._handlers: Dict[str, Callable[..., Coroutine]] = {}
         self._redis: Optional[Any] = None
         self._worker_task: Optional[asyncio.Task] = None
         self._subscribers: Dict[str, List[asyncio.Queue]] = {}
+        self._persistence = persistence
+        if persistence is not None:
+            self._records = persistence.load_all()
+            logger.info("TaskQueue restored %d records from persistence", len(self._records))
 
     async def start(self, handler: Callable[[TaskRecord], Coroutine]) -> None:
         """Start background worker with *handler* called for each task."""
@@ -90,6 +95,8 @@ class TaskQueue:
         record = TaskRecord(task_id=task_id, objective=objective)
         record.__dict__.update({"parameters": parameters})
         self._records[task_id] = record
+        if self._persistence:
+            self._persistence.save(record)
         await self._enqueue(task_id)
         await self._notify(task_id, "queued")
         logger.info("Task '%s' submitted: %s", task_id, objective[:60])
@@ -194,6 +201,8 @@ class TaskQueue:
         record = self._records.get(task_id)
         if record is None:
             return
+        if self._persistence:
+            self._persistence.save(record)
         payload = {"event": event, **record.to_dict()}
         for q in list(self._subscribers.get(task_id, [])):
             try:
