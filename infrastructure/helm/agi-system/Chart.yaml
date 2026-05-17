@@ -1,0 +1,17 @@
+apiVersion: v2
+name: agi-system
+description: AGI System — multi-agent orchestration platform
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - ai
+  - agents
+  - langgraph
+  - crewai
+  - llm
+home: https://github.com/Stacey77/agi-system
+sources:
+  - https://github.com/Stacey77/agi-system
+maintainers:
+  - name: AGI System Team

@@ -14,6 +14,9 @@ from fastapi.staticfiles import StaticFiles
 
 from src.agents.agent_factory import AgentFactory
 from src.agents.base_agent import AgentConfig, AgentType
+from src.tools.calculator_tool import CalculatorTool
+from src.tools.tool_registry import ToolRegistry
+from src.tools.web_search_tool import WebSearchTool
 from src.agents.kally_agent import KallyAgent
 from src.llm.provider import LLMProvider, create_llm
 from src.api.endpoints import agents, health, tasks
@@ -106,6 +109,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         capabilities=["signal_ingestion", "anomaly_detection", "auto_correction"],
     )
     app.state.kally_agent = KallyAgent(config=kally_config, execution_agent=execution_agent)
+
+    # Wire the tool registry into all agents
+    tool_registry = ToolRegistry()
+    tool_registry.register_tool(
+        WebSearchTool(
+            api_key=os.getenv("WEB_SEARCH_API_KEY"),
+            provider=os.getenv("WEB_SEARCH_PROVIDER", "mock"),
+        )
+    )
+    tool_registry.register_tool(CalculatorTool())
+    factory.set_tool_registry(tool_registry)
+    app.state.tool_registry = tool_registry
 
     # Wire the agent factory into the planning agent for delegation
     planning_agent = factory.get_agent("planning_agent")
