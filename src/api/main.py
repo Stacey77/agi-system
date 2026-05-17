@@ -133,6 +133,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from src.llm.token_tracker import TokenTracker
     app.state.token_tracker = TokenTracker()
 
+    # Memory layer
+    from src.memory.memory_manager import MemoryManager
+    from src.memory.hybrid_memory import HybridMemory
+    app.state.memory_manager = MemoryManager()
+    app.state.hybrid_memory = HybridMemory()
+
     # Eval results store
     app.state.eval_results = {}
 
@@ -281,6 +287,7 @@ _OPENAPI_TAGS = [
     {"name": "ide", "description": "AI-powered vibecoding IDE — completions, explanations, refactoring"},
     {"name": "cde", "description": "Cloud Development Environment lifecycle management"},
     {"name": "platform", "description": "Developer portal and tool landscape registry"},
+    {"name": "memory", "description": "Short-term, long-term, episodic and hybrid vector memory management"},
 ]
 
 
@@ -349,6 +356,9 @@ def create_app() -> FastAPI:
 
     from src.api.endpoints.usage import router as usage_router
     app.include_router(usage_router)
+
+    from src.api.endpoints.memory import router as memory_router
+    app.include_router(memory_router)
 
     # Static dashboard — served at / and /static
     _static_dir = os.path.join(os.path.dirname(__file__), "static")
