@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
@@ -38,6 +40,8 @@ class AgentConfig:
     memory_size: int = 100
     tools: List[str] = field(default_factory=list)
     temperature: float = 0.7
+    max_retries: int = 2          # retries on transient task failures
+    circuit_break_threshold: int = 5  # open circuit after N consecutive failures
 
 
 @dataclass
@@ -81,6 +85,8 @@ class BaseAgent(ABC):
         self.memory = AgentMemory(max_size=config.memory_size)
         self._tool_registry: Optional[Any] = None
         self._task_memory: Optional[Any] = None
+        self._consecutive_failures: int = 0
+        self._circuit_open_until: float = 0.0
         if persist_memory:
             try:
                 from src.memory.task_memory import TaskMemory
@@ -111,13 +117,52 @@ class BaseAgent(ABC):
 
     def get_status(self) -> Dict[str, Any]:
         """Return a status snapshot of this agent."""
+        circuit_open = time.time() < self._circuit_open_until
         return {
             "name": self.config.name,
             "type": self.config.agent_type,
             "memory_usage": len(self.memory),
             "persistent_memory_size": len(self._task_memory) if self._task_memory else 0,
             "capabilities": self.config.capabilities,
+            "consecutive_failures": self._consecutive_failures,
+            "circuit_open": circuit_open,
         }
+
+    async def run_with_retry(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """Call process_task with automatic retry and circuit breaker.
+
+        - Opens circuit for 60s after circuit_break_threshold consecutive failures.
+        - Retries up to max_retries times with 0.5s × 2^attempt backoff.
+        """
+        if time.time() < self._circuit_open_until:
+            raise RuntimeError(
+                f"Agent '{self.config.name}' circuit breaker is open — "
+                f"too many consecutive failures"
+            )
+
+        last_exc: Optional[Exception] = None
+        for attempt in range(self.config.max_retries + 1):
+            try:
+                result = await self.process_task(task)
+                self._consecutive_failures = 0
+                return result
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                self._consecutive_failures += 1
+                logger.warning(
+                    "Agent '%s' task attempt %d/%d failed: %s",
+                    self.config.name, attempt + 1, self.config.max_retries + 1, exc,
+                )
+                if self._consecutive_failures >= self.config.circuit_break_threshold:
+                    self._circuit_open_until = time.time() + 60.0
+                    logger.error(
+                        "Agent '%s' circuit breaker opened after %d consecutive failures",
+                        self.config.name, self._consecutive_failures,
+                    )
+                    raise
+                if attempt < self.config.max_retries:
+                    await asyncio.sleep(0.5 * (2 ** attempt))
+        raise last_exc  # type: ignore[misc]
 
     def recall_similar_tasks(self, query: str, k: int = 3) -> List[Dict[str, Any]]:
         """Return past tasks semantically similar to *query* (requires persist_memory=True)."""

@@ -256,13 +256,39 @@ def _register_default_agents(
         factory.create_agent(config)
 
 
+_OPENAPI_TAGS = [
+    {"name": "health", "description": "Liveness and readiness probes for load balancers and k8s"},
+    {"name": "agents", "description": "Register, query, and execute individual AI agents"},
+    {"name": "tasks", "description": "Async task queue — submit, track, cancel, retry, and stream progress via SSE"},
+    {"name": "crew", "description": "Multi-agent crew orchestration via CrewAI / LangGraph"},
+    {"name": "sessions", "description": "Multi-turn conversation sessions with per-agent message history"},
+    {"name": "auth", "description": "JWT token issuance and API key management (admin-only CRUD)"},
+    {"name": "system", "description": "Non-sensitive runtime info for dashboards and monitoring"},
+    {"name": "webhooks", "description": "Register HTTP callbacks for task/crew/session lifecycle events"},
+    {"name": "eval", "description": "Agent benchmark evaluation — run standard tasks and score results"},
+    {"name": "ide", "description": "AI-powered vibecoding IDE — completions, explanations, refactoring"},
+    {"name": "cde", "description": "Cloud Development Environment lifecycle management"},
+    {"name": "platform", "description": "Developer portal and tool landscape registry"},
+]
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
         title="AGI System API",
-        description="AGI-type system for smart chatbots, writing assistants, and research tools",
+        description=(
+            "Production AGI system — multi-agent orchestration, async task queue, "
+            "JWT auth, SSE streaming, ChromaDB memory, and LangGraph workflows.\n\n"
+            "**Auth**: Pass `X-API-Key: sk-...` or `Authorization: Bearer <jwt>` on all requests "
+            "(except `/health`, `/docs`, `/`).\n\n"
+            "**Streaming**: `GET /api/v1/tasks/{id}/stream` and `WS /api/v1/agents/{name}/ws` "
+            "for real-time output."
+        ),
         version="0.1.0",
         lifespan=lifespan,
+        openapi_tags=_OPENAPI_TAGS,
+        contact={"name": "AGI System", "url": "https://github.com/Stacey77/agi-system"},
+        license_info={"name": "MIT"},
     )
 
     # CORS

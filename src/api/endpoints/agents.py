@@ -158,3 +158,19 @@ async def agent_status(agent_name: str, request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"Agent '{agent_name}' not found")
 
     return agent.get_status()
+
+
+@router.post("/{agent_name}/circuit/reset")
+async def reset_circuit_breaker(agent_name: str, request: Request) -> Dict[str, Any]:
+    """Reset an agent's circuit breaker — use after fixing the underlying issue."""
+    factory = getattr(request.app.state, "agent_factory", None)
+    if factory is None:
+        raise HTTPException(status_code=503, detail="Agent system not initialised")
+
+    agent = factory.get_agent(agent_name)
+    if agent is None:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_name}' not found")
+
+    agent._consecutive_failures = 0
+    agent._circuit_open_until = 0.0
+    return {"agent": agent_name, "circuit_reset": True, "status": agent.get_status()}
