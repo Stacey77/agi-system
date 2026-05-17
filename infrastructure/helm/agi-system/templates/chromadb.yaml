@@ -1,0 +1,55 @@
+{{- if .Values.chromadb.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-chromadb
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}-chromadb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-chromadb
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-chromadb
+    spec:
+      containers:
+        - name: chromadb
+          image: "{{ .Values.chromadb.image }}:{{ .Values.chromadb.tag }}"
+          ports:
+            - containerPort: 8000
+          {{- if .Values.chromadb.persistence.enabled }}
+          volumeMounts:
+            - name: chroma-data
+              mountPath: /chroma/.chroma
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /api/v1/heartbeat
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+      {{- if .Values.chromadb.persistence.enabled }}
+      volumes:
+        - name: chroma-data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-chroma-pvc
+      {{- end }}
+---
+{{- if .Values.chromadb.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-chroma-pvc
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.chromadb.persistence.size }}
+{{- end }}
+{{- end }}

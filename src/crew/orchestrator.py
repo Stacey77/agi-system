@@ -33,11 +33,30 @@ class CrewOrchestrator:
         if agent_names is None:
             agent_names = ["research_agent", "analysis_agent", "writing_agent", "review_agent"]
 
+        langgraph_result = await self._try_langgraph(objective, agent_names)
+        if langgraph_result is not None:
+            return langgraph_result
+
         crewai_result = await self._try_crewai(objective, agent_names)
         if crewai_result is not None:
             return crewai_result
 
         return await self._sequential_fallback(objective, agent_names)
+
+    # ------------------------------------------------------------------
+    # LangGraph path
+    # ------------------------------------------------------------------
+
+    async def _try_langgraph(
+        self, objective: str, agent_names: List[str]
+    ) -> Optional[Dict[str, Any]]:
+        """Attempt to run the crew via LangGraph StateGraph; return None if unavailable."""
+        try:
+            from src.crew.langgraph_orchestrator import run_langgraph_crew
+            return await run_langgraph_crew(objective, agent_names, self._factory)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("LangGraph path failed: %s — falling back", exc)
+            return None
 
     # ------------------------------------------------------------------
     # CrewAI path

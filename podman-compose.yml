@@ -1,0 +1,64 @@
+# podman-compose.yml — Podman Desktop multi-container stack
+# Usage:
+#   podman-compose up -d
+#   podman-compose down
+
+version: "3.9"
+
+services:
+  agi-system:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: agi-system:latest
+    container_name: agi-system
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - WEB_SEARCH_API_KEY=${WEB_SEARCH_API_KEY:-}
+      - WEB_SEARCH_PROVIDER=${WEB_SEARCH_PROVIDER:-mock}
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+    depends_on:
+      chromadb:
+        condition: service_healthy
+    volumes:
+      - agi-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: agi-chromadb
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma-data:/chroma/.chroma
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: docker.io/redis:7-alpine
+    container_name: agi-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+volumes:
+  agi-data:
+  chroma-data:
+  redis-data:

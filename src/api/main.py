@@ -14,13 +14,25 @@ from fastapi.staticfiles import StaticFiles
 
 from src.agents.agent_factory import AgentFactory
 from src.agents.base_agent import AgentConfig, AgentType
+from src.api.middleware.metrics import MetricsMiddleware, metrics_response
+from src.api.middleware.rate_limit import RateLimitMiddleware
+from src.tools.calculator_tool import CalculatorTool
+from src.tools.database_tool import DatabaseTool
+from src.tools.document_parser_tool import DocumentParserTool
+from src.tools.tool_registry import ToolRegistry
+from src.tools.web_search_tool import WebSearchTool
 from src.agents.kally_agent import KallyAgent
 from src.llm.provider import LLMProvider, create_llm
 from src.api.endpoints import agents, health, tasks
 from src.api.endpoints.cde import router as cde_router
 from src.api.endpoints.crew import router as crew_router
+from src.api.endpoints.eval import router as eval_router
 from src.api.endpoints.ide import router as ide_router
 from src.api.endpoints.platform import router as platform_router
+from src.api.endpoints.sessions import router as sessions_router
+from src.api.endpoints.webhooks import router as webhooks_router
+from src.sessions.session_manager import SessionManager
+from src.webhooks.dispatcher import WebhookDispatcher
 from src.api.middleware.auth import APIKeyMiddleware
 from src.cde.cde_agent import CDEAgent
 from src.execution.execution_agent import ExecutionAgent
@@ -54,6 +66,10 @@ def _init_llm() -> object:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialise and tear down application-level resources."""
     logger.info("AGI System starting up...")
+
+    # Optional OpenTelemetry tracing
+    from src.api.middleware.tracing import setup_tracing
+    setup_tracing(service_name=os.getenv("OTEL_SERVICE_NAME", "agi-system"))
 
     # Initialise LLM
     llm = _init_llm()
@@ -98,6 +114,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Internal/External developer portal
     app.state.developer_portal = DeveloperPortal(load_defaults=True)
 
+    # Webhook dispatcher
+    app.state.webhook_dispatcher = WebhookDispatcher()
+
+    # Session manager
+    app.state.session_manager = SessionManager()
+
+    # Eval results store
+    app.state.eval_results = {}
+
     # Kally AI closed-loop agent
     kally_config = AgentConfig(
         name="kally_agent",
@@ -107,14 +132,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     app.state.kally_agent = KallyAgent(config=kally_config, execution_agent=execution_agent)
 
+    # Wire the tool registry into all agents
+    tool_registry = ToolRegistry()
+    tool_registry.register_tool(
+        WebSearchTool(
+            api_key=os.getenv("WEB_SEARCH_API_KEY"),
+            provider=os.getenv("WEB_SEARCH_PROVIDER", "mock"),
+        )
+    )
+    tool_registry.register_tool(CalculatorTool())
+    tool_registry.register_tool(DocumentParserTool())
+    tool_registry.register_tool(DatabaseTool(database_url=os.getenv("DATABASE_URL")))
+    factory.set_tool_registry(tool_registry)
+    app.state.tool_registry = tool_registry
+
     # Wire the agent factory into the planning agent for delegation
     planning_agent = factory.get_agent("planning_agent")
     if planning_agent is not None:
         planning_agent.set_agent_factory(factory)
 
     logger.info(
-        "AGI System initialised with %d agents + IDE + CDE + Kally AI + Platform",
+        "AGI System initialised — %d agents, %d tools, IDE + CDE + Kally + Platform",
         len(factory.list_agents()),
+        len(tool_registry),
     )
     yield
 
@@ -136,14 +176,14 @@ def _register_default_agents(
             agent_type=AgentType.RESEARCH,
             description="Multi-source information gathering",
             capabilities=["web_search", "source_assessment"],
-            tools=["web_search"],
+            tools=["web_search", "document_parser"],
         ),
         AgentConfig(
             name="analysis_agent",
             agent_type=AgentType.ANALYSIS,
             description="Data processing and insight extraction",
             capabilities=["statistical_analysis", "pattern_recognition"],
-            tools=["calculator"],
+            tools=["calculator", "database"],
         ),
         AgentConfig(
             name="writing_agent",
@@ -193,8 +233,16 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Auth
+    # Middleware (applied in reverse — last added = outermost)
+    app.add_middleware(MetricsMiddleware)
+    app.add_middleware(RateLimitMiddleware)
     app.add_middleware(APIKeyMiddleware)
+
+    # Prometheus metrics endpoint
+    from fastapi import Response as FastAPIResponse
+    @app.get("/metrics", include_in_schema=False)
+    async def prometheus_metrics() -> FastAPIResponse:
+        return metrics_response()
 
     # Routers
     app.include_router(health.router)
@@ -204,6 +252,9 @@ def create_app() -> FastAPI:
     app.include_router(ide_router)
     app.include_router(cde_router)
     app.include_router(platform_router)
+    app.include_router(webhooks_router)
+    app.include_router(sessions_router)
+    app.include_router(eval_router)
 
     # Static dashboard — served at / and /static
     _static_dir = os.path.join(os.path.dirname(__file__), "static")

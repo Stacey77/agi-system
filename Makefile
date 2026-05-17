@@ -57,3 +57,63 @@ clean: ## Remove __pycache__ and build artefacts
 
 health: ## Hit the health endpoint (server must be running)
 	curl -s http://localhost:$(PORT)/api/v1/health | $(PYTHON) -m json.tool
+
+# ── Docker / Podman ──────────────────────────────────────────
+docker-build: ## Build Docker image
+	docker build -t agi-system:latest -f infrastructure/docker/Dockerfile.agents .
+
+docker-up: ## Start full Docker stack
+	docker compose up -d
+
+docker-down: ## Stop Docker stack
+	docker compose down
+
+podman-build: ## Build Podman image from Containerfile
+	podman build -t agi-system:latest -f Containerfile .
+
+podman-up: ## Start Podman Desktop stack
+	podman-compose -f podman-compose.yml up -d
+
+podman-down: ## Stop Podman Desktop stack
+	podman-compose -f podman-compose.yml down
+
+podman-logs: ## Tail Podman container logs
+	podman-compose -f podman-compose.yml logs -f
+
+# ── Rancher Desktop / Helm ───────────────────────────────────
+HELM_RELEASE ?= agi-system
+HELM_NAMESPACE ?= agi-system
+HELM_CHART ?= infrastructure/helm/agi-system
+
+helm-install: ## Install Helm chart to Rancher Desktop (kubectl context)
+	kubectl create namespace $(HELM_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	helm install $(HELM_RELEASE) $(HELM_CHART) --namespace $(HELM_NAMESPACE) --values $(HELM_CHART)/values.yaml
+
+helm-upgrade: ## Upgrade existing Helm release
+	helm upgrade $(HELM_RELEASE) $(HELM_CHART) --namespace $(HELM_NAMESPACE) --values $(HELM_CHART)/values.yaml
+
+helm-uninstall: ## Uninstall Helm release
+	helm uninstall $(HELM_RELEASE) --namespace $(HELM_NAMESPACE)
+
+helm-status: ## Show Helm release status
+	helm status $(HELM_RELEASE) --namespace $(HELM_NAMESPACE)
+
+helm-template: ## Render Helm templates without installing
+	helm template $(HELM_RELEASE) $(HELM_CHART) --namespace $(HELM_NAMESPACE)
+
+rancher-up: podman-build helm-install ## Build image + deploy to Rancher Desktop k8s
+	kubectl rollout status deployment/$(HELM_RELEASE) --namespace $(HELM_NAMESPACE)
+
+rancher-down: helm-uninstall ## Remove from Rancher Desktop k8s
+
+# ── Kubernetes shortcuts ─────────────────────────────────────
+k8s-apply: ## Apply raw k8s manifests (infrastructure/kubernetes/)
+	kubectl apply -f infrastructure/kubernetes/namespace.yaml
+	kubectl apply -f infrastructure/kubernetes/deployment.yaml
+	kubectl apply -f infrastructure/kubernetes/service.yaml
+
+k8s-delete: ## Delete raw k8s manifests
+	kubectl delete -f infrastructure/kubernetes/ --ignore-not-found
+
+k8s-logs: ## Stream AGI system pod logs
+	kubectl logs -l app=agi-system -n $(HELM_NAMESPACE) -f --tail=100
