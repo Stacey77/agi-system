@@ -129,6 +129,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.session_manager = SessionManager(store=session_store)
     app.state.session_store = session_store
 
+    # Token usage tracker
+    from src.llm.token_tracker import TokenTracker
+    app.state.token_tracker = TokenTracker()
+
     # Eval results store
     app.state.eval_results = {}
 
@@ -190,6 +194,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.task_queue = task_queue
     app.state.task_persistence = task_persistence
 
+    # Task scheduler
+    from src.tasks.scheduler import TaskScheduler
+    task_scheduler = TaskScheduler()
+    task_scheduler.attach_queue(task_queue)
+    await task_scheduler.start()
+    app.state.task_scheduler = task_scheduler
+
     logger.info(
         "AGI System initialised — %d agents, %d tools, IDE + CDE + Kally + Platform",
         len(factory.list_agents()),
@@ -197,6 +208,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     yield
 
+    await task_scheduler.stop()
     await task_queue.stop()
     task_persistence.close()
     session_store.close()
@@ -331,6 +343,12 @@ def create_app() -> FastAPI:
 
     from src.api.endpoints.system import router as system_router
     app.include_router(system_router)
+
+    from src.api.endpoints.scheduler import router as scheduler_router
+    app.include_router(scheduler_router)
+
+    from src.api.endpoints.usage import router as usage_router
+    app.include_router(usage_router)
 
     # Static dashboard — served at / and /static
     _static_dir = os.path.join(os.path.dirname(__file__), "static")
