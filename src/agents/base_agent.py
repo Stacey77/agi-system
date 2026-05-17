@@ -73,12 +73,21 @@ class BaseAgent(ABC):
         config: AgentConfig,
         execution_agent: Optional[Any] = None,
         llm: Optional[Any] = None,
+        persist_memory: bool = False,
     ) -> None:
         self.config = config
         self.execution_agent = execution_agent
         self.llm = llm  # Optional LangChain chat model
         self.memory = AgentMemory(max_size=config.memory_size)
         self._tool_registry: Optional[Any] = None
+        self._task_memory: Optional[Any] = None
+        if persist_memory:
+            try:
+                from src.memory.task_memory import TaskMemory
+                self._task_memory = TaskMemory(agent_name=config.name)
+                logger.info("Persistent task memory enabled for '%s'", config.name)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Could not initialise task memory: %s", exc)
         logger.info(
             "Initialised agent '%s' (type=%s, llm=%s)",
             config.name,
@@ -106,8 +115,15 @@ class BaseAgent(ABC):
             "name": self.config.name,
             "type": self.config.agent_type,
             "memory_usage": len(self.memory),
+            "persistent_memory_size": len(self._task_memory) if self._task_memory else 0,
             "capabilities": self.config.capabilities,
         }
+
+    def recall_similar_tasks(self, query: str, k: int = 3) -> List[Dict[str, Any]]:
+        """Return past tasks semantically similar to *query* (requires persist_memory=True)."""
+        if self._task_memory is None:
+            return []
+        return self._task_memory.recall(query, k=k)
 
     def set_tool_registry(self, registry: Any) -> None:
         """Inject a tool registry for tool access."""
@@ -127,6 +143,11 @@ class BaseAgent(ABC):
 
     def _record_task(self, task: Dict[str, Any], result: Dict[str, Any]) -> None:
         self.memory.add({"task": task, "result": result})
+        if self._task_memory is not None:
+            try:
+                self._task_memory.remember(task, result)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to persist task memory: %s", exc)
 
     async def _invoke_llm(self, system_prompt: str, user_prompt: str) -> Optional[str]:
         """Call the LLM and return the full response, or None if no LLM configured."""

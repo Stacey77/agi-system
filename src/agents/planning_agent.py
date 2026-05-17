@@ -34,6 +34,17 @@ class PlanningAgent(BaseAgent):
         "Respond ONLY with a JSON array of step objects."
     )
 
+    # Maps agent type strings to registered agent names
+    _AGENT_TYPE_MAP = {
+        "research": "research_agent",
+        "analysis": "analysis_agent",
+        "writing": "writing_agent",
+        "review": "review_agent",
+        "coding": "coding_agent",
+        "summarization": "summarization_agent",
+        "planning": "planning_agent",
+    }
+
     def __init__(
         self,
         config: AgentConfig,
@@ -41,15 +52,21 @@ class PlanningAgent(BaseAgent):
         llm: Optional[Any] = None,
     ) -> None:
         super().__init__(config, execution_agent, llm)
+        self._agent_factory: Optional[Any] = None
+
+    def set_agent_factory(self, factory: Any) -> None:
+        """Inject the agent factory to enable step delegation."""
+        self._agent_factory = factory
 
     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Process a planning task — decompose objective into steps."""
         objective = task.get("objective", task.get("task", ""))
-        logger.info("PlanningAgent processing objective: %s", objective)
+        execute = task.get("execute", False)
+        logger.info("PlanningAgent processing objective: %s (execute=%s)", objective, execute)
 
         plan = await self.create_executable_plan(objective)
 
-        result = {
+        result: Dict[str, Any] = {
             "status": "completed",
             "plan": {
                 "objective": plan.objective,
@@ -59,8 +76,47 @@ class PlanningAgent(BaseAgent):
                 "validation_notes": plan.validation_notes,
             },
         }
+
+        if execute and self._agent_factory is not None:
+            delegation_results = await self.execute_plan(plan, objective)
+            result["delegation_results"] = delegation_results
+
         self._record_task(task, result)
         return result
+
+    async def execute_plan(
+        self, plan: "ExecutablePlan", objective: str
+    ) -> List[Dict[str, Any]]:
+        """Delegate each plan step to the appropriate agent and collect results."""
+        step_results: List[Dict[str, Any]] = []
+        context = objective
+
+        for step in plan.steps:
+            step_id = step.get("step_id", "")
+            agent_type = step.get("agent", "")
+            description = step.get("description", step.get("action", ""))
+            agent_name = self._AGENT_TYPE_MAP.get(agent_type, f"{agent_type}_agent")
+            agent = self._agent_factory.get_agent(agent_name)
+
+            if agent is None:
+                logger.warning("Delegation: agent '%s' not found for step %s", agent_name, step_id)
+                step_results.append({"step_id": step_id, "agent": agent_name, "error": "agent not found"})
+                continue
+
+            try:
+                task_dict = {"task": f"{description}\n\nContext: {context}"}
+                sub_result = await agent.process_task(task_dict)
+                step_results.append({"step_id": step_id, "agent": agent_name, "result": sub_result})
+                # Pass summary forward as context
+                for key in ("summary", "content", "analysis", "code", "review"):
+                    if key in sub_result:
+                        context = f"{objective}\n\nPrevious output ({step_id}): {sub_result[key]}"
+                        break
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Delegation error for step %s via '%s': %s", step_id, agent_name, exc)
+                step_results.append({"step_id": step_id, "agent": agent_name, "error": str(exc)})
+
+        return step_results
 
     async def create_executable_plan(self, objective: str) -> ExecutablePlan:
         """Decompose an objective into an executable plan.
