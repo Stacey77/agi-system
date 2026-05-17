@@ -49,3 +49,5 @@ data/
 # OS
 .DS_Store
 Thumbs.db
+push-me.patch
+agi-llm-integration.patch

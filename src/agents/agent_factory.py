@@ -10,10 +10,12 @@ import yaml
 
 from src.agents.analysis_agent import AnalysisAgent
 from src.agents.base_agent import AgentConfig, AgentType, BaseAgent
+from src.agents.coding_agent import CodingAgent
 from src.agents.kally_agent import KallyAgent
 from src.agents.planning_agent import PlanningAgent
 from src.agents.research_agent import ResearchAgent
 from src.agents.review_agent import ReviewAgent
+from src.agents.summarization_agent import SummarizationAgent
 from src.agents.writing_agent import WritingAgent
 from src.cde.cde_agent import CDEAgent
 from src.ide.ide_agent import IDEAgent
@@ -26,6 +28,8 @@ _AGENT_CLASSES = {
     AgentType.ANALYSIS: AnalysisAgent,
     AgentType.WRITING: WritingAgent,
     AgentType.REVIEW: ReviewAgent,
+    AgentType.CODING: CodingAgent,
+    AgentType.SUMMARIZATION: SummarizationAgent,
     AgentType.IDE: IDEAgent,
     AgentType.CDE: CDEAgent,
     AgentType.KALLY: KallyAgent,
@@ -38,6 +42,7 @@ _CONFIG_DIR = Path(__file__).resolve().parents[2] / "config" / "agents"
 def create_agent(
     config: AgentConfig,
     execution_agent: Optional[Any] = None,
+    llm: Optional[Any] = None,
 ) -> BaseAgent:
     """Instantiate an agent for the given *config*.
 
@@ -47,11 +52,13 @@ def create_agent(
         AgentConfig describing the agent to create.
     execution_agent:
         Optional execution agent to inject for validated execution.
+    llm:
+        Optional LLM instance to inject for LLM-powered responses.
     """
     cls = _AGENT_CLASSES.get(config.agent_type)
     if cls is None:
         raise ValueError(f"No agent class registered for type: {config.agent_type}")
-    agent = cls(config=config, execution_agent=execution_agent)
+    agent = cls(config=config, execution_agent=execution_agent, llm=llm)
     logger.info("Factory created agent '%s'", config.name)
     return agent
 
@@ -59,6 +66,7 @@ def create_agent(
 def create_agent_from_yaml(
     agent_name: str,
     execution_agent: Optional[Any] = None,
+    llm: Optional[Any] = None,
 ) -> BaseAgent:
     """Load an AgentConfig from a YAML file and create the agent.
 
@@ -91,18 +99,19 @@ def create_agent_from_yaml(
         tools=raw.get("tools", []),
         temperature=raw.get("temperature", 0.7),
     )
-    return create_agent(config, execution_agent)
+    return create_agent(config, execution_agent, llm)
 
 
 class AgentFactory:
     """Factory class wrapping the module-level helpers."""
 
-    def __init__(self, execution_agent: Optional[Any] = None) -> None:
+    def __init__(self, execution_agent: Optional[Any] = None, llm: Optional[Any] = None) -> None:
         self._execution_agent = execution_agent
+        self._llm = llm
         self._agents: Dict[str, BaseAgent] = {}
 
     def create_agent(self, config: AgentConfig) -> BaseAgent:
-        agent = create_agent(config, self._execution_agent)
+        agent = create_agent(config, self._execution_agent, self._llm)
         self._agents[config.name] = agent
         return agent
 

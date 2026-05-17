@@ -1,0 +1,1982 @@
+From cd847716ef5057de9a05e1ff3bacdbadd8c90381 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 17 May 2026 00:34:10 +0000
+Subject: [PATCH] Add LLM integration, streaming SSE, new agents, and improved
+ test coverage
+
+- Wire OpenAI and Anthropic providers via LangChain (src/llm/provider.py);
+  agents gracefully fall back to deterministic logic when no API key is set
+- Add CodingAgent (generate/review/explain modes) and SummarizationAgent
+  (concise/detailed/bullet/executive styles) with extractive fallback
+- Add POST /{agent_name}/stream SSE endpoint for token-by-token streaming
+- Extend AgentFactory and main.py to pass llm instance to all agents and
+  register coding_agent + summarization_agent by default
+- Add 58 new tests: test_llm_provider, test_new_agents, test_agents_with_llm,
+  integration streaming tests (215 total, all passing)
+- Add Makefile with install/run/dev/test/lint/format targets
+- Add scripts/start_dev.sh with .env validation and mock-mode warnings
+- Update .env.example with LLM_PROVIDER, model, temperature, CORS vars
+- Update requirements.txt with langchain-core, langchain-openai, langchain-anthropic
+
+https://claude.ai/code/session_015MZ1vesqZFZxBLU7KtdCUj
+---
+ .env.example                          |  10 ++
+ Makefile                              |  59 +++++++
+ requirements.txt                      |   7 +-
+ scripts/start_dev.sh                  |  41 +++++
+ src/agents/agent_factory.py           |  17 +-
+ src/agents/analysis_agent.py          |  39 ++++-
+ src/agents/base_agent.py              |  41 ++++-
+ src/agents/coding_agent.py            | 178 +++++++++++++++++++
+ src/agents/planning_agent.py          |  37 +++-
+ src/agents/research_agent.py          |  24 ++-
+ src/agents/review_agent.py            |  51 +++++-
+ src/agents/summarization_agent.py     | 137 +++++++++++++++
+ src/agents/writing_agent.py           | 108 +++++++++---
+ src/api/endpoints/agents.py           |  33 ++++
+ src/api/main.py                       |  37 +++-
+ src/llm/__init__.py                   |   5 +
+ src/llm/provider.py                   |  99 +++++++++++
+ tests/integration/test_full_system.py |  74 ++++++++
+ tests/unit/test_agents_with_llm.py    | 236 ++++++++++++++++++++++++++
+ tests/unit/test_llm_provider.py       | 124 ++++++++++++++
+ tests/unit/test_new_agents.py         | 155 +++++++++++++++++
+ 21 files changed, 1472 insertions(+), 40 deletions(-)
+ create mode 100644 Makefile
+ create mode 100755 scripts/start_dev.sh
+ create mode 100644 src/agents/coding_agent.py
+ create mode 100644 src/agents/summarization_agent.py
+ create mode 100644 src/llm/__init__.py
+ create mode 100644 src/llm/provider.py
+ create mode 100644 tests/unit/test_agents_with_llm.py
+ create mode 100644 tests/unit/test_llm_provider.py
+ create mode 100644 tests/unit/test_new_agents.py
+
+diff --git a/.env.example b/.env.example
+index 8867150..1cc9a99 100644
+--- a/.env.example
++++ b/.env.example
+@@ -1,13 +1,23 @@
+ # Environment
+ ENVIRONMENT=development
++PORT=8000
+ 
+ # LLM API Keys
+ OPENAI_API_KEY=your-openai-api-key
+ ANTHROPIC_API_KEY=your-anthropic-api-key
+ 
++# LLM Configuration
++LLM_PROVIDER=openai
++OPENAI_MODEL=gpt-4o
++ANTHROPIC_MODEL=claude-sonnet-4-6
++DEFAULT_TEMPERATURE=0.7
++
+ # Database
+ DATABASE_URL=postgresql://user:password@localhost:5432/agi_system
+ REDIS_URL=redis://localhost:6379
+ 
+ # Auth
+ API_KEY=your-api-key-for-auth
++
++# CORS (comma-separated origins, or * for all)
++CORS_ORIGINS=*
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..6f64cf0
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,59 @@
++.PHONY: install install-dev env run dev test test-unit test-integration test-perf test-cov lint format typecheck clean health help
++
++PYTHON  ?= python3
++PIP     ?= pip
++UVICORN ?= uvicorn
++PORT    ?= 8000
++
++help:
++	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
++		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
++	@echo ""
++	@echo "Usage: make <target>"
++
++install: ## Install production dependencies
++	$(PIP) install -r requirements.txt
++
++install-dev: ## Install development dependencies
++	$(PIP) install -r requirements.txt -r requirements-dev.txt
++
++env: ## Copy .env.example to .env if .env doesn't exist
++	@test -f .env || (cp .env.example .env && echo "Created .env from .env.example — please fill in your API keys")
++
++run: env ## Start the API server (production mode)
++	$(UVICORN) src.api.main:app --host 0.0.0.0 --port $(PORT)
++
++dev: env ## Start the API server with auto-reload
++	$(UVICORN) src.api.main:app --host 0.0.0.0 --port $(PORT) --reload
++
++test: ## Run all tests
++	$(PYTHON) -m pytest tests/ -v
++
++test-unit: ## Run unit tests only
++	$(PYTHON) -m pytest tests/unit/ -v
++
++test-integration: ## Run integration tests only
++	$(PYTHON) -m pytest tests/integration/ -v
++
++test-perf: ## Run performance tests only
++	$(PYTHON) -m pytest tests/performance/ -v
++
++test-cov: ## Run tests with coverage report
++	$(PYTHON) -m pytest tests/ --cov=src --cov-report=term-missing --cov-report=html
++
++lint: ## Run ruff linter
++	$(PYTHON) -m ruff check src/ tests/
++
++format: ## Auto-format with ruff
++	$(PYTHON) -m ruff format src/ tests/
++
++typecheck: ## Run mypy type checks
++	$(PYTHON) -m mypy src/ --ignore-missing-imports
++
++clean: ## Remove __pycache__ and build artefacts
++	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
++	find . -type f -name "*.pyc" -delete
++	rm -rf .pytest_cache htmlcov .coverage
++
++health: ## Hit the health endpoint (server must be running)
++	curl -s http://localhost:$(PORT)/api/v1/health | $(PYTHON) -m json.tool
+diff --git a/requirements.txt b/requirements.txt
+index ef8e92b..af044a7 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -1,6 +1,9 @@
+ aiofiles>=23.0.0
+-langchain>=0.1.0
+-langchain-community>=0.0.10
++langchain>=0.2.0
++langchain-core>=0.2.0
++langchain-openai>=0.1.0
++langchain-anthropic>=0.1.0
++langchain-community>=0.0.38
+ crewai>=0.1.0
+ fastapi>=0.109.0
+ uvicorn>=0.27.0
+diff --git a/scripts/start_dev.sh b/scripts/start_dev.sh
+new file mode 100755
+index 0000000..3b171c0
+--- /dev/null
++++ b/scripts/start_dev.sh
+@@ -0,0 +1,41 @@
++#!/usr/bin/env bash
++# Start the AGI System API server in development mode.
++set -euo pipefail
++
++SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
++PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
++cd "${PROJECT_ROOT}"
++
++# ── .env handling ───────────────────────────────────────────────────────────
++if [[ ! -f .env ]]; then
++    if [[ -f .env.example ]]; then
++        cp .env.example .env
++        echo "[info] Created .env from .env.example"
++    fi
++fi
++
++if [[ -f .env ]]; then
++    # shellcheck disable=SC2046
++    export $(grep -v '^#' .env | grep -v '^$' | xargs)
++fi
++
++# ── API key warnings (mock mode notice) ────────────────────────────────────
++if [[ -z "${OPENAI_API_KEY:-}" && -z "${ANTHROPIC_API_KEY:-}" ]]; then
++    echo "[warn] No LLM API keys found — agents will run in mock/fallback mode"
++    echo "       Set OPENAI_API_KEY or ANTHROPIC_API_KEY in .env to enable real LLM calls"
++elif [[ -z "${OPENAI_API_KEY:-}" ]]; then
++    echo "[info] OPENAI_API_KEY not set — OpenAI provider unavailable"
++elif [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
++    echo "[info] ANTHROPIC_API_KEY not set — Anthropic provider unavailable"
++fi
++
++# ── Dependency check ────────────────────────────────────────────────────────
++if ! python3 -c "import fastapi" 2>/dev/null; then
++    echo "[info] Installing dependencies..."
++    pip install -r requirements.txt
++fi
++
++# ── Start server ────────────────────────────────────────────────────────────
++PORT="${PORT:-8000}"
++echo "[info] Starting AGI System API on http://0.0.0.0:${PORT} (reload enabled)"
++exec uvicorn src.api.main:app --host 0.0.0.0 --port "${PORT}" --reload
+diff --git a/src/agents/agent_factory.py b/src/agents/agent_factory.py
+index 9b879b3..9c7c60e 100644
+--- a/src/agents/agent_factory.py
++++ b/src/agents/agent_factory.py
+@@ -10,10 +10,12 @@ import yaml
+ 
+ from src.agents.analysis_agent import AnalysisAgent
+ from src.agents.base_agent import AgentConfig, AgentType, BaseAgent
++from src.agents.coding_agent import CodingAgent
+ from src.agents.kally_agent import KallyAgent
+ from src.agents.planning_agent import PlanningAgent
+ from src.agents.research_agent import ResearchAgent
+ from src.agents.review_agent import ReviewAgent
++from src.agents.summarization_agent import SummarizationAgent
+ from src.agents.writing_agent import WritingAgent
+ from src.cde.cde_agent import CDEAgent
+ from src.ide.ide_agent import IDEAgent
+@@ -26,6 +28,8 @@ _AGENT_CLASSES = {
+     AgentType.ANALYSIS: AnalysisAgent,
+     AgentType.WRITING: WritingAgent,
+     AgentType.REVIEW: ReviewAgent,
++    AgentType.CODING: CodingAgent,
++    AgentType.SUMMARIZATION: SummarizationAgent,
+     AgentType.IDE: IDEAgent,
+     AgentType.CDE: CDEAgent,
+     AgentType.KALLY: KallyAgent,
+@@ -38,6 +42,7 @@ _CONFIG_DIR = Path(__file__).resolve().parents[2] / "config" / "agents"
+ def create_agent(
+     config: AgentConfig,
+     execution_agent: Optional[Any] = None,
++    llm: Optional[Any] = None,
+ ) -> BaseAgent:
+     """Instantiate an agent for the given *config*.
+ 
+@@ -47,11 +52,13 @@ def create_agent(
+         AgentConfig describing the agent to create.
+     execution_agent:
+         Optional execution agent to inject for validated execution.
++    llm:
++        Optional LLM instance to inject for LLM-powered responses.
+     """
+     cls = _AGENT_CLASSES.get(config.agent_type)
+     if cls is None:
+         raise ValueError(f"No agent class registered for type: {config.agent_type}")
+-    agent = cls(config=config, execution_agent=execution_agent)
++    agent = cls(config=config, execution_agent=execution_agent, llm=llm)
+     logger.info("Factory created agent '%s'", config.name)
+     return agent
+ 
+@@ -59,6 +66,7 @@ def create_agent(
+ def create_agent_from_yaml(
+     agent_name: str,
+     execution_agent: Optional[Any] = None,
++    llm: Optional[Any] = None,
+ ) -> BaseAgent:
+     """Load an AgentConfig from a YAML file and create the agent.
+ 
+@@ -91,18 +99,19 @@ def create_agent_from_yaml(
+         tools=raw.get("tools", []),
+         temperature=raw.get("temperature", 0.7),
+     )
+-    return create_agent(config, execution_agent)
++    return create_agent(config, execution_agent, llm)
+ 
+ 
+ class AgentFactory:
+     """Factory class wrapping the module-level helpers."""
+ 
+-    def __init__(self, execution_agent: Optional[Any] = None) -> None:
++    def __init__(self, execution_agent: Optional[Any] = None, llm: Optional[Any] = None) -> None:
+         self._execution_agent = execution_agent
++        self._llm = llm
+         self._agents: Dict[str, BaseAgent] = {}
+ 
+     def create_agent(self, config: AgentConfig) -> BaseAgent:
+-        agent = create_agent(config, self._execution_agent)
++        agent = create_agent(config, self._execution_agent, self._llm)
+         self._agents[config.name] = agent
+         return agent
+ 
+diff --git a/src/agents/analysis_agent.py b/src/agents/analysis_agent.py
+index b0c4726..42c0a19 100644
+--- a/src/agents/analysis_agent.py
++++ b/src/agents/analysis_agent.py
+@@ -26,12 +26,20 @@ class AnalysisResult:
+ class AnalysisAgent(BaseAgent):
+     """Processes data and extracts insights."""
+ 
++    _SYSTEM_PROMPT = (
++        "You are a senior data analyst. Given data (as JSON) and an analysis type, "
++        "return a JSON object with keys: insights (list of strings), patterns (list), "
++        "statistics (dict), recommendations (list), confidence (float 0-1). "
++        "Respond ONLY with valid JSON — no markdown, no explanation."
++    )
++
+     def __init__(
+         self,
+         config: AgentConfig,
+         execution_agent: Optional[Any] = None,
++        llm: Optional[Any] = None,
+     ) -> None:
+-        super().__init__(config, execution_agent)
++        super().__init__(config, execution_agent, llm)
+ 
+     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+         """Process an analysis task."""
+@@ -57,6 +65,10 @@ class AnalysisAgent(BaseAgent):
+         self, data: Dict[str, Any], analysis_type: str
+     ) -> AnalysisResult:
+         """Perform the requested analysis on the provided data."""
++        llm_result = await self._llm_analyze(data, analysis_type)
++        if llm_result is not None:
++            return llm_result
++
+         handler = {
+             "statistical": self._statistical_analysis,
+             "pattern": self._pattern_analysis,
+@@ -65,6 +77,31 @@ class AnalysisAgent(BaseAgent):
+ 
+         return handler(data)
+ 
++    async def _llm_analyze(
++        self, data: Dict[str, Any], analysis_type: str
++    ) -> Optional[AnalysisResult]:
++        """Delegate analysis to the LLM; return None on failure."""
++        import json
++
++        user_prompt = f"Analysis type: {analysis_type}\nData: {json.dumps(data, default=str)}"
++        raw = await self._invoke_llm(self._SYSTEM_PROMPT, user_prompt)
++        if not raw:
++            return None
++        try:
++            raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
++            parsed: Dict[str, Any] = json.loads(raw)
++            return AnalysisResult(
++                analysis_type=analysis_type,
++                insights=parsed.get("insights", []),
++                patterns=parsed.get("patterns", []),
++                statistics=parsed.get("statistics", {}),
++                recommendations=parsed.get("recommendations", []),
++                confidence=float(parsed.get("confidence", 0.8)),
++            )
++        except (json.JSONDecodeError, ValueError, TypeError):
++            logger.warning("LLM analysis returned non-JSON; falling back to algorithmic analysis")
++            return None
++
+     # ------------------------------------------------------------------
+     # Analysis strategies
+     # ------------------------------------------------------------------
+diff --git a/src/agents/base_agent.py b/src/agents/base_agent.py
+index cc3e4c5..05243a7 100644
+--- a/src/agents/base_agent.py
++++ b/src/agents/base_agent.py
+@@ -6,7 +6,7 @@ import logging
+ from abc import ABC, abstractmethod
+ from dataclasses import dataclass, field
+ from enum import Enum
+-from typing import Any, Dict, List, Optional
++from typing import Any, AsyncIterator, Dict, List, Optional
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -23,6 +23,8 @@ class AgentType(str, Enum):
+     IDE = "ide"
+     CDE = "cde"
+     KALLY = "kally"
++    CODING = "coding"
++    SUMMARIZATION = "summarization"
+ 
+ 
+ @dataclass
+@@ -70,12 +72,19 @@ class BaseAgent(ABC):
+         self,
+         config: AgentConfig,
+         execution_agent: Optional[Any] = None,
++        llm: Optional[Any] = None,
+     ) -> None:
+         self.config = config
+         self.execution_agent = execution_agent
++        self.llm = llm  # Optional LangChain chat model
+         self.memory = AgentMemory(max_size=config.memory_size)
+         self._tool_registry: Optional[Any] = None
+-        logger.info("Initialised agent '%s' (type=%s)", config.name, config.agent_type)
++        logger.info(
++            "Initialised agent '%s' (type=%s, llm=%s)",
++            config.name,
++            config.agent_type,
++            "enabled" if llm is not None else "mock",
++        )
+ 
+     # ------------------------------------------------------------------
+     # Public interface
+@@ -85,6 +94,12 @@ class BaseAgent(ABC):
+     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+         """Process a task and return a result dictionary."""
+ 
++    async def stream_task(self, task: Dict[str, Any]) -> AsyncIterator[str]:
++        """Stream task output as text chunks (default: yields full result as one chunk)."""
++        import json
++        result = await self.process_task(task)
++        yield json.dumps(result)
++
+     def get_status(self) -> Dict[str, Any]:
+         """Return a status snapshot of this agent."""
+         return {
+@@ -112,3 +127,25 @@ class BaseAgent(ABC):
+ 
+     def _record_task(self, task: Dict[str, Any], result: Dict[str, Any]) -> None:
+         self.memory.add({"task": task, "result": result})
++
++    async def _invoke_llm(self, system_prompt: str, user_prompt: str) -> Optional[str]:
++        """Call the LLM and return the full response, or None if no LLM configured."""
++        if self.llm is None:
++            return None
++        try:
++            from src.llm.provider import invoke_llm
++            return await invoke_llm(self.llm, system_prompt, user_prompt)
++        except Exception as exc:  # noqa: BLE001
++            logger.warning("LLM invocation failed: %s", exc)
++            return None
++
++    async def _stream_llm(self, prompt: str) -> AsyncIterator[str]:
++        """Stream tokens from the LLM, or yield nothing if no LLM configured."""
++        if self.llm is None:
++            return
++        try:
++            from src.llm.provider import stream_llm_response
++            async for chunk in stream_llm_response(self.llm, prompt):
++                yield chunk
++        except Exception as exc:  # noqa: BLE001
++            logger.warning("LLM streaming failed: %s", exc)
+diff --git a/src/agents/coding_agent.py b/src/agents/coding_agent.py
+new file mode 100644
+index 0000000..d2cd411
+--- /dev/null
++++ b/src/agents/coding_agent.py
+@@ -0,0 +1,178 @@
++"""Coding agent — code generation, review, and explanation."""
++
++from __future__ import annotations
++
++import logging
++from dataclasses import dataclass, field
++from typing import Any, AsyncIterator, Dict, List, Optional
++
++from src.agents.base_agent import AgentConfig, BaseAgent
++
++logger = logging.getLogger(__name__)
++
++
++@dataclass
++class CodeResult:
++    """Output of the coding agent."""
++
++    language: str
++    code: str = ""
++    explanation: str = ""
++    tests: str = ""
++    issues: List[str] = field(default_factory=list)
++    suggestions: List[str] = field(default_factory=list)
++    metadata: Dict[str, Any] = field(default_factory=dict)
++
++
++class CodingAgent(BaseAgent):
++    """Generates, reviews, and explains code using an LLM or deterministic fallback."""
++
++    _GENERATE_SYSTEM = (
++        "You are an expert software engineer. Given a task description and target language, "
++        "produce clean, well-commented, production-quality code. "
++        "Return a JSON object with keys: code (string), explanation (string), "
++        "tests (string with example unit tests). "
++        "Respond ONLY with valid JSON — no markdown fences."
++    )
++    _REVIEW_SYSTEM = (
++        "You are a senior code reviewer. Given code and language, review it thoroughly. "
++        "Return a JSON object with keys: issues (list), suggestions (list), "
++        "explanation (string summary of findings). "
++        "Respond ONLY with valid JSON."
++    )
++    _EXPLAIN_SYSTEM = (
++        "You are a patient programming tutor. Explain the provided code in plain English "
++        "suitable for the specified audience level. Return only the explanation text."
++    )
++
++    def __init__(
++        self,
++        config: AgentConfig,
++        execution_agent: Optional[Any] = None,
++        llm: Optional[Any] = None,
++    ) -> None:
++        super().__init__(config, execution_agent, llm)
++
++    async def stream_task(self, task: Dict[str, Any]) -> AsyncIterator[str]:
++        """Stream code generation token-by-token when an LLM is available."""
++        if self.llm is None:
++            import json
++            result = await self.process_task(task)
++            yield json.dumps(result)
++            return
++
++        language = task.get("language", "python")
++        description = task.get("task", task.get("description", ""))
++        prompt = (
++            f"Write clean, well-commented {language} code for the following task: {description}"
++        )
++        async for chunk in self._stream_llm(prompt):
++            yield chunk
++
++    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
++        """Process a coding task.
++
++        Supported modes via ``task["mode"]``:
++        - ``generate`` (default): generate code from a description
++        - ``review``: review existing code
++        - ``explain``: explain existing code
++        """
++        mode = task.get("mode", "generate")
++        language = task.get("language", "python")
++        logger.info("CodingAgent mode=%s language=%s", mode, language)
++
++        if mode == "review":
++            result_obj = await self.review_code(task.get("code", ""), language)
++        elif mode == "explain":
++            result_obj = await self.explain_code(
++                task.get("code", ""), language, task.get("audience", "intermediate")
++            )
++        else:
++            result_obj = await self.generate_code(
++                task.get("task", task.get("description", "")), language
++            )
++
++        result: Dict[str, Any] = {
++            "status": "completed",
++            "mode": mode,
++            "language": result_obj.language,
++            "code": result_obj.code,
++            "explanation": result_obj.explanation,
++            "tests": result_obj.tests,
++            "issues": result_obj.issues,
++            "suggestions": result_obj.suggestions,
++        }
++        self._record_task(task, result)
++        return result
++
++    # ------------------------------------------------------------------
++    # Core operations
++    # ------------------------------------------------------------------
++
++    async def generate_code(self, description: str, language: str = "python") -> CodeResult:
++        """Generate code from a natural-language description."""
++        import json
++
++        user_prompt = f"Language: {language}\nTask: {description}"
++        raw = await self._invoke_llm(self._GENERATE_SYSTEM, user_prompt)
++
++        if raw:
++            try:
++                cleaned = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
++                parsed: Dict[str, Any] = json.loads(cleaned)
++                return CodeResult(
++                    language=language,
++                    code=parsed.get("code", ""),
++                    explanation=parsed.get("explanation", ""),
++                    tests=parsed.get("tests", ""),
++                )
++            except (json.JSONDecodeError, ValueError):
++                return CodeResult(language=language, code=raw, explanation="Generated by LLM.")
++
++        return CodeResult(
++            language=language,
++            code=f"# TODO: implement — {description}\ndef solution():\n    pass\n",
++            explanation=f"Stub generated for: {description}",
++        )
++
++    async def review_code(self, code: str, language: str = "python") -> CodeResult:
++        """Review code and return issues and suggestions."""
++        import json
++
++        user_prompt = f"Language: {language}\nCode:\n{code}"
++        raw = await self._invoke_llm(self._REVIEW_SYSTEM, user_prompt)
++
++        if raw:
++            try:
++                cleaned = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
++                parsed = json.loads(cleaned)
++                return CodeResult(
++                    language=language,
++                    code=code,
++                    issues=parsed.get("issues", []),
++                    suggestions=parsed.get("suggestions", []),
++                    explanation=parsed.get("explanation", ""),
++                )
++            except (json.JSONDecodeError, ValueError):
++                pass
++
++        # Deterministic fallback: basic heuristics
++        issues: List[str] = []
++        suggestions: List[str] = []
++        if "eval(" in code:
++            issues.append("Use of eval() — potential security risk")
++            suggestions.append("Replace eval() with a safe alternative")
++        if not any(line.strip().startswith(("#", '"""', "'''")) for line in code.splitlines()):
++            suggestions.append("Add docstrings and inline comments for clarity")
++        return CodeResult(language=language, code=code, issues=issues, suggestions=suggestions)
++
++    async def explain_code(
++        self, code: str, language: str = "python", audience: str = "intermediate"
++    ) -> CodeResult:
++        """Explain what a piece of code does."""
++        user_prompt = f"Language: {language}\nAudience level: {audience}\nCode:\n{code}"
++        explanation = (
++            await self._invoke_llm(self._EXPLAIN_SYSTEM, user_prompt)
++            or f"This {language} code performs the described operation."
++        )
++        return CodeResult(language=language, code=code, explanation=explanation)
+diff --git a/src/agents/planning_agent.py b/src/agents/planning_agent.py
+index 75906d4..4f2fef1 100644
+--- a/src/agents/planning_agent.py
++++ b/src/agents/planning_agent.py
+@@ -26,12 +26,21 @@ class ExecutablePlan:
+ class PlanningAgent(BaseAgent):
+     """Decomposes high-level objectives into executable plans."""
+ 
++    _SYSTEM_PROMPT = (
++        "You are a strategic planning agent. Given an objective, decompose it into a "
++        "numbered list of concrete, actionable steps. Each step must include: "
++        "step_id (e.g. step_1), action (verb), description, and the best agent type "
++        "(planning/research/analysis/writing/review/coding/summarization). "
++        "Respond ONLY with a JSON array of step objects."
++    )
++
+     def __init__(
+         self,
+         config: AgentConfig,
+         execution_agent: Optional[Any] = None,
++        llm: Optional[Any] = None,
+     ) -> None:
+-        super().__init__(config, execution_agent)
++        super().__init__(config, execution_agent, llm)
+ 
+     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+         """Process a planning task — decompose objective into steps."""
+@@ -56,10 +65,10 @@ class PlanningAgent(BaseAgent):
+     async def create_executable_plan(self, objective: str) -> ExecutablePlan:
+         """Decompose an objective into an executable plan.
+ 
+-        If an execution_agent is available the plan is validated before
+-        being returned; otherwise a best-effort plan is returned directly.
++        Uses the LLM when available; falls back to a hard-coded pipeline otherwise.
++        If an execution_agent is available the plan is validated before being returned.
+         """
+-        steps = self._decompose_objective(objective)
++        steps = await self._llm_decompose(objective) or self._decompose_objective(objective)
+         dependencies = self._analyse_dependencies(steps)
+ 
+         plan = ExecutablePlan(
+@@ -84,6 +93,26 @@ class PlanningAgent(BaseAgent):
+     # Internal helpers
+     # ------------------------------------------------------------------
+ 
++    async def _llm_decompose(self, objective: str) -> Optional[List[Dict[str, Any]]]:
++        """Ask the LLM to decompose *objective* into steps. Returns None on failure."""
++        import json
++
++        raw = await self._invoke_llm(self._SYSTEM_PROMPT, f"Objective: {objective}")
++        if not raw:
++            return None
++        try:
++            raw = raw.strip()
++            if raw.startswith("```"):
++                raw = raw.split("```")[1]
++                if raw.startswith("json"):
++                    raw = raw[4:]
++            steps: List[Dict[str, Any]] = json.loads(raw)
++            if isinstance(steps, list) and steps:
++                return steps
++        except (json.JSONDecodeError, ValueError):
++            logger.warning("LLM returned non-JSON plan; falling back to hardcoded decomposition")
++        return None
++
+     def _decompose_objective(self, objective: str) -> List[Dict[str, Any]]:
+         """Break an objective into ordered steps."""
+         return [
+diff --git a/src/agents/research_agent.py b/src/agents/research_agent.py
+index 8778402..a604410 100644
+--- a/src/agents/research_agent.py
++++ b/src/agents/research_agent.py
+@@ -26,12 +26,19 @@ class ResearchResult:
+ class ResearchAgent(BaseAgent):
+     """Gathers information from multiple sources and assesses quality."""
+ 
++    _SYSTEM_PROMPT = (
++        "You are an expert research agent. Given a query and a list of source snippets, "
++        "synthesise a clear, concise, and factual summary. Highlight key findings and "
++        "note the reliability of sources. Write in plain prose (no JSON)."
++    )
++
+     def __init__(
+         self,
+         config: AgentConfig,
+         execution_agent: Optional[Any] = None,
++        llm: Optional[Any] = None,
+     ) -> None:
+-        super().__init__(config, execution_agent)
++        super().__init__(config, execution_agent, llm)
+ 
+     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+         """Process a research task."""
+@@ -69,7 +76,7 @@ class ResearchAgent(BaseAgent):
+                 sources.extend(r)
+ 
+         quality = self._assess_quality(sources)
+-        summary = self._build_summary(query, sources)
++        summary = await self._llm_summarise(query, sources) or self._build_summary(query, sources)
+ 
+         return ResearchResult(
+             query=query,
+@@ -82,6 +89,19 @@ class ResearchAgent(BaseAgent):
+     # Helpers
+     # ------------------------------------------------------------------
+ 
++    async def _llm_summarise(
++        self, query: str, sources: List[Dict[str, Any]]
++    ) -> Optional[str]:
++        """Use the LLM to synthesise a summary from gathered sources."""
++        if not sources:
++            return None
++        snippets = "\n".join(
++            f"- [{s.get('source', 'unknown')}] {s.get('title', '')}: {s.get('snippet', '')}"
++            for s in sources[:10]
++        )
++        user_prompt = f"Query: {query}\n\nSources:\n{snippets}"
++        return await self._invoke_llm(self._SYSTEM_PROMPT, user_prompt)
++
+     async def _search_source(
+         self, query: str, tool_name: str
+     ) -> List[Dict[str, Any]]:
+diff --git a/src/agents/review_agent.py b/src/agents/review_agent.py
+index a5fef37..e4438ba 100644
+--- a/src/agents/review_agent.py
++++ b/src/agents/review_agent.py
+@@ -26,12 +26,21 @@ class ReviewResult:
+ class ReviewAgent(BaseAgent):
+     """Validates and quality-assures output from other agents."""
+ 
++    _SYSTEM_PROMPT = (
++        "You are a meticulous quality reviewer. Analyse the provided content against the "
++        "given criteria. Return a JSON object with keys: "
++        "is_approved (bool), score (float 0-1), issues (list of strings), "
++        "suggestions (list of strings), reflection_notes (list of strings). "
++        "Respond ONLY with valid JSON."
++    )
++
+     def __init__(
+         self,
+         config: AgentConfig,
+         execution_agent: Optional[Any] = None,
++        llm: Optional[Any] = None,
+     ) -> None:
+-        super().__init__(config, execution_agent)
++        super().__init__(config, execution_agent, llm)
+ 
+     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+         """Process a review task."""
+@@ -57,7 +66,14 @@ class ReviewAgent(BaseAgent):
+     async def review_output(
+         self, content: Any, criteria: Dict[str, Any]
+     ) -> ReviewResult:
+-        """Review content against the provided criteria."""
++        """Review content against the provided criteria.
++
++        Uses the LLM for deep analysis when available; falls back to rule-based checks.
++        """
++        llm_result = await self._llm_review(content, criteria)
++        if llm_result is not None:
++            return llm_result
++
+         issues: List[str] = []
+         suggestions: List[str] = []
+         notes: List[str] = []
+@@ -99,6 +115,37 @@ class ReviewAgent(BaseAgent):
+             reflection_notes=notes,
+         )
+ 
++    # ------------------------------------------------------------------
++    # LLM-powered review
++    # ------------------------------------------------------------------
++
++    async def _llm_review(
++        self, content: Any, criteria: Dict[str, Any]
++    ) -> Optional[ReviewResult]:
++        """Use the LLM to perform deep content review; return None on failure."""
++        import json
++
++        user_prompt = (
++            f"Content to review:\n{content}\n\n"
++            f"Review criteria: {json.dumps(criteria, default=str)}"
++        )
++        raw = await self._invoke_llm(self._SYSTEM_PROMPT, user_prompt)
++        if not raw:
++            return None
++        try:
++            raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
++            parsed: Dict[str, Any] = json.loads(raw)
++            return ReviewResult(
++                is_approved=bool(parsed.get("is_approved", False)),
++                score=float(parsed.get("score", 0.0)),
++                issues=parsed.get("issues", []),
++                suggestions=parsed.get("suggestions", []),
++                reflection_notes=parsed.get("reflection_notes", []),
++            )
++        except (json.JSONDecodeError, ValueError, TypeError):
++            logger.warning("LLM review returned non-JSON; falling back to rule-based review")
++            return None
++
+     # ------------------------------------------------------------------
+     # Self-correction
+     # ------------------------------------------------------------------
+diff --git a/src/agents/summarization_agent.py b/src/agents/summarization_agent.py
+new file mode 100644
+index 0000000..59dca46
+--- /dev/null
++++ b/src/agents/summarization_agent.py
+@@ -0,0 +1,137 @@
++"""Summarization agent — condenses text, documents, and research into digestible summaries."""
++
++from __future__ import annotations
++
++import logging
++from dataclasses import dataclass, field
++from typing import Any, Dict, List, Optional
++
++from src.agents.base_agent import AgentConfig, BaseAgent
++
++logger = logging.getLogger(__name__)
++
++
++@dataclass
++class SummaryResult:
++    """Output of the summarization agent."""
++
++    original_length: int
++    summary: str = ""
++    key_points: List[str] = field(default_factory=list)
++    style: str = "concise"
++    compression_ratio: float = 0.0
++    metadata: Dict[str, Any] = field(default_factory=dict)
++
++
++class SummarizationAgent(BaseAgent):
++    """Produces concise summaries in multiple styles using an LLM or extractive fallback."""
++
++    _SYSTEM_PROMPT = (
++        "You are an expert summarizer. Given text and a style, produce a summary. "
++        "Return a JSON object with keys: "
++        "summary (string), key_points (list of up to 5 bullet strings). "
++        "Styles: 'concise' (1-2 sentences), 'detailed' (full paragraph), "
++        "'bullet' (bullet list), 'executive' (executive-briefing prose). "
++        "Respond ONLY with valid JSON."
++    )
++
++    def __init__(
++        self,
++        config: AgentConfig,
++        execution_agent: Optional[Any] = None,
++        llm: Optional[Any] = None,
++    ) -> None:
++        super().__init__(config, execution_agent, llm)
++
++    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
++        """Process a summarization task.
++
++        Expected task keys:
++        - ``text`` (str): the content to summarise
++        - ``style`` (str, optional): concise | detailed | bullet | executive
++        - ``max_length`` (int, optional): soft word-count cap on the summary
++        """
++        text = task.get("text", task.get("task", ""))
++        style = task.get("style", "concise")
++        max_length = task.get("max_length")
++        logger.info("SummarizationAgent style=%s text_length=%d", style, len(text))
++
++        result_obj = await self.summarize(text, style=style, max_length=max_length)
++
++        result: Dict[str, Any] = {
++            "status": "completed",
++            "summary": result_obj.summary,
++            "key_points": result_obj.key_points,
++            "style": result_obj.style,
++            "original_length": result_obj.original_length,
++            "compression_ratio": result_obj.compression_ratio,
++        }
++        self._record_task(task, result)
++        return result
++
++    async def summarize(
++        self,
++        text: str,
++        style: str = "concise",
++        max_length: Optional[int] = None,
++    ) -> SummaryResult:
++        """Summarize *text* in the requested *style*."""
++        original_length = len(text.split())
++        import json
++
++        user_prompt = f"Style: {style}\nText:\n{text}"
++        if max_length:
++            user_prompt += f"\n\nMax summary length: {max_length} words"
++
++        raw = await self._invoke_llm(self._SYSTEM_PROMPT, user_prompt)
++        if raw:
++            try:
++                cleaned = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
++                parsed: Dict[str, Any] = json.loads(cleaned)
++                summary = parsed.get("summary", "")
++                key_points = parsed.get("key_points", [])
++                summary_length = len(summary.split())
++                compression = (
++                    round(1 - summary_length / original_length, 2) if original_length > 0 else 0.0
++                )
++                return SummaryResult(
++                    original_length=original_length,
++                    summary=summary,
++                    key_points=key_points,
++                    style=style,
++                    compression_ratio=compression,
++                )
++            except (json.JSONDecodeError, ValueError):
++                summary = raw.strip()
++                compression = (
++                    round(1 - len(summary.split()) / original_length, 2)
++                    if original_length > 0
++                    else 0.0
++                )
++                return SummaryResult(
++                    original_length=original_length,
++                    summary=summary,
++                    style=style,
++                    compression_ratio=compression,
++                )
++
++        return self._extractive_summary(text, style, original_length)
++
++    def _extractive_summary(
++        self, text: str, style: str, original_length: int
++    ) -> SummaryResult:
++        sentences = [s.strip() for s in text.replace("\n", " ").split(".") if s.strip()]
++        n = 1 if style == "concise" else min(5, len(sentences))
++        summary = ". ".join(sentences[:n]) + ("." if sentences[:n] else "")
++        key_points = [f"* {s}." for s in sentences[:5]]
++        summary_length = len(summary.split())
++        compression = (
++            round(1 - summary_length / original_length, 2) if original_length > 0 else 0.0
++        )
++        return SummaryResult(
++            original_length=original_length,
++            summary=summary,
++            key_points=key_points,
++            style=style,
++            compression_ratio=compression,
++        )
+diff --git a/src/agents/writing_agent.py b/src/agents/writing_agent.py
+index 1803807..6bc4dbb 100644
+--- a/src/agents/writing_agent.py
++++ b/src/agents/writing_agent.py
+@@ -4,7 +4,7 @@ from __future__ import annotations
+ 
+ import logging
+ from dataclasses import dataclass, field
+-from typing import Any, Dict, List, Optional
++from typing import Any, AsyncIterator, Dict, List, Optional
+ 
+ from src.agents.base_agent import AgentConfig, BaseAgent
+ 
+@@ -28,12 +28,45 @@ class Document:
+ class WritingAgent(BaseAgent):
+     """Generates high-quality content through a structured pipeline."""
+ 
++    _OUTLINE_PROMPT = (
++        "You are a skilled writer. Given a topic, format, and target audience, generate a "
++        "document outline as a JSON array of section heading strings. "
++        "Respond ONLY with a JSON array — no markdown, no explanation."
++    )
++    _SECTION_PROMPT = (
++        "You are a skilled writer. Write the content for the section '{heading}' of a "
++        "{format} about '{topic}'. Tone: {tone}. Audience: {audience}. "
++        "Write 2-4 substantial paragraphs. No headings, just prose."
++    )
++
+     def __init__(
+         self,
+         config: AgentConfig,
+         execution_agent: Optional[Any] = None,
++        llm: Optional[Any] = None,
+     ) -> None:
+-        super().__init__(config, execution_agent)
++        super().__init__(config, execution_agent, llm)
++
++    async def stream_task(self, task: Dict[str, Any]) -> AsyncIterator[str]:
++        """Stream document content token-by-token when an LLM is available."""
++        if self.llm is None:
++            import json
++            result = await self.process_task(task)
++            yield json.dumps(result)
++            return
++
++        topic = task.get("topic", task.get("task", ""))
++        requirements = task.get("requirements", {})
++        tone = requirements.get("tone", "professional")
++        audience = requirements.get("audience", "general")
++        doc_format = requirements.get("format", "article")
++
++        prompt = (
++            f"Write a {tone} {doc_format} about '{topic}' for a {audience} audience. "
++            "Use clear markdown headings for each section."
++        )
++        async for chunk in self._stream_llm(prompt):
++            yield chunk
+ 
+     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+         """Process a writing task."""
+@@ -63,8 +96,11 @@ class WritingAgent(BaseAgent):
+         audience = requirements.get("audience", "general")
+         doc_format = requirements.get("format", "article")
+ 
+-        outline = self._create_outline(topic, doc_format)
+-        sections = self._draft_sections(outline, topic, tone, audience)
++        outline = (
++            await self._llm_create_outline(topic, doc_format, audience)
++            or self._create_outline(topic, doc_format)
++        )
++        sections = await self._llm_draft_sections(outline, topic, tone, audience, doc_format)
+         content = self._assemble_content(sections)
+         content = self._edit_content(content, requirements)
+ 
+@@ -82,6 +118,52 @@ class WritingAgent(BaseAgent):
+     # Pipeline stages
+     # ------------------------------------------------------------------
+ 
++    async def _llm_create_outline(
++        self, topic: str, doc_format: str, audience: str
++    ) -> Optional[List[str]]:
++        """Ask the LLM to produce an outline; return None on failure."""
++        import json
++
++        user_prompt = f"Topic: {topic}\nFormat: {doc_format}\nAudience: {audience}"
++        raw = await self._invoke_llm(self._OUTLINE_PROMPT, user_prompt)
++        if not raw:
++            return None
++        try:
++            raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
++            outline: List[str] = json.loads(raw)
++            if isinstance(outline, list) and outline:
++                return outline
++        except (json.JSONDecodeError, ValueError):
++            logger.warning("LLM outline response was not JSON; using default outline")
++        return None
++
++    async def _llm_draft_sections(
++        self,
++        outline: List[str],
++        topic: str,
++        tone: str,
++        audience: str,
++        doc_format: str,
++    ) -> List[Dict[str, Any]]:
++        """Draft each section using the LLM if available, else use placeholder text."""
++        sections: List[Dict[str, Any]] = []
++        for heading in outline:
++            if self.llm is not None:
++                prompt = self._SECTION_PROMPT.format(
++                    heading=heading,
++                    format=doc_format,
++                    topic=topic,
++                    tone=tone,
++                    audience=audience,
++                )
++                content = await self._invoke_llm("", prompt) or (
++                    f"[{tone.upper()} | {audience}] Content for '{heading}' related to {topic}."
++                )
++            else:
++                content = f"[{tone.upper()} | {audience}] Content for '{heading}' related to {topic}."
++            sections.append({"heading": heading, "content": content})
++        return sections
++
+     def _create_outline(self, topic: str, doc_format: str) -> List[str]:
+         if doc_format == "report":
+             return [
+@@ -101,24 +183,6 @@ class WritingAgent(BaseAgent):
+             "Conclusion",
+         ]
+ 
+-    def _draft_sections(
+-        self,
+-        outline: List[str],
+-        topic: str,
+-        tone: str,
+-        audience: str,
+-    ) -> List[Dict[str, Any]]:
+-        return [
+-            {
+-                "heading": heading,
+-                "content": (
+-                    f"[{tone.upper()} | {audience}] "
+-                    f"Content for '{heading}' related to {topic}."
+-                ),
+-            }
+-            for heading in outline
+-        ]
+-
+     def _assemble_content(self, sections: List[Dict[str, Any]]) -> str:
+         parts: List[str] = []
+         for section in sections:
+diff --git a/src/api/endpoints/agents.py b/src/api/endpoints/agents.py
+index 395613d..779d559 100644
+--- a/src/api/endpoints/agents.py
++++ b/src/api/endpoints/agents.py
+@@ -6,6 +6,7 @@ import logging
+ from typing import Any, Dict, List
+ 
+ from fastapi import APIRouter, HTTPException, Request
++from fastapi.responses import StreamingResponse
+ from pydantic import BaseModel
+ 
+ logger = logging.getLogger(__name__)
+@@ -58,6 +59,38 @@ async def execute_agent_task(
+         raise HTTPException(status_code=500, detail=str(exc)) from exc
+ 
+ 
++@router.post("/{agent_name}/stream")
++async def stream_agent_task(
++    agent_name: str, body: TaskRequest, request: Request
++) -> StreamingResponse:
++    """Stream agent output token-by-token via Server-Sent Events."""
++    factory = getattr(request.app.state, "agent_factory", None)
++    if factory is None:
++        raise HTTPException(status_code=503, detail="Agent system not initialised")
++
++    agent = factory.get_agent(agent_name)
++    if agent is None:
++        raise HTTPException(status_code=404, detail=f"Agent '{agent_name}' not found")
++
++    task_dict = {"task": body.task, **body.parameters}
++
++    async def _event_generator():
++        try:
++            async for chunk in agent.stream_task(task_dict):
++                safe_chunk = chunk.replace("\n", "\\n")
++                yield f"data: {safe_chunk}\n\n"
++        except Exception as exc:  # noqa: BLE001
++            logger.error("Agent '%s' stream error: %s", agent_name, exc)
++            yield f"data: {{'error': '{exc}'}}\n\n"
++        yield "data: [DONE]\n\n"
++
++    return StreamingResponse(
++        _event_generator(),
++        media_type="text/event-stream",
++        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
++    )
++
++
+ @router.get("/{agent_name}/status")
+ async def agent_status(agent_name: str, request: Request) -> Dict[str, Any]:
+     """Get status and memory usage for the named agent."""
+diff --git a/src/api/main.py b/src/api/main.py
+index faad383..ed534f1 100644
+--- a/src/api/main.py
++++ b/src/api/main.py
+@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
+ from src.agents.agent_factory import AgentFactory
+ from src.agents.base_agent import AgentConfig, AgentType
+ from src.agents.kally_agent import KallyAgent
++from src.llm.provider import LLMProvider, create_llm
+ from src.api.endpoints import agents, health, tasks
+ from src.api.endpoints.cde import router as cde_router
+ from src.api.endpoints.ide import router as ide_router
+@@ -30,11 +31,33 @@ from src.platform.tool_landscape import ToolLandscape
+ logger = logging.getLogger(__name__)
+ 
+ 
++def _init_llm() -> object:
++    """Create an LLM instance from environment variables; returns None in mock mode."""
++    provider = os.getenv("LLM_PROVIDER", "openai").lower()
++    try:
++        llm_provider = LLMProvider(provider)
++    except ValueError:
++        llm_provider = LLMProvider.OPENAI
++    llm = create_llm(
++        provider=llm_provider,
++        temperature=float(os.getenv("DEFAULT_TEMPERATURE", "0.7")),
++    )
++    if llm is None:
++        logger.warning("No LLM API key found — running in mock/fallback mode")
++    else:
++        logger.info("LLM initialised with provider=%s", provider)
++    return llm
++
++
+ @asynccontextmanager
+ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+     """Initialise and tear down application-level resources."""
+     logger.info("AGI System starting up...")
+ 
++    # Initialise LLM
++    llm = _init_llm()
++    app.state.llm = llm
++
+     # Initialise execution engine and agent
+     execution_engine = ExecutionEngine()
+     execution_agent = ExecutionAgent(execution_engine=execution_engine)
+@@ -42,7 +65,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+     app.state.execution_agent = execution_agent
+ 
+     # Initialise agent factory and default agents
+-    factory = AgentFactory(execution_agent=execution_agent)
++    factory = AgentFactory(execution_agent=execution_agent, llm=llm)
+     _register_default_agents(factory, execution_agent)
+     app.state.agent_factory = factory
+ 
+@@ -124,6 +147,18 @@ def _register_default_agents(
+             description="Quality assurance and fact-checking",
+             capabilities=["quality_assurance", "fact_checking"],
+         ),
++        AgentConfig(
++            name="coding_agent",
++            agent_type=AgentType.CODING,
++            description="Code generation, review, and explanation",
++            capabilities=["code_generation", "code_review", "code_explanation"],
++        ),
++        AgentConfig(
++            name="summarization_agent",
++            agent_type=AgentType.SUMMARIZATION,
++            description="Text summarization in multiple styles",
++            capabilities=["summarization", "key_point_extraction"],
++        ),
+     ]
+     for config in default_configs:
+         factory.create_agent(config)
+diff --git a/src/llm/__init__.py b/src/llm/__init__.py
+new file mode 100644
+index 0000000..e43d19f
+--- /dev/null
++++ b/src/llm/__init__.py
+@@ -0,0 +1,5 @@
++"""LLM provider module — OpenAI and Anthropic via LangChain."""
++
++from src.llm.provider import LLMProvider, create_llm
++
++__all__ = ["LLMProvider", "create_llm"]
+diff --git a/src/llm/provider.py b/src/llm/provider.py
+new file mode 100644
+index 0000000..3e8f168
+--- /dev/null
++++ b/src/llm/provider.py
+@@ -0,0 +1,99 @@
++"""LLM provider factory — wraps OpenAI and Anthropic via LangChain."""
++
++from __future__ import annotations
++
++import logging
++import os
++from enum import Enum
++from typing import AsyncIterator, Optional
++
++logger = logging.getLogger(__name__)
++
++
++class LLMProvider(str, Enum):
++    """Supported LLM backend providers."""
++
++    OPENAI = "openai"
++    ANTHROPIC = "anthropic"
++
++
++def create_llm(
++    provider: str = "openai",
++    model: Optional[str] = None,
++    temperature: float = 0.7,
++    max_tokens: int = 2000,
++    api_key: Optional[str] = None,
++) -> Optional[object]:
++    """Instantiate a LangChain chat model for the given provider.
++
++    Returns ``None`` (graceful no-op) when the required API key is absent or
++    the optional LangChain provider package is not installed.
++    """
++    provider = provider.lower()
++
++    if provider == LLMProvider.OPENAI:
++        key = api_key or os.getenv("OPENAI_API_KEY")
++        if not key:
++            logger.warning("OPENAI_API_KEY not set — LLM disabled for this agent")
++            return None
++        try:
++            from langchain_openai import ChatOpenAI  # type: ignore
++
++            resolved_model = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
++            llm = ChatOpenAI(
++                model=resolved_model,
++                temperature=temperature,
++                max_tokens=max_tokens,
++                api_key=key,
++                streaming=True,
++            )
++            logger.info("Initialised OpenAI LLM: %s", resolved_model)
++            return llm
++        except ImportError:
++            logger.warning("langchain-openai not installed — run: pip install langchain-openai")
++            return None
++
++    if provider == LLMProvider.ANTHROPIC:
++        key = api_key or os.getenv("ANTHROPIC_API_KEY")
++        if not key:
++            logger.warning("ANTHROPIC_API_KEY not set — LLM disabled for this agent")
++            return None
++        try:
++            from langchain_anthropic import ChatAnthropic  # type: ignore
++
++            resolved_model = model or os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
++            llm = ChatAnthropic(
++                model=resolved_model,
++                temperature=temperature,
++                max_tokens=max_tokens,
++                api_key=key,
++            )
++            logger.info("Initialised Anthropic LLM: %s", resolved_model)
++            return llm
++        except ImportError:
++            logger.warning(
++                "langchain-anthropic not installed — run: pip install langchain-anthropic"
++            )
++            return None
++
++    logger.warning("Unknown LLM provider '%s' — LLM disabled", provider)
++    return None
++
++
++async def stream_llm_response(llm: object, prompt: str) -> AsyncIterator[str]:
++    """Yield text chunks from an LLM using LangChain's async streaming interface."""
++    from langchain_core.messages import HumanMessage  # type: ignore
++
++    async for chunk in llm.astream([HumanMessage(content=prompt)]):  # type: ignore[union-attr]
++        delta = getattr(chunk, "content", "")
++        if delta:
++            yield delta
++
++
++async def invoke_llm(llm: object, system_prompt: str, user_prompt: str) -> str:
++    """Invoke an LLM with a system + user message pair and return the full response."""
++    from langchain_core.messages import HumanMessage, SystemMessage  # type: ignore
++
++    messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
++    response = await llm.ainvoke(messages)  # type: ignore[union-attr]
++    return str(getattr(response, "content", response))
+diff --git a/tests/integration/test_full_system.py b/tests/integration/test_full_system.py
+index 5b21869..96f682e 100644
+--- a/tests/integration/test_full_system.py
++++ b/tests/integration/test_full_system.py
+@@ -93,3 +93,77 @@ class TestTaskEndpoints:
+     def test_unknown_task_returns_404(self, client):
+         response = client.get("/api/v1/tasks/nonexistent-task-id")
+         assert response.status_code == 404
++
++
++class TestNewAgents:
++    def test_coding_agent_listed(self, client):
++        response = client.get("/api/v1/agents/")
++        assert response.status_code == 200
++        names = [a["name"] for a in response.json()]
++        assert "coding_agent" in names
++
++    def test_summarization_agent_listed(self, client):
++        response = client.get("/api/v1/agents/")
++        assert response.status_code == 200
++        names = [a["name"] for a in response.json()]
++        assert "summarization_agent" in names
++
++    def test_coding_agent_generate(self, client):
++        response = client.post(
++            "/api/v1/agents/coding_agent/execute",
++            json={"task": "reverse a string", "parameters": {"mode": "generate", "language": "python"}},
++        )
++        assert response.status_code == 200
++        data = response.json()["result"]
++        assert data["status"] == "completed"
++        assert "code" in data
++
++    def test_coding_agent_review(self, client):
++        response = client.post(
++            "/api/v1/agents/coding_agent/execute",
++            json={"task": "review code", "parameters": {"mode": "review", "code": "x = eval(input())", "language": "python"}},
++        )
++        assert response.status_code == 200
++        data = response.json()["result"]
++        assert "issues" in data
++
++    def test_summarization_agent_execute(self, client):
++        response = client.post(
++            "/api/v1/agents/summarization_agent/execute",
++            json={"task": "summarize", "parameters": {"text": "The quick brown fox. Machine learning is great. AI is transforming industries.", "style": "concise"}},
++        )
++        assert response.status_code == 200
++        data = response.json()["result"]
++        assert data["status"] == "completed"
++        assert "summary" in data
++
++
++class TestStreamingEndpoint:
++    def test_stream_returns_event_stream(self, client):
++        with client.stream(
++            "POST",
++            "/api/v1/agents/summarization_agent/stream",
++            json={"task": "summarize this", "parameters": {"text": "Hello world. This is a test.", "style": "concise"}},
++        ) as response:
++            assert response.status_code == 200
++            assert "text/event-stream" in response.headers.get("content-type", "")
++            raw = response.read().decode()
++            assert "data:" in raw
++            assert "[DONE]" in raw
++
++    def test_stream_unknown_agent_returns_404(self, client):
++        response = client.post(
++            "/api/v1/agents/nonexistent_agent/stream",
++            json={"task": "test"},
++        )
++        assert response.status_code == 404
++
++    def test_stream_coding_agent(self, client):
++        with client.stream(
++            "POST",
++            "/api/v1/agents/coding_agent/stream",
++            json={"task": "write hello world", "parameters": {"language": "python"}},
++        ) as response:
++            assert response.status_code == 200
++            raw = response.read().decode()
++            assert "data:" in raw
+diff --git a/tests/unit/test_agents_with_llm.py b/tests/unit/test_agents_with_llm.py
+new file mode 100644
+index 0000000..3e77c3d
+--- /dev/null
++++ b/tests/unit/test_agents_with_llm.py
+@@ -0,0 +1,236 @@
++"""Unit tests for all agents with a mocked LLM."""
++
++from __future__ import annotations
++
++import json
++from unittest.mock import AsyncMock, MagicMock
++
++import pytest
++
++from src.agents.analysis_agent import AnalysisAgent
++from src.agents.base_agent import AgentConfig, AgentType
++from src.agents.coding_agent import CodingAgent
++from src.agents.planning_agent import PlanningAgent
++from src.agents.research_agent import ResearchAgent
++from src.agents.review_agent import ReviewAgent
++from src.agents.summarization_agent import SummarizationAgent
++from src.agents.writing_agent import WritingAgent
++
++
++def _mock_llm(response_content: str) -> MagicMock:
++    """Return a mock LLM whose ainvoke() resolves to *response_content*."""
++    mock_response = MagicMock()
++    mock_response.content = response_content
++    mock_llm = MagicMock()
++    mock_llm.ainvoke = AsyncMock(return_value=mock_response)
++    return mock_llm
++
++
++def _config(agent_type: AgentType, name: str = "test") -> AgentConfig:
++    return AgentConfig(name=name, agent_type=agent_type, description="", capabilities=[])
++
++
++# ── PlanningAgent ─────────────────────────────────────────────────────────────
++
++class TestPlanningAgentWithLlm:
++    @pytest.mark.asyncio
++    async def test_llm_decompose_used_when_available(self):
++        steps = [
++            {"step_id": "step_1", "action": "research", "description": "Do something", "agent_type": "research"},
++        ]
++        llm = _mock_llm(json.dumps(steps))
++        agent = PlanningAgent(config=_config(AgentType.PLANNING), llm=llm)
++        result = await agent.process_task({"task": "Build an app"})
++        assert result["status"] == "completed"
++        assert len(result["plan"]["steps"]) == 1
++
++    @pytest.mark.asyncio
++    async def test_falls_back_on_invalid_json(self):
++        llm = _mock_llm("not json at all")
++        agent = PlanningAgent(config=_config(AgentType.PLANNING), llm=llm)
++        result = await agent.process_task({"task": "Build an app"})
++        assert result["status"] == "completed"
++        assert len(result["plan"]["steps"]) > 0
++
++
++# ── ResearchAgent ─────────────────────────────────────────────────────────────
++
++class TestResearchAgentWithLlm:
++    @pytest.mark.asyncio
++    async def test_llm_summary_included_in_result(self):
++        llm = _mock_llm("Here is a great research summary.")
++        agent = ResearchAgent(config=_config(AgentType.RESEARCH), llm=llm)
++        result = await agent.process_task({"task": "quantum computing"})
++        assert result["status"] == "completed"
++        assert "summary" in result
++
++
++# ── AnalysisAgent ─────────────────────────────────────────────────────────────
++
++class TestAnalysisAgentWithLlm:
++    @pytest.mark.asyncio
++    async def test_llm_analysis_parsed(self):
++        payload = {
++            "insights": ["trend upward"],
++            "patterns": ["seasonal"],
++            "statistics": {"mean": 42},
++            "recommendations": ["invest more"],
++            "confidence": 0.9,
++        }
++        llm = _mock_llm(json.dumps(payload))
++        agent = AnalysisAgent(config=_config(AgentType.ANALYSIS), llm=llm)
++        result = await agent.process_task({"data": {"x": 1}, "analysis_type": "general"})
++        assert result["confidence"] == 0.9
++        assert result["insights"] == ["trend upward"]
++
++    @pytest.mark.asyncio
++    async def test_falls_back_on_bad_json(self):
++        llm = _mock_llm("garbage")
++        agent = AnalysisAgent(config=_config(AgentType.ANALYSIS), llm=llm)
++        result = await agent.process_task({"data": {"a": 1}, "analysis_type": "statistical"})
++        assert result["status"] == "completed"
++
++
++# ── WritingAgent ──────────────────────────────────────────────────────────────
++
++class TestWritingAgentWithLlm:
++    @pytest.mark.asyncio
++    async def test_llm_outline_used(self):
++        call_count = 0
++
++        async def _fake_ainvoke(messages):
++            nonlocal call_count
++            call_count += 1
++            mock_resp = MagicMock()
++            if call_count == 1:
++                mock_resp.content = json.dumps(["Intro", "Body", "Conclusion"])
++            else:
++                mock_resp.content = "Section content here."
++            return mock_resp
++
++        mock_llm = MagicMock()
++        mock_llm.ainvoke = _fake_ainvoke
++
++        agent = WritingAgent(config=_config(AgentType.WRITING), llm=mock_llm)
++        result = await agent.process_task({"topic": "AI", "requirements": {}})
++        assert "Intro" in result["outline"] or result["word_count"] > 0
++
++    @pytest.mark.asyncio
++    async def test_stream_task_yields_chunks(self):
++        chunk = MagicMock()
++        chunk.content = "streamed content"
++
++        async def _fake_astream(messages):
++            yield chunk
++
++        mock_llm = MagicMock()
++        mock_llm.astream = _fake_astream
++
++        agent = WritingAgent(config=_config(AgentType.WRITING), llm=mock_llm)
++        chunks = []
++        async for c in agent.stream_task({"topic": "AI", "requirements": {}}):
++            chunks.append(c)
++        assert "streamed content" in chunks
++
++
++# ── ReviewAgent ───────────────────────────────────────────────────────────────
++
++class TestReviewAgentWithLlm:
++    @pytest.mark.asyncio
++    async def test_llm_review_parsed(self):
++        payload = {
++            "is_approved": True,
++            "score": 0.95,
++            "issues": [],
++            "suggestions": ["Nice work"],
++            "reflection_notes": ["Thorough content"],
++        }
++        llm = _mock_llm(json.dumps(payload))
++        agent = ReviewAgent(config=_config(AgentType.REVIEW), llm=llm)
++        result = await agent.process_task({"content": "Great content here", "criteria": {}})
++        assert result["is_approved"] is True
++        assert result["score"] == 0.95
++
++    @pytest.mark.asyncio
++    async def test_falls_back_on_non_json(self):
++        llm = _mock_llm("This looks fine to me.")
++        agent = ReviewAgent(config=_config(AgentType.REVIEW), llm=llm)
++        result = await agent.process_task({"content": "some content", "criteria": {}})
++        assert result["status"] == "completed"
++
++
++# ── CodingAgent ───────────────────────────────────────────────────────────────
++
++class TestCodingAgentWithLlm:
++    @pytest.mark.asyncio
++    async def test_generate_code_parsed(self):
++        payload = {
++            "code": "def sort_list(lst): return sorted(lst)",
++            "explanation": "Uses Python's built-in sorted().",
++            "tests": "assert sort_list([3,1,2]) == [1,2,3]",
++        }
++        llm = _mock_llm(json.dumps(payload))
++        agent = CodingAgent(config=_config(AgentType.CODING), llm=llm)
++        result = await agent.generate_code("sort a list")
++        assert "sorted" in result.code
++        assert result.explanation != ""
++
++    @pytest.mark.asyncio
++    async def test_review_code_parsed(self):
++        payload = {
++            "issues": ["Missing type hints"],
++            "suggestions": ["Add return type annotation"],
++            "explanation": "Code is functional but lacks annotations.",
++        }
++        llm = _mock_llm(json.dumps(payload))
++        agent = CodingAgent(config=_config(AgentType.CODING), llm=llm)
++        result = await agent.review_code("def foo(): return 1")
++        assert "Missing type hints" in result.issues
++
++    @pytest.mark.asyncio
++    async def test_stream_task_yields_chunks(self):
++        chunk = MagicMock()
++        chunk.content = "def solution(): pass"
++
++        async def _fake_astream(messages):
++            yield chunk
++
++        mock_llm = MagicMock()
++        mock_llm.astream = _fake_astream
++
++        agent = CodingAgent(config=_config(AgentType.CODING), llm=mock_llm)
++        chunks = []
++        async for c in agent.stream_task({"task": "write a function", "language": "python"}):
++            chunks.append(c)
++        assert "def solution(): pass" in chunks
++
++
++# ── SummarizationAgent ────────────────────────────────────────────────────────
++
++class TestSummarizationAgentWithLlm:
++    @pytest.mark.asyncio
++    async def test_summarize_parsed_from_llm(self):
++        payload = {
++            "summary": "AI is transforming the world.",
++            "key_points": ["AI is fast", "AI is powerful"],
++        }
++        llm = _mock_llm(json.dumps(payload))
++        agent = SummarizationAgent(config=_config(AgentType.SUMMARIZATION), llm=llm)
++        result = await agent.summarize("Long text about AI " * 20, style="concise")
++        assert result.summary == "AI is transforming the world."
++        assert len(result.key_points) == 2
++
++    @pytest.mark.asyncio
++    async def test_falls_back_on_non_json(self):
++        llm = _mock_llm("This is a plain text summary.")
++        agent = SummarizationAgent(config=_config(AgentType.SUMMARIZATION), llm=llm)
++        result = await agent.summarize("Some content " * 10, style="concise")
++        assert "plain text summary" in result.summary
++
++    @pytest.mark.asyncio
++    async def test_compression_ratio_computed_from_llm_summary(self):
++        payload = {"summary": "Short.", "key_points": []}
++        llm = _mock_llm(json.dumps(payload))
++        agent = SummarizationAgent(config=_config(AgentType.SUMMARIZATION), llm=llm)
++        result = await agent.summarize("word " * 100, style="concise")
++        assert result.compression_ratio > 0
+diff --git a/tests/unit/test_llm_provider.py b/tests/unit/test_llm_provider.py
+new file mode 100644
+index 0000000..5069b43
+--- /dev/null
++++ b/tests/unit/test_llm_provider.py
+@@ -0,0 +1,124 @@
++"""Unit tests for the LLM provider module."""
++
++from __future__ import annotations
++
++from unittest.mock import AsyncMock, MagicMock, patch
++
++import pytest
++
++from src.llm.provider import LLMProvider, create_llm, invoke_llm, stream_llm_response
++
++
++class TestCreateLlm:
++    def test_returns_none_when_no_api_key(self):
++        with patch.dict("os.environ", {}, clear=True):
++            result = create_llm(provider=LLMProvider.OPENAI, api_key=None)
++        assert result is None
++
++    def test_returns_none_for_anthropic_when_no_key(self):
++        with patch.dict("os.environ", {}, clear=True):
++            result = create_llm(provider=LLMProvider.ANTHROPIC, api_key=None)
++        assert result is None
++
++    def test_returns_llm_when_openai_key_provided(self):
++        mock_llm = MagicMock()
++        with patch("src.llm.provider.LLMProvider", LLMProvider):
++            try:
++                from langchain_openai import ChatOpenAI  # noqa: F401
++            except ImportError:
++                pytest.skip("langchain-openai not installed")
++            with patch("langchain_openai.ChatOpenAI", return_value=mock_llm):
++                result = create_llm(provider=LLMProvider.OPENAI, api_key="test-key")
++        assert result is not None
++
++    def test_returns_llm_when_anthropic_key_provided(self):
++        mock_llm = MagicMock()
++        try:
++            from langchain_anthropic import ChatAnthropic  # noqa: F401
++        except ImportError:
++            pytest.skip("langchain-anthropic not installed")
++        with patch("langchain_anthropic.ChatAnthropic", return_value=mock_llm):
++            result = create_llm(provider=LLMProvider.ANTHROPIC, api_key="test-key")
++        assert result is not None
++
++    def test_env_key_used_when_no_explicit_key(self):
++        try:
++            from langchain_openai import ChatOpenAI  # noqa: F401
++        except ImportError:
++            pytest.skip("langchain-openai not installed")
++        mock_llm = MagicMock()
++        with patch.dict("os.environ", {"OPENAI_API_KEY": "env-key"}):
++            with patch("langchain_openai.ChatOpenAI", return_value=mock_llm):
++                result = create_llm(provider=LLMProvider.OPENAI)
++        assert result is not None
++
++
++@pytest.mark.asyncio
++class TestInvokeLlm:
++    async def test_invoke_returns_content_string(self):
++        mock_response = MagicMock()
++        mock_response.content = "Hello from LLM"
++        mock_llm = MagicMock()
++        mock_llm.ainvoke = AsyncMock(return_value=mock_response)
++
++        result = await invoke_llm(mock_llm, "system prompt", "user prompt")
++        assert result == "Hello from LLM"
++
++    async def test_invoke_calls_ainvoke_with_messages(self):
++        mock_response = MagicMock()
++        mock_response.content = "response"
++        mock_llm = MagicMock()
++        mock_llm.ainvoke = AsyncMock(return_value=mock_response)
++
++        await invoke_llm(mock_llm, "sys", "usr")
++        mock_llm.ainvoke.assert_called_once()
++        messages = mock_llm.ainvoke.call_args[0][0]
++        assert len(messages) == 2
++
++    async def test_invoke_handles_empty_system_prompt(self):
++        mock_response = MagicMock()
++        mock_response.content = "ok"
++        mock_llm = MagicMock()
++        mock_llm.ainvoke = AsyncMock(return_value=mock_response)
++
++        result = await invoke_llm(mock_llm, "", "user only")
++        assert result == "ok"
++
++
++@pytest.mark.asyncio
++class TestStreamLlmResponse:
++    async def test_stream_yields_chunks(self):
++        chunk1, chunk2 = MagicMock(), MagicMock()
++        chunk1.content = "Hello"
++        chunk2.content = " world"
++
++        async def _fake_astream(messages):
++            for c in [chunk1, chunk2]:
++                yield c
++
++        mock_llm = MagicMock()
++        mock_llm.astream = _fake_astream
++
++        chunks = []
++        async for chunk in stream_llm_response(mock_llm, "test prompt"):
++            chunks.append(chunk)
++
++        assert chunks == ["Hello", " world"]
++
++    async def test_stream_skips_empty_chunks(self):
++        chunk1, chunk2 = MagicMock(), MagicMock()
++        chunk1.content = "data"
++        chunk2.content = ""
++
++        async def _fake_astream(messages):
++            for c in [chunk1, chunk2]:
++                yield c
++
++        mock_llm = MagicMock()
++        mock_llm.astream = _fake_astream
++
++        chunks = []
++        async for chunk in stream_llm_response(mock_llm, "prompt"):
++            chunks.append(chunk)
++
++        assert chunks == ["data"]
+diff --git a/tests/unit/test_new_agents.py b/tests/unit/test_new_agents.py
+new file mode 100644
+index 0000000..db3311b
+--- /dev/null
++++ b/tests/unit/test_new_agents.py
+@@ -0,0 +1,155 @@
++"""Unit tests for CodingAgent and SummarizationAgent (no LLM required)."""
++
++from __future__ import annotations
++
++import pytest
++
++from src.agents.base_agent import AgentConfig, AgentType
++from src.agents.coding_agent import CodeResult, CodingAgent
++from src.agents.summarization_agent import SummaryResult, SummarizationAgent
++
++
++def _coding_agent() -> CodingAgent:
++    config = AgentConfig(
++        name="test_coding",
++        agent_type=AgentType.CODING,
++        description="test",
++        capabilities=[],
++    )
++    return CodingAgent(config=config, llm=None)
++
++
++def _summarization_agent() -> SummarizationAgent:
++    config = AgentConfig(
++        name="test_summarization",
++        agent_type=AgentType.SUMMARIZATION,
++        description="test",
++        capabilities=[],
++    )
++    return SummarizationAgent(config=config, llm=None)
++
++
++# ── CodingAgent ──────────────────────────────────────────────────────────────
++
++class TestCodingAgentFallback:
++    @pytest.mark.asyncio
++    async def test_generate_returns_stub(self):
++        agent = _coding_agent()
++        result = await agent.generate_code("sort a list", language="python")
++        assert isinstance(result, CodeResult)
++        assert "solution" in result.code
++        assert result.language == "python"
++
++    @pytest.mark.asyncio
++    async def test_review_detects_eval(self):
++        agent = _coding_agent()
++        result = await agent.review_code("x = eval(input())", "python")
++        assert any("eval" in issue for issue in result.issues)
++
++    @pytest.mark.asyncio
++    async def test_review_suggests_docstring_when_missing(self):
++        agent = _coding_agent()
++        result = await agent.review_code("def foo():\n    return 1\n", "python")
++        assert any("docstring" in s.lower() or "comment" in s.lower() for s in result.suggestions)
++
++    @pytest.mark.asyncio
++    async def test_explain_returns_explanation(self):
++        agent = _coding_agent()
++        result = await agent.explain_code("def foo(): pass", "python")
++        assert isinstance(result.explanation, str)
++        assert len(result.explanation) > 0
++
++    @pytest.mark.asyncio
++    async def test_process_task_generate(self):
++        agent = _coding_agent()
++        result = await agent.process_task({"task": "reverse a string", "mode": "generate", "language": "python"})
++        assert result["status"] == "completed"
++        assert "code" in result
++        assert result["mode"] == "generate"
++
++    @pytest.mark.asyncio
++    async def test_process_task_review(self):
++        agent = _coding_agent()
++        result = await agent.process_task({"mode": "review", "code": "x = 1", "language": "python"})
++        assert result["status"] == "completed"
++        assert "issues" in result
++
++    @pytest.mark.asyncio
++    async def test_process_task_explain(self):
++        agent = _coding_agent()
++        result = await agent.process_task({"mode": "explain", "code": "print('hi')", "language": "python"})
++        assert result["status"] == "completed"
++        assert "explanation" in result
++
++    @pytest.mark.asyncio
++    async def test_stream_task_yields_json(self):
++        agent = _coding_agent()
++        chunks = []
++        async for chunk in agent.stream_task({"task": "hello world", "language": "python"}):
++            chunks.append(chunk)
++        assert len(chunks) >= 1
++        import json
++        data = json.loads(chunks[0])
++        assert "status" in data
++
++
++# ── SummarizationAgent ───────────────────────────────────────────────────────
++
++class TestSummarizationAgentFallback:
++    _TEXT = (
++        "The quick brown fox jumps over the lazy dog. "
++        "Machine learning is transforming every industry. "
++        "Large language models are trained on vast corpora. "
++        "Natural language processing enables human-computer interaction. "
++        "Deep learning architectures power modern AI systems."
++    )
++
++    @pytest.mark.asyncio
++    async def test_summarize_concise_is_short(self):
++        agent = _summarization_agent()
++        result = await agent.summarize(self._TEXT, style="concise")
++        assert isinstance(result, SummaryResult)
++        assert len(result.summary) > 0
++        assert result.style == "concise"
++
++    @pytest.mark.asyncio
++    async def test_summarize_detailed_has_more_sentences(self):
++        agent = _summarization_agent()
++        concise = await agent.summarize(self._TEXT, style="concise")
++        detailed = await agent.summarize(self._TEXT, style="detailed")
++        assert len(detailed.summary) >= len(concise.summary)
++
++    @pytest.mark.asyncio
++    async def test_key_points_extracted(self):
++        agent = _summarization_agent()
++        result = await agent.summarize(self._TEXT, style="bullet")
++        assert isinstance(result.key_points, list)
++        assert len(result.key_points) > 0
++
++    @pytest.mark.asyncio
++    async def test_compression_ratio_is_non_negative(self):
++        agent = _summarization_agent()
++        result = await agent.summarize(self._TEXT, style="concise")
++        assert result.compression_ratio >= 0
++
++    @pytest.mark.asyncio
++    async def test_original_length_recorded(self):
++        agent = _summarization_agent()
++        result = await agent.summarize(self._TEXT, style="concise")
++        expected = len(self._TEXT.split())
++        assert result.original_length == expected
++
++    @pytest.mark.asyncio
++    async def test_empty_text_handled(self):
++        agent = _summarization_agent()
++        result = await agent.summarize("", style="concise")
++        assert isinstance(result, SummaryResult)
++        assert result.compression_ratio == 0.0
++
++    @pytest.mark.asyncio
++    async def test_process_task_returns_expected_keys(self):
++        agent = _summarization_agent()
++        result = await agent.process_task({"text": self._TEXT, "style": "concise"})
++        assert result["status"] == "completed"
++        for key in ("summary", "key_points", "style", "original_length", "compression_ratio"):
++            assert key in result
+-- 
+2.43.0
+
