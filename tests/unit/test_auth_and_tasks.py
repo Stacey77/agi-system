@@ -251,6 +251,51 @@ class TestTaskQueue:
         q.unsubscribe(task_id, sub_q)
         await q.stop()
 
+    @pytest.mark.asyncio
+    async def test_update_progress(self):
+        from src.tasks.queue import TaskQueue, TaskStatus
+        q = TaskQueue()
+        progress_events = []
+        done = asyncio.Event()
+
+        async def handler(record):
+            await q.update_progress(record.task_id, 50, "halfway")
+            done.set()
+
+        await q.start(handler)
+        record = await q.submit("track progress", {})
+        task_id = record.task_id
+        sub_q = await q.subscribe(task_id)
+        await asyncio.wait_for(done.wait(), timeout=5.0)
+        await asyncio.sleep(0.1)
+        events = []
+        while not sub_q.empty():
+            events.append(sub_q.get_nowait())
+        progress_events = [e for e in events if e.get("event") == "progress"]
+        assert len(progress_events) >= 1
+        assert progress_events[0]["progress"] == 50
+        q.unsubscribe(task_id, sub_q)
+        await q.stop()
+
+    @pytest.mark.asyncio
+    async def test_update_progress_noop_when_not_running(self):
+        from src.tasks.queue import TaskQueue
+        q = TaskQueue()
+        done = asyncio.Event()
+
+        async def handler(record):
+            done.set()
+
+        await q.start(handler)
+        record = await q.submit("test", {})
+        await asyncio.wait_for(done.wait(), timeout=5.0)
+        await asyncio.sleep(0.1)
+        # Task is now COMPLETED — update_progress should be a no-op
+        await q.update_progress(record.task_id, 42)
+        fetched = q.get(record.task_id)
+        assert fetched is not None and fetched.progress == 100
+        await q.stop()
+
 
 # ---------------------------------------------------------------------------
 # Integration: auth and task endpoints
