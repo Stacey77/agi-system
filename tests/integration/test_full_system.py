@@ -93,3 +93,77 @@ class TestTaskEndpoints:
     def test_unknown_task_returns_404(self, client):
         response = client.get("/api/v1/tasks/nonexistent-task-id")
         assert response.status_code == 404
+
+
+class TestNewAgents:
+    def test_coding_agent_listed(self, client):
+        response = client.get("/api/v1/agents/")
+        assert response.status_code == 200
+        names = [a["name"] for a in response.json()]
+        assert "coding_agent" in names
+
+    def test_summarization_agent_listed(self, client):
+        response = client.get("/api/v1/agents/")
+        assert response.status_code == 200
+        names = [a["name"] for a in response.json()]
+        assert "summarization_agent" in names
+
+    def test_coding_agent_generate(self, client):
+        response = client.post(
+            "/api/v1/agents/coding_agent/execute",
+            json={"task": "reverse a string", "parameters": {"mode": "generate", "language": "python"}},
+        )
+        assert response.status_code == 200
+        data = response.json()["result"]
+        assert data["status"] == "completed"
+        assert "code" in data
+
+    def test_coding_agent_review(self, client):
+        response = client.post(
+            "/api/v1/agents/coding_agent/execute",
+            json={"task": "review code", "parameters": {"mode": "review", "code": "x = eval(input())", "language": "python"}},
+        )
+        assert response.status_code == 200
+        data = response.json()["result"]
+        assert "issues" in data
+
+    def test_summarization_agent_execute(self, client):
+        response = client.post(
+            "/api/v1/agents/summarization_agent/execute",
+            json={"task": "summarize", "parameters": {"text": "The quick brown fox. Machine learning is great. AI is transforming industries.", "style": "concise"}},
+        )
+        assert response.status_code == 200
+        data = response.json()["result"]
+        assert data["status"] == "completed"
+        assert "summary" in data
+
+
+class TestStreamingEndpoint:
+    def test_stream_returns_event_stream(self, client):
+        with client.stream(
+            "POST",
+            "/api/v1/agents/summarization_agent/stream",
+            json={"task": "summarize this", "parameters": {"text": "Hello world. This is a test.", "style": "concise"}},
+        ) as response:
+            assert response.status_code == 200
+            assert "text/event-stream" in response.headers.get("content-type", "")
+            raw = response.read().decode()
+            assert "data:" in raw
+            assert "[DONE]" in raw
+
+    def test_stream_unknown_agent_returns_404(self, client):
+        response = client.post(
+            "/api/v1/agents/nonexistent_agent/stream",
+            json={"task": "test"},
+        )
+        assert response.status_code == 404
+
+    def test_stream_coding_agent(self, client):
+        with client.stream(
+            "POST",
+            "/api/v1/agents/coding_agent/stream",
+            json={"task": "write hello world", "parameters": {"language": "python"}},
+        ) as response:
+            assert response.status_code == 200
+            raw = response.read().decode()
+            assert "data:" in raw

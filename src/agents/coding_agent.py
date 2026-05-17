@@ -1,0 +1,178 @@
+"""Coding agent — code generation, review, and explanation."""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field
+from typing import Any, AsyncIterator, Dict, List, Optional
+
+from src.agents.base_agent import AgentConfig, BaseAgent
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CodeResult:
+    """Output of the coding agent."""
+
+    language: str
+    code: str = ""
+    explanation: str = ""
+    tests: str = ""
+    issues: List[str] = field(default_factory=list)
+    suggestions: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+class CodingAgent(BaseAgent):
+    """Generates, reviews, and explains code using an LLM or deterministic fallback."""
+
+    _GENERATE_SYSTEM = (
+        "You are an expert software engineer. Given a task description and target language, "
+        "produce clean, well-commented, production-quality code. "
+        "Return a JSON object with keys: code (string), explanation (string), "
+        "tests (string with example unit tests). "
+        "Respond ONLY with valid JSON — no markdown fences."
+    )
+    _REVIEW_SYSTEM = (
+        "You are a senior code reviewer. Given code and language, review it thoroughly. "
+        "Return a JSON object with keys: issues (list), suggestions (list), "
+        "explanation (string summary of findings). "
+        "Respond ONLY with valid JSON."
+    )
+    _EXPLAIN_SYSTEM = (
+        "You are a patient programming tutor. Explain the provided code in plain English "
+        "suitable for the specified audience level. Return only the explanation text."
+    )
+
+    def __init__(
+        self,
+        config: AgentConfig,
+        execution_agent: Optional[Any] = None,
+        llm: Optional[Any] = None,
+    ) -> None:
+        super().__init__(config, execution_agent, llm)
+
+    async def stream_task(self, task: Dict[str, Any]) -> AsyncIterator[str]:
+        """Stream code generation token-by-token when an LLM is available."""
+        if self.llm is None:
+            import json
+            result = await self.process_task(task)
+            yield json.dumps(result)
+            return
+
+        language = task.get("language", "python")
+        description = task.get("task", task.get("description", ""))
+        prompt = (
+            f"Write clean, well-commented {language} code for the following task: {description}"
+        )
+        async for chunk in self._stream_llm(prompt):
+            yield chunk
+
+    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """Process a coding task.
+
+        Supported modes via ``task["mode"]``:
+        - ``generate`` (default): generate code from a description
+        - ``review``: review existing code
+        - ``explain``: explain existing code
+        """
+        mode = task.get("mode", "generate")
+        language = task.get("language", "python")
+        logger.info("CodingAgent mode=%s language=%s", mode, language)
+
+        if mode == "review":
+            result_obj = await self.review_code(task.get("code", ""), language)
+        elif mode == "explain":
+            result_obj = await self.explain_code(
+                task.get("code", ""), language, task.get("audience", "intermediate")
+            )
+        else:
+            result_obj = await self.generate_code(
+                task.get("task", task.get("description", "")), language
+            )
+
+        result: Dict[str, Any] = {
+            "status": "completed",
+            "mode": mode,
+            "language": result_obj.language,
+            "code": result_obj.code,
+            "explanation": result_obj.explanation,
+            "tests": result_obj.tests,
+            "issues": result_obj.issues,
+            "suggestions": result_obj.suggestions,
+        }
+        self._record_task(task, result)
+        return result
+
+    # ------------------------------------------------------------------
+    # Core operations
+    # ------------------------------------------------------------------
+
+    async def generate_code(self, description: str, language: str = "python") -> CodeResult:
+        """Generate code from a natural-language description."""
+        import json
+
+        user_prompt = f"Language: {language}\nTask: {description}"
+        raw = await self._invoke_llm(self._GENERATE_SYSTEM, user_prompt)
+
+        if raw:
+            try:
+                cleaned = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
+                parsed: Dict[str, Any] = json.loads(cleaned)
+                return CodeResult(
+                    language=language,
+                    code=parsed.get("code", ""),
+                    explanation=parsed.get("explanation", ""),
+                    tests=parsed.get("tests", ""),
+                )
+            except (json.JSONDecodeError, ValueError):
+                return CodeResult(language=language, code=raw, explanation="Generated by LLM.")
+
+        return CodeResult(
+            language=language,
+            code=f"# TODO: implement — {description}\ndef solution():\n    pass\n",
+            explanation=f"Stub generated for: {description}",
+        )
+
+    async def review_code(self, code: str, language: str = "python") -> CodeResult:
+        """Review code and return issues and suggestions."""
+        import json
+
+        user_prompt = f"Language: {language}\nCode:\n{code}"
+        raw = await self._invoke_llm(self._REVIEW_SYSTEM, user_prompt)
+
+        if raw:
+            try:
+                cleaned = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
+                parsed = json.loads(cleaned)
+                return CodeResult(
+                    language=language,
+                    code=code,
+                    issues=parsed.get("issues", []),
+                    suggestions=parsed.get("suggestions", []),
+                    explanation=parsed.get("explanation", ""),
+                )
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        # Deterministic fallback: basic heuristics
+        issues: List[str] = []
+        suggestions: List[str] = []
+        if "eval(" in code:
+            issues.append("Use of eval() — potential security risk")
+            suggestions.append("Replace eval() with a safe alternative")
+        if not any(line.strip().startswith(("#", '"""', "'''")) for line in code.splitlines()):
+            suggestions.append("Add docstrings and inline comments for clarity")
+        return CodeResult(language=language, code=code, issues=issues, suggestions=suggestions)
+
+    async def explain_code(
+        self, code: str, language: str = "python", audience: str = "intermediate"
+    ) -> CodeResult:
+        """Explain what a piece of code does."""
+        user_prompt = f"Language: {language}\nAudience level: {audience}\nCode:\n{code}"
+        explanation = (
+            await self._invoke_llm(self._EXPLAIN_SYSTEM, user_prompt)
+            or f"This {language} code performs the described operation."
+        )
+        return CodeResult(language=language, code=code, explanation=explanation)

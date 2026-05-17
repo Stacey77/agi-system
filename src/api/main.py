@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from src.agents.agent_factory import AgentFactory
 from src.agents.base_agent import AgentConfig, AgentType
 from src.agents.kally_agent import KallyAgent
+from src.llm.provider import LLMProvider, create_llm
 from src.api.endpoints import agents, health, tasks
 from src.api.endpoints.cde import router as cde_router
 from src.api.endpoints.ide import router as ide_router
@@ -30,10 +31,32 @@ from src.platform.tool_landscape import ToolLandscape
 logger = logging.getLogger(__name__)
 
 
+def _init_llm() -> object:
+    """Create an LLM instance from environment variables; returns None in mock mode."""
+    provider = os.getenv("LLM_PROVIDER", "openai").lower()
+    try:
+        llm_provider = LLMProvider(provider)
+    except ValueError:
+        llm_provider = LLMProvider.OPENAI
+    llm = create_llm(
+        provider=llm_provider,
+        temperature=float(os.getenv("DEFAULT_TEMPERATURE", "0.7")),
+    )
+    if llm is None:
+        logger.warning("No LLM API key found — running in mock/fallback mode")
+    else:
+        logger.info("LLM initialised with provider=%s", provider)
+    return llm
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialise and tear down application-level resources."""
     logger.info("AGI System starting up...")
+
+    # Initialise LLM
+    llm = _init_llm()
+    app.state.llm = llm
 
     # Initialise execution engine and agent
     execution_engine = ExecutionEngine()
@@ -42,7 +65,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.execution_agent = execution_agent
 
     # Initialise agent factory and default agents
-    factory = AgentFactory(execution_agent=execution_agent)
+    factory = AgentFactory(execution_agent=execution_agent, llm=llm)
     _register_default_agents(factory, execution_agent)
     app.state.agent_factory = factory
 
@@ -123,6 +146,18 @@ def _register_default_agents(
             agent_type=AgentType.REVIEW,
             description="Quality assurance and fact-checking",
             capabilities=["quality_assurance", "fact_checking"],
+        ),
+        AgentConfig(
+            name="coding_agent",
+            agent_type=AgentType.CODING,
+            description="Code generation, review, and explanation",
+            capabilities=["code_generation", "code_review", "code_explanation"],
+        ),
+        AgentConfig(
+            name="summarization_agent",
+            agent_type=AgentType.SUMMARIZATION,
+            description="Text summarization in multiple styles",
+            capabilities=["summarization", "key_point_extraction"],
         ),
     ]
     for config in default_configs:

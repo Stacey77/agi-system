@@ -26,12 +26,19 @@ class ResearchResult:
 class ResearchAgent(BaseAgent):
     """Gathers information from multiple sources and assesses quality."""
 
+    _SYSTEM_PROMPT = (
+        "You are an expert research agent. Given a query and a list of source snippets, "
+        "synthesise a clear, concise, and factual summary. Highlight key findings and "
+        "note the reliability of sources. Write in plain prose (no JSON)."
+    )
+
     def __init__(
         self,
         config: AgentConfig,
         execution_agent: Optional[Any] = None,
+        llm: Optional[Any] = None,
     ) -> None:
-        super().__init__(config, execution_agent)
+        super().__init__(config, execution_agent, llm)
 
     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Process a research task."""
@@ -69,7 +76,7 @@ class ResearchAgent(BaseAgent):
                 sources.extend(r)
 
         quality = self._assess_quality(sources)
-        summary = self._build_summary(query, sources)
+        summary = await self._llm_summarise(query, sources) or self._build_summary(query, sources)
 
         return ResearchResult(
             query=query,
@@ -81,6 +88,19 @@ class ResearchAgent(BaseAgent):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    async def _llm_summarise(
+        self, query: str, sources: List[Dict[str, Any]]
+    ) -> Optional[str]:
+        """Use the LLM to synthesise a summary from gathered sources."""
+        if not sources:
+            return None
+        snippets = "\n".join(
+            f"- [{s.get('source', 'unknown')}] {s.get('title', '')}: {s.get('snippet', '')}"
+            for s in sources[:10]
+        )
+        user_prompt = f"Query: {query}\n\nSources:\n{snippets}"
+        return await self._invoke_llm(self._SYSTEM_PROMPT, user_prompt)
 
     async def _search_source(
         self, query: str, tool_name: str

@@ -26,12 +26,20 @@ class AnalysisResult:
 class AnalysisAgent(BaseAgent):
     """Processes data and extracts insights."""
 
+    _SYSTEM_PROMPT = (
+        "You are a senior data analyst. Given data (as JSON) and an analysis type, "
+        "return a JSON object with keys: insights (list of strings), patterns (list), "
+        "statistics (dict), recommendations (list), confidence (float 0-1). "
+        "Respond ONLY with valid JSON — no markdown, no explanation."
+    )
+
     def __init__(
         self,
         config: AgentConfig,
         execution_agent: Optional[Any] = None,
+        llm: Optional[Any] = None,
     ) -> None:
-        super().__init__(config, execution_agent)
+        super().__init__(config, execution_agent, llm)
 
     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Process an analysis task."""
@@ -57,6 +65,10 @@ class AnalysisAgent(BaseAgent):
         self, data: Dict[str, Any], analysis_type: str
     ) -> AnalysisResult:
         """Perform the requested analysis on the provided data."""
+        llm_result = await self._llm_analyze(data, analysis_type)
+        if llm_result is not None:
+            return llm_result
+
         handler = {
             "statistical": self._statistical_analysis,
             "pattern": self._pattern_analysis,
@@ -64,6 +76,31 @@ class AnalysisAgent(BaseAgent):
         }.get(analysis_type, self._general_analysis)
 
         return handler(data)
+
+    async def _llm_analyze(
+        self, data: Dict[str, Any], analysis_type: str
+    ) -> Optional[AnalysisResult]:
+        """Delegate analysis to the LLM; return None on failure."""
+        import json
+
+        user_prompt = f"Analysis type: {analysis_type}\nData: {json.dumps(data, default=str)}"
+        raw = await self._invoke_llm(self._SYSTEM_PROMPT, user_prompt)
+        if not raw:
+            return None
+        try:
+            raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
+            parsed: Dict[str, Any] = json.loads(raw)
+            return AnalysisResult(
+                analysis_type=analysis_type,
+                insights=parsed.get("insights", []),
+                patterns=parsed.get("patterns", []),
+                statistics=parsed.get("statistics", {}),
+                recommendations=parsed.get("recommendations", []),
+                confidence=float(parsed.get("confidence", 0.8)),
+            )
+        except (json.JSONDecodeError, ValueError, TypeError):
+            logger.warning("LLM analysis returned non-JSON; falling back to algorithmic analysis")
+            return None
 
     # ------------------------------------------------------------------
     # Analysis strategies

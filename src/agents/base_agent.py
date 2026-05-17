@@ -6,7 +6,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,8 @@ class AgentType(str, Enum):
     IDE = "ide"
     CDE = "cde"
     KALLY = "kally"
+    CODING = "coding"
+    SUMMARIZATION = "summarization"
 
 
 @dataclass
@@ -70,12 +72,19 @@ class BaseAgent(ABC):
         self,
         config: AgentConfig,
         execution_agent: Optional[Any] = None,
+        llm: Optional[Any] = None,
     ) -> None:
         self.config = config
         self.execution_agent = execution_agent
+        self.llm = llm  # Optional LangChain chat model
         self.memory = AgentMemory(max_size=config.memory_size)
         self._tool_registry: Optional[Any] = None
-        logger.info("Initialised agent '%s' (type=%s)", config.name, config.agent_type)
+        logger.info(
+            "Initialised agent '%s' (type=%s, llm=%s)",
+            config.name,
+            config.agent_type,
+            "enabled" if llm is not None else "mock",
+        )
 
     # ------------------------------------------------------------------
     # Public interface
@@ -84,6 +93,12 @@ class BaseAgent(ABC):
     @abstractmethod
     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Process a task and return a result dictionary."""
+
+    async def stream_task(self, task: Dict[str, Any]) -> AsyncIterator[str]:
+        """Stream task output as text chunks (default: yields full result as one chunk)."""
+        import json
+        result = await self.process_task(task)
+        yield json.dumps(result)
 
     def get_status(self) -> Dict[str, Any]:
         """Return a status snapshot of this agent."""
@@ -112,3 +127,25 @@ class BaseAgent(ABC):
 
     def _record_task(self, task: Dict[str, Any], result: Dict[str, Any]) -> None:
         self.memory.add({"task": task, "result": result})
+
+    async def _invoke_llm(self, system_prompt: str, user_prompt: str) -> Optional[str]:
+        """Call the LLM and return the full response, or None if no LLM configured."""
+        if self.llm is None:
+            return None
+        try:
+            from src.llm.provider import invoke_llm
+            return await invoke_llm(self.llm, system_prompt, user_prompt)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("LLM invocation failed: %s", exc)
+            return None
+
+    async def _stream_llm(self, prompt: str) -> AsyncIterator[str]:
+        """Stream tokens from the LLM, or yield nothing if no LLM configured."""
+        if self.llm is None:
+            return
+        try:
+            from src.llm.provider import stream_llm_response
+            async for chunk in stream_llm_response(self.llm, prompt):
+                yield chunk
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("LLM streaming failed: %s", exc)

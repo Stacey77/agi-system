@@ -26,12 +26,21 @@ class ReviewResult:
 class ReviewAgent(BaseAgent):
     """Validates and quality-assures output from other agents."""
 
+    _SYSTEM_PROMPT = (
+        "You are a meticulous quality reviewer. Analyse the provided content against the "
+        "given criteria. Return a JSON object with keys: "
+        "is_approved (bool), score (float 0-1), issues (list of strings), "
+        "suggestions (list of strings), reflection_notes (list of strings). "
+        "Respond ONLY with valid JSON."
+    )
+
     def __init__(
         self,
         config: AgentConfig,
         execution_agent: Optional[Any] = None,
+        llm: Optional[Any] = None,
     ) -> None:
-        super().__init__(config, execution_agent)
+        super().__init__(config, execution_agent, llm)
 
     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Process a review task."""
@@ -57,7 +66,14 @@ class ReviewAgent(BaseAgent):
     async def review_output(
         self, content: Any, criteria: Dict[str, Any]
     ) -> ReviewResult:
-        """Review content against the provided criteria."""
+        """Review content against the provided criteria.
+
+        Uses the LLM for deep analysis when available; falls back to rule-based checks.
+        """
+        llm_result = await self._llm_review(content, criteria)
+        if llm_result is not None:
+            return llm_result
+
         issues: List[str] = []
         suggestions: List[str] = []
         notes: List[str] = []
@@ -98,6 +114,37 @@ class ReviewAgent(BaseAgent):
             corrected_content=corrected,
             reflection_notes=notes,
         )
+
+    # ------------------------------------------------------------------
+    # LLM-powered review
+    # ------------------------------------------------------------------
+
+    async def _llm_review(
+        self, content: Any, criteria: Dict[str, Any]
+    ) -> Optional[ReviewResult]:
+        """Use the LLM to perform deep content review; return None on failure."""
+        import json
+
+        user_prompt = (
+            f"Content to review:\n{content}\n\n"
+            f"Review criteria: {json.dumps(criteria, default=str)}"
+        )
+        raw = await self._invoke_llm(self._SYSTEM_PROMPT, user_prompt)
+        if not raw:
+            return None
+        try:
+            raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
+            parsed: Dict[str, Any] = json.loads(raw)
+            return ReviewResult(
+                is_approved=bool(parsed.get("is_approved", False)),
+                score=float(parsed.get("score", 0.0)),
+                issues=parsed.get("issues", []),
+                suggestions=parsed.get("suggestions", []),
+                reflection_notes=parsed.get("reflection_notes", []),
+            )
+        except (json.JSONDecodeError, ValueError, TypeError):
+            logger.warning("LLM review returned non-JSON; falling back to rule-based review")
+            return None
 
     # ------------------------------------------------------------------
     # Self-correction

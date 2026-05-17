@@ -26,12 +26,21 @@ class ExecutablePlan:
 class PlanningAgent(BaseAgent):
     """Decomposes high-level objectives into executable plans."""
 
+    _SYSTEM_PROMPT = (
+        "You are a strategic planning agent. Given an objective, decompose it into a "
+        "numbered list of concrete, actionable steps. Each step must include: "
+        "step_id (e.g. step_1), action (verb), description, and the best agent type "
+        "(planning/research/analysis/writing/review/coding/summarization). "
+        "Respond ONLY with a JSON array of step objects."
+    )
+
     def __init__(
         self,
         config: AgentConfig,
         execution_agent: Optional[Any] = None,
+        llm: Optional[Any] = None,
     ) -> None:
-        super().__init__(config, execution_agent)
+        super().__init__(config, execution_agent, llm)
 
     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Process a planning task — decompose objective into steps."""
@@ -56,10 +65,10 @@ class PlanningAgent(BaseAgent):
     async def create_executable_plan(self, objective: str) -> ExecutablePlan:
         """Decompose an objective into an executable plan.
 
-        If an execution_agent is available the plan is validated before
-        being returned; otherwise a best-effort plan is returned directly.
+        Uses the LLM when available; falls back to a hard-coded pipeline otherwise.
+        If an execution_agent is available the plan is validated before being returned.
         """
-        steps = self._decompose_objective(objective)
+        steps = await self._llm_decompose(objective) or self._decompose_objective(objective)
         dependencies = self._analyse_dependencies(steps)
 
         plan = ExecutablePlan(
@@ -83,6 +92,26 @@ class PlanningAgent(BaseAgent):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    async def _llm_decompose(self, objective: str) -> Optional[List[Dict[str, Any]]]:
+        """Ask the LLM to decompose *objective* into steps. Returns None on failure."""
+        import json
+
+        raw = await self._invoke_llm(self._SYSTEM_PROMPT, f"Objective: {objective}")
+        if not raw:
+            return None
+        try:
+            raw = raw.strip()
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            steps: List[Dict[str, Any]] = json.loads(raw)
+            if isinstance(steps, list) and steps:
+                return steps
+        except (json.JSONDecodeError, ValueError):
+            logger.warning("LLM returned non-JSON plan; falling back to hardcoded decomposition")
+        return None
 
     def _decompose_objective(self, objective: str) -> List[Dict[str, Any]]:
         """Break an objective into ordered steps."""
