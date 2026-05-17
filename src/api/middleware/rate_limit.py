@@ -1,12 +1,16 @@
-"""Token-bucket rate limiting middleware — per API key or IP address."""
+"""Token-bucket rate limiting middleware — per API key or IP address.
+
+Admin-role keys bypass rate limiting entirely.
+Write-role keys get the configured limit.
+Read-role keys get half the configured limit.
+"""
 
 from __future__ import annotations
 
 import logging
-import os
 import time
 from collections import defaultdict
-from typing import Callable, Dict, Tuple
+from typing import Callable, Dict
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -41,32 +45,57 @@ class _Bucket:
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Sliding-window token-bucket rate limiter.
 
-    Configuration via env vars:
-        RATE_LIMIT_REQUESTS — max requests per window (default 60)
-        RATE_LIMIT_WINDOW   — window size in seconds (default 60)
+    Rate limits are role-aware:
+        admin  — unlimited (bypass)
+        write  — full RATE_LIMIT_REQUESTS capacity
+        read   — half capacity
+        unknown — full capacity (no key presented)
     """
 
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
-        self._capacity = float(os.getenv("RATE_LIMIT_REQUESTS", "60"))
-        window = float(os.getenv("RATE_LIMIT_WINDOW", "60"))
-        self._refill_rate = self._capacity / window
+        from src.config import get_settings
+        cfg = get_settings()
+        self._capacity = float(cfg.rate_limit_requests)
+        self._refill_rate = self._capacity / cfg.rate_limit_window
         self._buckets: Dict[str, _Bucket] = defaultdict(lambda: _Bucket(self._capacity))
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         if request.url.path in _EXCLUDED_PATHS or request.url.path.startswith("/static/"):
             return await call_next(request)
 
+        # Determine role from auth state (set by APIKeyMiddleware which runs first)
+        auth_role = getattr(getattr(request, "state", None), "auth_role", None)
+
+        # Admin keys bypass rate limiting entirely
+        if auth_role == "admin":
+            return await call_next(request)
+
+        # Capacity multiplier: read keys get 50% of configured limit
+        capacity_mult = 0.5 if auth_role == "read" else 1.0
+        effective_capacity = self._capacity * capacity_mult
+        effective_refill = self._refill_rate * capacity_mult
+
         client_id = (
             request.headers.get("X-API-Key")
             or (request.client.host if request.client else "unknown")
         )
         bucket = self._buckets[client_id]
-        if not bucket.consume(self._capacity, self._refill_rate):
-            logger.warning("Rate limit exceeded for client '%s'", client_id)
+        if not bucket.consume(effective_capacity, effective_refill):
+            logger.warning("Rate limit exceeded for client '%s' (role=%s)", client_id, auth_role)
+            try:
+                from src.api.middleware.metrics import record_rate_limit_hit
+                record_rate_limit_hit(auth_role or "unknown")
+            except Exception:  # noqa: BLE001
+                pass
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Rate limit exceeded — try again shortly"},
                 headers={"Retry-After": str(int(1 / self._refill_rate))},
             )
-        return await call_next(request)
+
+        # Expose rate limit state in response headers
+        response = await call_next(request)
+        response.headers["X-RateLimit-Limit"] = str(int(effective_capacity))
+        response.headers["X-RateLimit-Remaining"] = str(int(max(0, bucket.tokens)))
+        return response

@@ -58,6 +58,16 @@ if _PROMETHEUS_AVAILABLE:
         "agi_websocket_connections_active",
         "Currently active WebSocket connections",
     )
+    TASK_QUEUE_DEPTH = Gauge(
+        "agi_task_queue_depth",
+        "Number of tasks currently in the queue by status",
+        ["status"],
+    )
+    RATE_LIMIT_HITS_TOTAL = Counter(
+        "agi_rate_limit_hits_total",
+        "Number of requests rejected by rate limiter",
+        ["client_role"],
+    )
 
 
 def record_agent_task(agent_name: str, status: str, duration_s: float) -> None:
@@ -82,6 +92,19 @@ def ws_connection_open() -> None:
 def ws_connection_close() -> None:
     if _PROMETHEUS_AVAILABLE:
         WS_CONNECTIONS_ACTIVE.dec()
+
+
+def update_task_queue_metrics(by_status: dict) -> None:
+    """Update TASK_QUEUE_DEPTH gauges from a {status: count} dict."""
+    if not _PROMETHEUS_AVAILABLE:
+        return
+    for status, count in by_status.items():
+        TASK_QUEUE_DEPTH.labels(status=status).set(count)
+
+
+def record_rate_limit_hit(client_role: str = "unknown") -> None:
+    if _PROMETHEUS_AVAILABLE:
+        RATE_LIMIT_HITS_TOTAL.labels(client_role=client_role).inc()
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):

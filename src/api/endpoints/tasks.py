@@ -59,6 +59,13 @@ async def list_tasks(request: Request) -> Dict[str, Any]:
     for r in records:
         by_status[r.status] = by_status.get(r.status, 0) + 1
 
+    # Push current counts to Prometheus gauges
+    try:
+        from src.api.middleware.metrics import update_task_queue_metrics
+        update_task_queue_metrics(by_status)
+    except Exception:  # noqa: BLE001
+        pass
+
     return {
         "tasks": [r.to_dict() for r in records],
         "total": len(records),
@@ -79,6 +86,36 @@ async def cancel_task(task_id: str, request: Request) -> Dict[str, str]:
             raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
         return {"message": f"Task '{task_id}' cannot be cancelled (status={record.status})"}
     return {"message": f"Task '{task_id}' cancelled"}
+
+
+@router.post("/{task_id}/retry")
+async def retry_task(task_id: str, request: Request) -> Dict[str, Any]:
+    """Re-queue a FAILED or CANCELLED task with the same objective."""
+    queue = getattr(request.app.state, "task_queue", None)
+    if queue is None:
+        raise HTTPException(status_code=503, detail="Task queue not initialised")
+
+    record = queue.get(task_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
+
+    if record.status not in (TaskStatus.FAILED, TaskStatus.CANCELLED):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Only FAILED or CANCELLED tasks can be retried (current status={record.status})",
+        )
+
+    new_record = await queue.submit(
+        record.objective,
+        getattr(record, "parameters", {}),
+    )
+    logger.info("Task '%s' retried as new task '%s'", task_id, new_record.task_id)
+    return {
+        "original_task_id": task_id,
+        "new_task_id": new_record.task_id,
+        "status": new_record.status,
+        "objective": new_record.objective,
+    }
 
 
 @router.get("/{task_id}/stream")
