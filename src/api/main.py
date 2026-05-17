@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -40,6 +41,8 @@ from src.execution.execution_engine import ExecutionEngine
 from src.ide.ide_agent import IDEAgent
 from src.platform.developer_portal import DeveloperPortal
 from src.platform.tool_landscape import ToolLandscape
+from src.config import get_settings
+from src.logging_config import configure_logging
 
 logger = logging.getLogger(__name__)
 
@@ -65,11 +68,14 @@ def _init_llm() -> object:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialise and tear down application-level resources."""
+    cfg = get_settings()
+    configure_logging(level=cfg.log_level, fmt=cfg.log_format)
     logger.info("AGI System starting up...")
+    app.state.settings = cfg
 
     # Optional OpenTelemetry tracing
     from src.api.middleware.tracing import setup_tracing
-    setup_tracing(service_name=os.getenv("OTEL_SERVICE_NAME", "agi-system"))
+    setup_tracing(service_name=cfg.otel_service_name)
 
     # Initialise LLM
     llm = _init_llm()
@@ -117,8 +123,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Webhook dispatcher
     app.state.webhook_dispatcher = WebhookDispatcher()
 
-    # Session manager
-    app.state.session_manager = SessionManager()
+    # Session manager with optional SQLite persistence
+    from src.sessions.session_store import SessionStore
+    session_store = SessionStore(db_path=cfg.task_db_path.replace("tasks.db", "sessions.db"))
+    app.state.session_manager = SessionManager(store=session_store)
+    app.state.session_store = session_store
 
     # Eval results store
     app.state.eval_results = {}
@@ -131,6 +140,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         capabilities=["signal_ingestion", "anomaly_detection", "auto_correction"],
     )
     app.state.kally_agent = KallyAgent(config=kally_config, execution_agent=execution_agent)
+
+    # Auth: key store and JWT manager
+    from src.auth.key_store import KeyStore
+    from src.auth.jwt_manager import JWTManager
+    app.state.key_store = KeyStore()
+    app.state.jwt_manager = JWTManager(
+        secret=os.getenv("JWT_SECRET", secrets.token_hex(32)),
+        expiry_seconds=int(os.getenv("JWT_EXPIRY_SECONDS", "3600")),
+    )
 
     # Wire the tool registry into all agents
     tool_registry = ToolRegistry()
@@ -151,6 +169,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if planning_agent is not None:
         planning_agent.set_agent_factory(factory)
 
+    # Task queue with optional SQLite persistence
+    from src.tasks.queue import TaskQueue
+    from src.tasks.persistence import TaskPersistence
+
+    task_persistence = TaskPersistence(db_path=cfg.task_db_path)
+
+    async def _default_task_handler(record) -> None:
+        planning = factory.get_agent("planning_agent")
+        if planning is not None:
+            await task_queue.update_progress(record.task_id, 10, "Decomposing objective…")
+            result = await planning.process_task({"objective": record.objective, "task_id": record.task_id})
+            await task_queue.update_progress(record.task_id, 90, "Finalising result…")
+            record.result = result
+        else:
+            record.result = {"status": "completed", "summary": record.objective}
+
+    task_queue = TaskQueue(persistence=task_persistence)
+    await task_queue.start(_default_task_handler)
+    app.state.task_queue = task_queue
+    app.state.task_persistence = task_persistence
+
     logger.info(
         "AGI System initialised — %d agents, %d tools, IDE + CDE + Kally + Platform",
         len(factory.list_agents()),
@@ -158,6 +197,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     yield
 
+    await task_queue.stop()
+    task_persistence.close()
+    session_store.close()
     logger.info("AGI System shutting down...")
 
 
@@ -224,7 +266,7 @@ def create_app() -> FastAPI:
     )
 
     # CORS
-    allowed_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+    allowed_origins = get_settings().cors_origins_list()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
@@ -234,9 +276,11 @@ def create_app() -> FastAPI:
     )
 
     # Middleware (applied in reverse — last added = outermost)
+    from src.api.middleware.request_id import RequestIDMiddleware
     app.add_middleware(MetricsMiddleware)
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(APIKeyMiddleware)
+    app.add_middleware(RequestIDMiddleware)
 
     # Prometheus metrics endpoint
     from fastapi import Response as FastAPIResponse
@@ -255,6 +299,12 @@ def create_app() -> FastAPI:
     app.include_router(webhooks_router)
     app.include_router(sessions_router)
     app.include_router(eval_router)
+
+    from src.api.endpoints.auth import router as auth_router
+    app.include_router(auth_router)
+
+    from src.api.endpoints.system import router as system_router
+    app.include_router(system_router)
 
     # Static dashboard — served at / and /static
     _static_dir = os.path.join(os.path.dirname(__file__), "static")

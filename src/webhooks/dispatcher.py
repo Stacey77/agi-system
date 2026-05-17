@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import httpx
 
 logger = logging.getLogger(__name__)
+
+_MAX_RETRIES = 3
+_BASE_DELAY = 1.0  # seconds; doubles each retry
 
 
 class WebhookDispatcher:
@@ -21,6 +25,9 @@ class WebhookDispatcher:
             "url": url,
             "events": events,
             "created_at": datetime.now(timezone.utc).isoformat(),
+            "last_error": None,
+            "delivery_count": 0,
+            "failure_count": 0,
         }
         return webhook_id
 
@@ -38,14 +45,38 @@ class WebhookDispatcher:
         if not targets:
             return
         body = {"event": event, "payload": payload}
+        await asyncio.gather(
+            *[self._deliver(webhook, body) for webhook in targets],
+            return_exceptions=True,
+        )
+
+    async def _deliver(self, webhook: Dict[str, Any], body: Dict[str, Any]) -> None:
+        delay = _BASE_DELAY
+        last_exc: Optional[Exception] = None
         async with httpx.AsyncClient(timeout=10.0) as client:
-            for webhook in targets:
+            for attempt in range(1, _MAX_RETRIES + 1):
                 try:
-                    await client.post(webhook["url"], json=body)
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning(
-                        "Webhook delivery failed (id=%s url=%s): %s",
-                        webhook["id"],
-                        webhook["url"],
-                        exc,
+                    resp = await client.post(webhook["url"], json=body)
+                    resp.raise_for_status()
+                    webhook["delivery_count"] = webhook.get("delivery_count", 0) + 1
+                    webhook["last_error"] = None
+                    logger.debug(
+                        "Webhook delivered (id=%s event=%s attempt=%d status=%d)",
+                        webhook["id"], body.get("event"), attempt, resp.status_code,
                     )
+                    return
+                except Exception as exc:  # noqa: BLE001
+                    last_exc = exc
+                    logger.warning(
+                        "Webhook delivery attempt %d/%d failed (id=%s url=%s): %s",
+                        attempt, _MAX_RETRIES, webhook["id"], webhook["url"], exc,
+                    )
+                    if attempt < _MAX_RETRIES:
+                        await asyncio.sleep(delay)
+                        delay *= 2
+        webhook["failure_count"] = webhook.get("failure_count", 0) + 1
+        webhook["last_error"] = str(last_exc)
+        logger.error(
+            "Webhook delivery permanently failed after %d attempts (id=%s url=%s)",
+            _MAX_RETRIES, webhook["id"], webhook["url"],
+        )
