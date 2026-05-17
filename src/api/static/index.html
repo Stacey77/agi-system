@@ -268,6 +268,9 @@
   <button data-tab="cde">CDE</button>
   <button data-tab="platform">Platform</button>
   <button data-tab="kally">Kally AI</button>
+  <button data-tab="sessions">Sessions</button>
+  <button data-tab="webhooks">Webhooks</button>
+  <button data-tab="eval">Eval</button>
 </nav>
 
 <!-- ═══════════════════════ Main ═══════════════════════ -->
@@ -616,6 +619,116 @@
       </div>
       <button class="btn btn-primary" onclick="ingestSignal(event)">▶ Ingest</button>
       <div id="sig-output" class="output"></div>
+    </div>
+  </div>
+
+  <!-- ── Sessions ── -->
+  <div id="tab-sessions" class="tab-panel">
+    <div class="card">
+      <div class="section-header">
+        <h2>Active sessions</h2>
+        <span class="count" id="sessions-count">–</span>
+        <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadSessions()">↺ Refresh</button>
+      </div>
+      <div id="sessions-table"><div class="spinner"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">New session</div>
+      <label>Agent</label>
+      <select id="new-session-agent">
+        <option>research_agent</option>
+        <option>analysis_agent</option>
+        <option>writing_agent</option>
+        <option>review_agent</option>
+        <option>coding_agent</option>
+        <option>summarization_agent</option>
+        <option>planning_agent</option>
+      </select>
+      <button class="btn btn-primary" onclick="createSession(event)">Create</button>
+      <div id="create-session-output" class="output"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Send message</div>
+      <label>Session ID</label>
+      <input id="send-msg-session-id" type="text" placeholder="session-uuid" />
+      <label>Message</label>
+      <textarea id="send-msg-text" placeholder="Type your message…"></textarea>
+      <button class="btn btn-primary" onclick="sendSessionMessage(event)">Send</button>
+      <div id="send-msg-output" class="output"></div>
+    </div>
+  </div>
+
+  <!-- ── Webhooks ── -->
+  <div id="tab-webhooks" class="tab-panel">
+    <div class="card">
+      <div class="section-header">
+        <h2>Registered webhooks</h2>
+        <span class="count" id="webhooks-count">–</span>
+        <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadWebhooks()">↺ Refresh</button>
+      </div>
+      <div id="webhooks-table"><div class="spinner"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Register webhook</div>
+      <label>URL</label>
+      <input id="webhook-url" type="text" placeholder="https://example.com/webhook" />
+      <label>Events</label>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px">
+        <label style="display:flex;align-items:center;gap:6px;color:var(--text);font-size:13px;margin-bottom:0">
+          <input type="checkbox" id="wh-evt-task-completed" value="task.completed" checked /> task.completed
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;color:var(--text);font-size:13px;margin-bottom:0">
+          <input type="checkbox" id="wh-evt-crew-completed" value="crew.completed" /> crew.completed
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;color:var(--text);font-size:13px;margin-bottom:0">
+          <input type="checkbox" id="wh-evt-session-message" value="session.message" /> session.message
+        </label>
+      </div>
+      <button class="btn btn-primary" onclick="registerWebhook(event)">Register</button>
+      <div id="register-webhook-output" class="output"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Test webhook</div>
+      <label>Webhook ID</label>
+      <input id="test-webhook-id" type="text" placeholder="webhook-uuid" />
+      <button class="btn btn-secondary" onclick="testWebhook(event)">Send test ping</button>
+      <div id="test-webhook-output" class="output"></div>
+    </div>
+  </div>
+
+  <!-- ── Eval ── -->
+  <div id="tab-eval" class="tab-panel">
+    <div class="card">
+      <div class="card-title">Run evaluation</div>
+      <label>Agent name</label>
+      <input id="eval-agent-name" type="text" placeholder="e.g. research_agent" />
+      <label>Benchmark</label>
+      <select id="eval-benchmark">
+        <option value="standard">standard</option>
+      </select>
+      <button class="btn btn-primary" onclick="runEval(event)">▶ Run eval</button>
+      <div id="eval-run-output" class="output"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Last result</div>
+      <div id="eval-last-result">
+        <div id="eval-score-display" style="display:none;margin-bottom:14px">
+          <span style="font-size:13px;color:var(--muted)">Score: </span>
+          <span id="eval-score-value" style="font-size:20px;font-weight:700;color:var(--accent)">–</span>
+        </div>
+        <div id="eval-tasks-table-wrap" style="display:none">
+          <table>
+            <thead><tr><th>Task</th><th>Status</th><th>Duration (ms)</th></tr></thead>
+            <tbody id="eval-tasks-body"></tbody>
+          </table>
+        </div>
+        <div id="eval-last-empty" class="empty">No evaluation run yet</div>
+      </div>
     </div>
   </div>
 
@@ -1257,12 +1370,184 @@ async function recallMemory(event) {
   });
 }
 
+// ────────────────────────── Sessions ──────────────────────────
+
+async function loadSessions() {
+  const container = document.getElementById('sessions-table');
+  const countEl   = document.getElementById('sessions-count');
+  container.innerHTML = '<div class="spinner"></div>';
+  try {
+    const data = await apiFetch('/api/v1/sessions');
+    const sessions = data.sessions || data || [];
+    const list = Array.isArray(sessions) ? sessions : [];
+    countEl.textContent = list.length;
+    if (!list.length) { container.innerHTML = '<div class="empty">No active sessions</div>'; return; }
+    container.innerHTML = `<table>
+      <thead><tr><th>ID</th><th>Agent</th><th>Created</th><th>Messages</th></tr></thead>
+      <tbody>${list.map(s => `<tr>
+        <td><code style="font-size:11px">${s.id||s.session_id||'–'}</code></td>
+        <td>${s.agent||s.agent_name||'–'}</td>
+        <td>${s.created_at ? new Date(s.created_at).toLocaleString() : '–'}</td>
+        <td>${s.message_count ?? s.messages ?? '–'}</td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--danger)">${err.message}</div>`;
+  }
+}
+
+async function createSession(event) {
+  const btn = event.target;
+  const out = document.getElementById('create-session-output');
+  const agent = document.getElementById('new-session-agent').value;
+  await run(btn, async () => {
+    try {
+      const r = await apiFetch('/api/v1/sessions', { method: 'POST', body: JSON.stringify({ agent }) });
+      const sid = r.id || r.session_id || (r.session && (r.session.id || r.session.session_id));
+      if (sid) document.getElementById('send-msg-session-id').value = sid;
+      show(out, r);
+      loadSessions();
+    } catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+async function sendSessionMessage(event) {
+  const btn = event.target;
+  const out = document.getElementById('send-msg-output');
+  const sid = document.getElementById('send-msg-session-id').value.trim();
+  const msg = document.getElementById('send-msg-text').value.trim();
+  if (!sid) { show(out, 'Session ID is required.', true); return; }
+  if (!msg) { show(out, 'Message is required.', true); return; }
+  await run(btn, async () => {
+    try {
+      show(out, await apiFetch(`/api/v1/sessions/${encodeURIComponent(sid)}/message`, {
+        method: 'POST', body: JSON.stringify({ message: msg }),
+      }));
+    } catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+// ────────────────────────── Webhooks ──────────────────────────
+
+async function loadWebhooks() {
+  const container = document.getElementById('webhooks-table');
+  const countEl   = document.getElementById('webhooks-count');
+  container.innerHTML = '<div class="spinner"></div>';
+  try {
+    const data = await apiFetch('/api/v1/webhooks');
+    const hooks = data.webhooks || data || [];
+    const list = Array.isArray(hooks) ? hooks : [];
+    countEl.textContent = list.length;
+    if (!list.length) { container.innerHTML = '<div class="empty">No webhooks registered</div>'; return; }
+    container.innerHTML = `<table>
+      <thead><tr><th>ID</th><th>URL</th><th>Events</th></tr></thead>
+      <tbody>${list.map(w => `<tr>
+        <td><code style="font-size:11px">${w.id||w.webhook_id||'–'}</code></td>
+        <td style="word-break:break-all;max-width:260px">${w.url||'–'}</td>
+        <td><div class="tags">${(w.events||[]).map(e=>`<span class="tag">${e}</span>`).join('')}</div></td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--danger)">${err.message}</div>`;
+  }
+}
+
+async function registerWebhook(event) {
+  const btn = event.target;
+  const out = document.getElementById('register-webhook-output');
+  const url = document.getElementById('webhook-url').value.trim();
+  if (!url) { show(out, 'URL is required.', true); return; }
+  const events = ['wh-evt-task-completed', 'wh-evt-crew-completed', 'wh-evt-session-message']
+    .filter(id => document.getElementById(id).checked)
+    .map(id => document.getElementById(id).value);
+  if (!events.length) { show(out, 'Select at least one event.', true); return; }
+  await run(btn, async () => {
+    try {
+      const r = await apiFetch('/api/v1/webhooks', { method: 'POST', body: JSON.stringify({ url, events }) });
+      const wid = r.id || r.webhook_id || (r.webhook && (r.webhook.id || r.webhook.webhook_id));
+      if (wid) document.getElementById('test-webhook-id').value = wid;
+      show(out, r);
+      loadWebhooks();
+    } catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+async function testWebhook(event) {
+  const btn = event.target;
+  const out = document.getElementById('test-webhook-output');
+  const wid = document.getElementById('test-webhook-id').value.trim();
+  if (!wid) { show(out, 'Webhook ID is required.', true); return; }
+  await run(btn, async () => {
+    try {
+      show(out, await apiFetch(`/api/v1/webhooks/${encodeURIComponent(wid)}/test`, { method: 'POST' }));
+    } catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+// ────────────────────────── Eval ──────────────────────────
+
+async function loadEvalBenchmarks() {
+  try {
+    const data = await apiFetch('/api/v1/eval/benchmarks');
+    const benchmarks = data.benchmarks || [];
+    const sel = document.getElementById('eval-benchmark');
+    if (benchmarks.length) {
+      sel.innerHTML = benchmarks.map(b => `<option value="${b.id||b}">${b.name||b}</option>`).join('');
+    }
+  } catch { /* keep default "standard" option */ }
+}
+
+async function runEval(event) {
+  const btn   = event.target;
+  const out   = document.getElementById('eval-run-output');
+  const agent = document.getElementById('eval-agent-name').value.trim();
+  const bench = document.getElementById('eval-benchmark').value;
+  if (!agent) { show(out, 'Agent name is required.', true); return; }
+  await run(btn, async () => {
+    try {
+      const r = await apiFetch('/api/v1/eval/run', {
+        method: 'POST', body: JSON.stringify({ agent, benchmark: bench }),
+      });
+      show(out, r);
+      _renderEvalResult(r);
+    } catch (err) { show(out, err.data || err.message, true); }
+  });
+}
+
+function _renderEvalResult(r) {
+  const scoreDisplay = document.getElementById('eval-score-display');
+  const scoreValue   = document.getElementById('eval-score-value');
+  const tableWrap    = document.getElementById('eval-tasks-table-wrap');
+  const tbody        = document.getElementById('eval-tasks-body');
+  const emptyEl      = document.getElementById('eval-last-empty');
+
+  const score = r.score ?? r.result?.score;
+  if (score !== undefined && score !== null) {
+    scoreValue.textContent = typeof score === 'number' ? score.toFixed(2) : score;
+    scoreDisplay.style.display = 'block';
+  }
+
+  const tasks = r.tasks || r.result?.tasks || [];
+  if (tasks.length) {
+    tbody.innerHTML = tasks.map(t => `<tr>
+      <td>${t.description || t.task || t.name || '–'}</td>
+      <td>${statusChip(t.status || 'done')}</td>
+      <td>${t.duration_ms ?? t.duration ?? '–'}</td>
+    </tr>`).join('');
+    tableWrap.style.display = 'block';
+    emptyEl.style.display = 'none';
+  } else if (score !== undefined && score !== null) {
+    emptyEl.style.display = 'none';
+  }
+}
+
 // ────────────────────────── Tab loaders ──────────────────────────
 
 tabLoaders['agents']   = loadAgents;
 tabLoaders['ide']      = loadIDESessions;
 tabLoaders['cde']      = loadCDEEnvironments;
 tabLoaders['platform'] = () => { loadTools(); loadServices(); };
+tabLoaders['sessions'] = loadSessions;
+tabLoaders['webhooks'] = loadWebhooks;
+tabLoaders['eval']     = () => loadEvalBenchmarks();
 
 // ────────────────────────── Init ──────────────────────────
 
