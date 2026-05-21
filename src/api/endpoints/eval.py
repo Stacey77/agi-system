@@ -37,6 +37,10 @@ def _get_eval_results(request: Request) -> Dict[str, Any]:
     return getattr(request.app.state, "eval_results", {})
 
 
+def _get_eval_store(request: Request):
+    return getattr(request.app.state, "eval_store", None)
+
+
 @router.post("/run")
 async def run_evaluation(body: EvalRequest, request: Request) -> Dict[str, Any]:
     factory = _get_factory(request)
@@ -102,16 +106,47 @@ async def run_evaluation(body: EvalRequest, request: Request) -> Dict[str, Any]:
     eval_results = _get_eval_results(request)
     eval_results[eval_id] = eval_record
 
+    store = _get_eval_store(request)
+    if store is not None:
+        store.save(eval_record)
+
     return eval_record
+
+
+@router.get("/results")
+async def list_eval_results(request: Request) -> List[Dict[str, Any]]:
+    store = _get_eval_store(request)
+    if store is not None:
+        return store.load_all()
+    return list(_get_eval_results(request).values())
 
 
 @router.get("/results/{eval_id}")
 async def get_eval_result(eval_id: str, request: Request) -> Dict[str, Any]:
-    eval_results = _get_eval_results(request)
-    result = eval_results.get(eval_id)
+    store = _get_eval_store(request)
+    if store is not None:
+        result = store.get(eval_id)
+    else:
+        result = _get_eval_results(request).get(eval_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Eval result '{eval_id}' not found")
     return result
+
+
+@router.delete("/results/{eval_id}")
+async def delete_eval_result(eval_id: str, request: Request) -> Dict[str, str]:
+    store = _get_eval_store(request)
+    deleted = False
+    if store is not None:
+        deleted = store.delete(eval_id)
+    else:
+        eval_results = _get_eval_results(request)
+        if eval_id in eval_results:
+            del eval_results[eval_id]
+            deleted = True
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Eval result '{eval_id}' not found")
+    return {"message": f"Eval result '{eval_id}' deleted"}
 
 
 @router.get("/benchmarks")

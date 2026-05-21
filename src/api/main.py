@@ -141,6 +141,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Eval results store
     app.state.eval_results = {}
+    from src.eval.eval_store import EvalStore
+    app.state.eval_store = EvalStore(db_path=cfg.task_db_path.replace("tasks.db", "evals.db"))
 
     # Kally AI closed-loop agent
     kally_config = AgentConfig(
@@ -216,6 +218,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     await task_scheduler.stop()
     await task_queue.stop()
+    app.state.eval_store.close()
     task_persistence.close()
     session_store.close()
     logger.info("AGI System shutting down...")
