@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -116,6 +116,41 @@ async def send_message(
     manager.add_message(session_id, role="assistant", content=output)
 
     return {"role": "assistant", "content": output}
+
+
+@router.get("/{session_id}/messages")
+async def get_messages(
+    session_id: str,
+    request: Request,
+    role: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    search: Optional[str] = Query(default=None),
+) -> Dict[str, Any]:
+    manager = _get_manager(request)
+    session = manager.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+
+    messages = session.messages
+    total = len(messages)
+
+    if role is not None:
+        messages = [m for m in messages if m.get("role") == role]
+    if search is not None:
+        search_lower = search.lower()
+        messages = [m for m in messages if search_lower in str(m.get("content", "")).lower()]
+
+    total_filtered = len(messages)
+    messages = messages[offset: offset + limit]
+
+    return {
+        "messages": messages,
+        "total": total,
+        "total_filtered": total_filtered,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/{session_id}/history")
