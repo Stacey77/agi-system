@@ -48,27 +48,11 @@ CODING    SUMMARIZATION  IDE   CDE     KALLY  EXECUTION
 
 `BaseAgent` provides: `run_with_retry()` (retry + circuit breaker — opens for 60 s after `AgentConfig.circuit_break_threshold` consecutive failures, default 5), `_invoke_llm()`, `_stream_llm()`, `recall_similar_tasks()`, `set_tool_registry()`.
 
-## REST Routers
+## REST Routers (88 endpoints)
 
 All registered via `app.include_router()` in `create_app()`. OpenAPI tags: `_OPENAPI_TAGS` in `main.py`. Prometheus metrics at `/metrics`.
 
-| Module | Covers |
-|---|---|
-| `endpoints/health.py` | `/api/v1/health` |
-| `endpoints/agents.py` | Agent run/status |
-| `endpoints/tasks.py` | Task queue CRUD + SSE stream |
-| `endpoints/crew.py` | CrewAI orchestration |
-| `endpoints/ide.py` | IDE agent |
-| `endpoints/cde.py` | CDE agent |
-| `endpoints/platform.py` | Developer portal / tool landscape |
-| `endpoints/webhooks.py` | Webhook CRUD + delivery |
-| `endpoints/sessions.py` | Session management |
-| `endpoints/eval.py` | Evaluation |
-| `endpoints/auth.py` | Auth / key management |
-| `endpoints/system.py` | System info |
-| `endpoints/scheduler.py` | Recurring task management |
-| `endpoints/usage.py` | Token/cost tracking |
-| `endpoints/memory.py` | Memory read/write |
+`health` `agents` `tasks` (SSE stream) `crew` `ide` `cde` `platform` `webhooks` `sessions` `eval` `auth` `system` `scheduler` `usage` `memory` — each in `src/api/endpoints/<name>.py`.
 
 ## Auth
 
@@ -96,17 +80,11 @@ All registered via `app.include_router()` in `create_app()`. OpenAPI tags: `_OPE
 | `LOG_LEVEL` | `INFO` | |
 | `OTEL_SERVICE_NAME` | `agi-system` | OpenTelemetry |
 
-## Memory Architecture
+## Memory & Orchestration
 
-- **Short-term**: in-process dict on each `AgentMemory` instance.
-- **Long-term / episodic**: ChromaDB `VectorStore` (`src/memory/vector_store.py`).
-- **Hybrid**: `HybridMemory` combines both; `MemoryManager` is the unified API.
+Memory layers: short-term (in-process dict on `AgentMemory`), long-term/episodic (ChromaDB `VectorStore`), hybrid (`HybridMemory`). Unified API: `MemoryManager`.
 
-## Orchestration
-
-- **CrewAI**: multi-agent crew definitions in `src/crew/`.
-- **LangGraph**: stateful graph execution within agent pipelines.
-- **Execution engine**: `src/execution/execution_engine.py` + `ExecutionAgent`.
+Orchestration: CrewAI (`src/crew/`), LangGraph (within agent pipelines), `ExecutionAgent` (`src/execution/execution_engine.py`).
 
 ## Testing
 
