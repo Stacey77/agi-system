@@ -125,3 +125,8 @@ class AgentFactory:
         """Inject a tool registry into every registered agent."""
         for agent in self._agents.values():
             agent.set_tool_registry(registry)
+
+    def set_token_tracker(self, tracker: Any) -> None:
+        """Inject a TokenTracker into every registered agent."""
+        for agent in self._agents.values():
+            agent.set_token_tracker(tracker)

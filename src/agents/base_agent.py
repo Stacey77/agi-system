@@ -85,6 +85,7 @@ class BaseAgent(ABC):
         self.memory = AgentMemory(max_size=config.memory_size)
         self._tool_registry: Optional[Any] = None
         self._task_memory: Optional[Any] = None
+        self._tracker: Optional[Any] = None
         self._consecutive_failures: int = 0
         self._circuit_open_until: float = 0.0
         if persist_memory:
@@ -174,6 +175,10 @@ class BaseAgent(ABC):
         """Inject a tool registry for tool access."""
         self._tool_registry = registry
 
+    def set_token_tracker(self, tracker: Any) -> None:
+        """Inject a TokenTracker so that _invoke_llm() records token usage."""
+        self._tracker = tracker
+
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
@@ -194,13 +199,29 @@ class BaseAgent(ABC):
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to persist task memory: %s", exc)
 
-    async def _invoke_llm(self, system_prompt: str, user_prompt: str) -> Optional[str]:
-        """Call the LLM and return the full response, or None if no LLM configured."""
+    async def _invoke_llm(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        task_id: Optional[str] = None,
+    ) -> Optional[str]:
+        """Call the LLM and return the full response, or None if no LLM configured.
+
+        If a token tracker has been injected via ``set_token_tracker()``, usage
+        is recorded after each call.
+        """
         if self.llm is None:
             return None
         try:
             from src.llm.provider import invoke_llm
-            return await invoke_llm(self.llm, system_prompt, user_prompt)
+            return await invoke_llm(
+                self.llm,
+                system_prompt,
+                user_prompt,
+                agent_name=self.config.name,
+                task_id=task_id,
+                tracker=self._tracker,
+            )
         except Exception as exc:  # noqa: BLE001
             logger.warning("LLM invocation failed: %s", exc)
             return None

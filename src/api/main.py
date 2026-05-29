@@ -96,6 +96,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from src.crew.orchestrator import CrewOrchestrator
     app.state.crew_orchestrator = CrewOrchestrator(agent_factory=factory, llm=llm)
 
+    # Named crew templates store
+    app.state.crew_templates = {}
+
     # Vibecoding IDE
     ide_config = AgentConfig(
         name="ide_agent",
@@ -174,6 +177,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     tool_registry.register_tool(DocumentParserTool())
     tool_registry.register_tool(DatabaseTool(database_url=os.getenv("DATABASE_URL")))
     factory.set_tool_registry(tool_registry)
+    factory.set_token_tracker(app.state.token_tracker)
     app.state.tool_registry = tool_registry
 
     # Wire the agent factory into the planning agent for delegation
