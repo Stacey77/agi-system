@@ -127,6 +127,48 @@ agi-system/
 └── docs/                # Documentation
 ```
 
+## Platform Vision — The Three-Way Empire
+
+The AGI System is built on three interconnected pillars that together form a complete, enterprise-grade AI platform:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  🧪 Agentic Studio  — AI coding assistants, IDE, CDE, vibe-coding │
+├──────────────────────────────────────────────────────────────────┤
+│  🏗️  AI Foundry     — rapid application development & deployment  │
+├──────────────────────────────────────────────────────────────────┤
+│  🏭 AI Factory     — scalable, efficient AI infrastructure        │
+└──────────────────────────────────────────────────────────────────┘
+          ▲
+          │  underpinned by
+          ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  🔬 AI Proving Ground (AIPG)  — evaluate & validate AI tech       │
+│  🔗 Digital Twin              — live, data-connected reality model │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+This practical approach results in **seamless integration**, **robust security**, and **measurable business outcomes** — making AI adoption a strategic and impactful journey.
+
+| Pillar / Layer | What it does | Doc |
+|---|---|---|
+| **Agentic Studio** | AI coding assistants, vibecoding IDE, CDE, enterprise market landscape | [docs/agentic-studio/](docs/agentic-studio/) |
+| **AI Foundry** | Application templates, ADK, tool ecosystem, LLM integration, developer portal | [docs/ai-foundry/platform-overview.md](docs/ai-foundry/platform-overview.md) |
+| **AI Factory** | Kubernetes, Docker, Terraform, data/memory layer, CI/CD, observability | [docs/ai-factory/infrastructure-guide.md](docs/ai-factory/infrastructure-guide.md) |
+| **AIPG** | Benchmark evaluation, multi-provider LLM assessment, Kally AI, tech governance | [docs/aipg/proving-ground.md](docs/aipg/proving-ground.md) |
+| **Digital Twin** | Real-time asset mirroring, simulation sandbox, change event stream | [docs/digital-twin/overview.md](docs/digital-twin/overview.md) |
+
+## Documentation
+
+- [AI Foundry — Platform Overview](docs/ai-foundry/platform-overview.md)
+- [AI Factory — Infrastructure Guide](docs/ai-factory/infrastructure-guide.md)
+- [Agentic Studio — Market Landscape](docs/agentic-studio/market-landscape.md)
+- [AI Proving Ground (AIPG)](docs/aipg/proving-ground.md)
+- [Digital Twin Overview](docs/digital-twin/overview.md)
+- [API Reference](docs/api/README.md)
+- [User Guide](docs/user-guides/README.md)
+- [Deployment Guide](docs/deployment/README.md)
+
 ## Contributing
 
 1. Fork the repository
