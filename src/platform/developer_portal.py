@@ -47,11 +47,11 @@ class DeveloperService:
             "service_id": self.service_id,
             "name": self.name,
             "description": self.description,
-            "tier": self.tier,
+            "tier": self.tier.value,
             "version": self.version,
             "api_base_url": self.api_base_url,
             "docs_url": self.docs_url,
-            "status": self.status,
+            "status": self.status.value,
             "owner_team": self.owner_team,
             "tags": self.tags,
             "registered_at": self.registered_at.isoformat(),
@@ -212,7 +212,8 @@ class DeveloperPortal:
         return {
             "total_services": len(self._services),
             "status_counts": counts,
-            "fully_operational": counts[ServiceStatus.OPERATIONAL.value] == len(self._services),
+            "fully_operational": counts[ServiceStatus.OPERATIONAL.value]
+            == len(self._services),
         }
 
     def total_count(self) -> int:
