@@ -76,8 +76,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         effective_capacity = self._capacity * capacity_mult
         effective_refill = self._refill_rate * capacity_mult
 
+        # Prefer the stable authenticated identity (JWT sub or API key ID) set
+        # by APIKeyMiddleware; fall back to the raw header value and then to IP.
         client_id = (
-            request.headers.get("X-API-Key")
+            getattr(getattr(request, "state", None), "auth_identity", None)
+            or request.headers.get("X-API-Key")
             or (request.client.host if request.client else "unknown")
         )
         bucket = self._buckets[client_id]

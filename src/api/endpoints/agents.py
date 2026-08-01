@@ -5,11 +5,19 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from src.agents.base_agent import AgentConfig, AgentType
+from src.api.security.sanitizer import sanitize
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +113,7 @@ async def execute_agent_task(
     if agent is None:
         raise HTTPException(status_code=404, detail=f"Agent '{agent_name}' not found")
 
-    task_dict = {"task": body.task, **body.parameters}
+    task_dict = {"task": sanitize(body.task), **body.parameters}
     try:
         result = await agent.process_task(task_dict)
         return {"agent": agent_name, "result": result}
@@ -127,7 +135,7 @@ async def stream_agent_task(
     if agent is None:
         raise HTTPException(status_code=404, detail=f"Agent '{agent_name}' not found")
 
-    task_dict = {"task": body.task, **body.parameters}
+    task_dict = {"task": sanitize(body.task), **body.parameters}
 
     async def _event_generator():
         try:
@@ -165,7 +173,7 @@ async def websocket_agent_task(agent_name: str, websocket: WebSocket) -> None:
 
     try:
         data = await websocket.receive_json()
-        task_dict = {"task": data.get("task", ""), **data.get("parameters", {})}
+        task_dict = {"task": sanitize(data.get("task", "")), **data.get("parameters", {})}
         async for chunk in agent.stream_task(task_dict):
             await websocket.send_text(chunk)
         await websocket.send_text("[DONE]")

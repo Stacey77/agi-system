@@ -36,8 +36,8 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = ""
 
-    # CORS
-    cors_origins: str = "*"
+    # CORS — default to localhost only; override with a comma-separated list in production
+    cors_origins: str = "http://localhost:8000"
 
     @field_validator("cors_origins")
     @classmethod

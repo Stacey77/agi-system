@@ -159,11 +159,31 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Auth: key store and JWT manager
     from src.auth.key_store import KeyStore
     from src.auth.jwt_manager import JWTManager
-    app.state.key_store = KeyStore()
+    key_store = KeyStore()
+    app.state.key_store = key_store
+
+    jwt_secret_env = os.getenv("JWT_SECRET")
+    if not jwt_secret_env:
+        logger.warning(
+            "JWT_SECRET is not set — using an ephemeral random secret. "
+            "All tokens will be invalidated on every restart. "
+            "Set JWT_SECRET to a stable value in production."
+        )
+        jwt_secret = secrets.token_hex(32)
+    else:
+        jwt_secret = jwt_secret_env
+
     app.state.jwt_manager = JWTManager(
-        secret=os.getenv("JWT_SECRET", secrets.token_hex(32)),
+        secret=jwt_secret,
         expiry_seconds=int(os.getenv("JWT_EXPIRY_SECONDS", "3600")),
     )
+
+    if not key_store.list_keys():
+        logger.warning(
+            "No API keys configured (API_KEYS / API_KEY env vars are unset). "
+            "Authentication is DISABLED — all endpoints are publicly accessible. "
+            "Set API_KEYS in production to enforce access control."
+        )
 
     # Wire the tool registry into all agents
     tool_registry = ToolRegistry()
@@ -310,7 +330,7 @@ def create_app() -> FastAPI:
             "**Streaming**: `GET /api/v1/tasks/{id}/stream` and `WS /api/v1/agents/{name}/ws` "
             "for real-time output."
         ),
-        version="0.1.0",
+        version="1.0.0-rc.1",
         lifespan=lifespan,
         openapi_tags=_OPENAPI_TAGS,
         contact={"name": "AGI System", "url": "https://github.com/Stacey77/agi-system"},
@@ -318,7 +338,14 @@ def create_app() -> FastAPI:
     )
 
     # CORS
-    allowed_origins = get_settings().cors_origins_list()
+    cfg_for_cors = get_settings()
+    allowed_origins = cfg_for_cors.cors_origins_list()
+    if "*" in allowed_origins and cfg_for_cors.log_level.upper() != "DEBUG":
+        logger.warning(
+            "CORS_ORIGINS is set to '*' (allow all origins). "
+            "This is unsafe for production deployments. "
+            "Set CORS_ORIGINS to a specific comma-separated list of allowed origins."
+        )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,

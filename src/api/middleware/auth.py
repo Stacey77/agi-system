@@ -33,6 +33,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         auth_role: str | None = None
+        auth_identity: str | None = None
 
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer ") and jwt_manager is not None:
@@ -40,6 +41,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             payload = jwt_manager.verify_token(token)
             if payload:
                 auth_role = payload.get("role")
+                auth_identity = payload.get("sub")
 
         if auth_role is None:
             x_api_key = request.headers.get("X-API-Key", "")
@@ -47,6 +49,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
                 api_key = key_store.validate_key(x_api_key)
                 if api_key:
                     auth_role = api_key.role.value
+                    auth_identity = api_key.key_id
 
         if auth_role is None:
             logger.warning(
@@ -60,4 +63,5 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             )
 
         request.state.auth_role = auth_role
+        request.state.auth_identity = auth_identity
         return await call_next(request)
