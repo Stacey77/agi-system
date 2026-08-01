@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from src.api.security.sanitizer import sanitize
 from src.tasks.queue import TaskRecord, TaskStatus
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ async def submit_task(body: TaskSubmission, request: Request) -> Dict[str, Any]:
     if queue is None:
         raise HTTPException(status_code=503, detail="Task queue not initialised")
 
-    record = await queue.submit(body.objective, body.parameters)
+    record = await queue.submit(sanitize(body.objective), body.parameters)
     return {"task_id": record.task_id, "status": record.status, "objective": record.objective}
 
 

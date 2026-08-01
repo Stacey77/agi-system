@@ -36,7 +36,7 @@ async def system_info(request: Request) -> Dict[str, Any]:
             tasks_summary[r.status] = tasks_summary.get(r.status, 0) + 1
 
     return {
-        "version": "0.1.0",
+        "version": "1.0.0-rc.1",
         "python": sys.version.split()[0],
         "uptime_seconds": round(time.time() - _START, 1),
         "llm_provider": cfg.llm_provider if cfg else "unknown",
@@ -44,4 +44,30 @@ async def system_info(request: Request) -> Dict[str, Any]:
         "agents": agents,
         "tools": tools,
         "tasks": tasks_summary,
+    }
+
+
+@router.get("/auth-status")
+async def auth_status(request: Request) -> Dict[str, Any]:
+    """Return whether authentication is enforced.
+
+    Intended for use by operators and monitoring systems to detect
+    misconfigured (open) deployments.
+    """
+    key_store = getattr(request.app.state, "key_store", None)
+    configured_keys = key_store.list_keys() if key_store is not None else []
+    auth_enforced = len(configured_keys) > 0
+
+    import os
+    jwt_secret_stable = bool(os.getenv("JWT_SECRET"))
+
+    return {
+        "auth_enforced": auth_enforced,
+        "api_keys_configured": len(configured_keys),
+        "jwt_secret_stable": jwt_secret_stable,
+        "warning": (
+            None
+            if auth_enforced
+            else "Authentication is DISABLED — no API keys configured. All endpoints are publicly accessible."
+        ),
     }

@@ -76,13 +76,21 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         effective_capacity = self._capacity * capacity_mult
         effective_refill = self._refill_rate * capacity_mult
 
+        # Prefer the stable authenticated identity (JWT sub or API key ID) set
+        # by APIKeyMiddleware; fall back to the raw header value and then to IP.
+        auth_identity = getattr(getattr(request, "state", None), "auth_identity", None)
+        client_ip = request.client.host if request.client else "unknown"
         client_id = (
-            request.headers.get("X-API-Key")
-            or (request.client.host if request.client else "unknown")
+            auth_identity
+            or request.headers.get("X-API-Key")
+            or client_ip
         )
+        # Use a non-sensitive identifier for logging: prefer the internal identity
+        # or IP address rather than the raw API key header.
+        log_id = auth_identity or client_ip
         bucket = self._buckets[client_id]
         if not bucket.consume(effective_capacity, effective_refill):
-            logger.warning("Rate limit exceeded for client '%s' (role=%s)", client_id, auth_role)
+            logger.warning("Rate limit exceeded for client '%s' (role=%s)", log_id, auth_role)
             try:
                 from src.api.middleware.metrics import record_rate_limit_hit
                 record_rate_limit_hit(auth_role or "unknown")
