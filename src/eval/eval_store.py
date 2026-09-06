@@ -52,5 +52,10 @@ class EvalStore:
         return cur.rowcount > 0
 
     def close(self) -> None:
-        with self._lock:
-            self._conn.close()
+        if self._conn:
+            with self._lock:
+                try:
+                    self._conn.close()
+                except Exception:  # noqa: BLE001
+                    pass
+            self._conn = None

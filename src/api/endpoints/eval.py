@@ -139,11 +139,10 @@ async def delete_eval_result(eval_id: str, request: Request) -> Dict[str, str]:
     deleted = False
     if store is not None:
         deleted = store.delete(eval_id)
-    else:
-        eval_results = _get_eval_results(request)
-        if eval_id in eval_results:
-            del eval_results[eval_id]
-            deleted = True
+    eval_results = _get_eval_results(request)
+    if eval_id in eval_results:
+        del eval_results[eval_id]
+        deleted = True
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Eval result '{eval_id}' not found")
     return {"message": f"Eval result '{eval_id}' deleted"}
