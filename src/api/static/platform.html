@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nova Orchestrator Platform</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+background: #0f1419;
+color: #e5e3df;
+line-height: 1.6;
+}
+.container {
+max-width: 1400px;
+margin: 0 auto;
+padding: 2rem;
+padding-bottom: 150px;
+}
+header {
+text-align: center;
+margin-bottom: 3rem;
+border-bottom: 1px solid #2a2a28;
+padding-bottom: 2rem;
+}
+h1 {
+font-size: 2rem;
+margin-bottom: 0.5rem;
+color: #fff;
+}
+.subtitle {
+font-size: 0.95rem;
+color: #999;
+}
+.input-zone {
+display: grid;
+gap: 1rem;
+margin-bottom: 2rem;
+}
+textarea {
+width: 100%;
+padding: 1rem;
+background: #1a1f28;
+border: 1px solid #2a2a28;
+border-radius: 8px;
+color: #e5e3df;
+font-size: 1rem;
+min-height: 100px;
+}
+textarea:focus {
+outline: none;
+border-color: #4a9eff;
+background: #202a38;
+}
+.controls {
+display: flex;
+gap: 1rem;
+flex-wrap: wrap;
+}
+button {
+padding: 0.75rem 1.5rem;
+background: #4a9eff;
+color: #fff;
+border: none;
+border-radius: 6px;
+cursor: pointer;
+font-weight: 600;
+font-size: 0.95rem;
+transition: all 0.2s;
+}
+button:hover { background: #2a7ee5; }
+button:disabled { background: #444; cursor: not-allowed; }
+.agents-panel {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+gap: 1rem;
+margin-bottom: 2rem;
+}
+.agent-card {
+padding: 1rem;
+background: #1a1f28;
+border: 1px solid #2a2a28;
+border-radius: 8px;
+cursor: pointer;
+text-align: center;
+transition: all 0.2s;
+opacity: 0.5;
+}
+.agent-card.selected {
+background: #2a3a50;
+border-color: #4a9eff;
+opacity: 1;
+}
+.agent-card.active {
+background: #1a4a2a;
+border-color: #2ae070;
+animation: glow 0.6s ease-out;
+}
+@keyframes glow {
+0% { box-shadow: 0 0 20px rgba(42, 224, 112, 0.6); }
+100% { box-shadow: 0 0 0 rgba(42, 224, 112, 0); }
+}
+.agent-name { font-weight: 600; margin-bottom: 0.5rem; }
+.agent-role { font-size: 0.8rem; color: #999; }
+.work-stream {
+display: grid;
+gap: 2rem;
+}
+.agent-work {
+padding: 1.5rem;
+background: #1a1f28;
+border-left: 3px solid #4a9eff;
+border-radius: 6px;
+animation: slideIn 0.3s ease-out;
+}
+@keyframes slideIn {
+from { opacity: 0; transform: translateX(-20px); }
+to { opacity: 1; transform: translateX(0); }
+}
+.agent-header {
+font-weight: 600;
+margin-bottom: 1rem;
+color: #4a9eff;
+}
+.work-output {
+white-space: pre-wrap;
+font-size: 0.95rem;
+color: #ddd;
+margin-bottom: 1rem;
+}
+.verification {
+padding: 0.75rem;
+background: #0f1419;
+border-left: 2px solid #2ae070;
+font-size: 0.9rem;
+color: #aaa;
+}
+.status-bar {
+position: fixed;
+bottom: 0;
+left: 0;
+right: 0;
+padding: 1rem;
+background: #1a1f28;
+border-top: 1px solid #2a2a28;
+display: flex;
+justify-content: space-between;
+align-items: center;
+}
+.metrics { display: flex; gap: 2rem; color: #999; }
+.metric { display: flex; gap: 0.5rem; }
+.metric-value { color: #4a9eff; font-weight: 600; }
+.error {
+padding: 1rem;
+background: #4a1515;
+border-left: 3px solid #ff6b6b;
+border-radius: 6px;
+color: #ffaaaa;
+margin-bottom: 1rem;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>Nova Orchestrator</h1>
+<p class="subtitle">Speak a problem. Route to agents. Watch them work in real time.</p>
+</header>
+
+<div class="input-zone">
+<textarea id="problem" placeholder="Describe your problem or paste it here..."></textarea>
+<div class="controls">
+<button id="btnAnalyze">Analyze &amp; Select Agents</button>
+<button id="btnRoute">Route to Agents</button>
+<button id="btnReset">Reset</button>
+</div>
+</div>
+
+<div id="errorBox"></div>
+<div class="agents-panel" id="agentsPanel"></div>
+<div id="workStream" class="work-stream"></div>
+</div>
+
+<div class="status-bar">
+<div class="metrics">
+<div class="metric">Problems: <span class="metric-value" id="problemCount">0</span></div>
+<div class="metric">Agents engaged: <span class="metric-value" id="agentCount">0</span></div>
+<div class="metric">Steps verified: <span class="metric-value" id="verifyCount">0</span></div>
+</div>
+</div>
+
+<script>
+"use strict";
+
+/**
+ * @typedef {Object} AgentDef
+ * @property {string} role
+ */
+
+/** @type {Record<string, AgentDef>} */
+const AGENTS = {
+  Vortex:   { role: 'sales / pipeline' },
+  Echo:     { role: 'marketing / comms' },
+  Sentinel: { role: 'finance / integrity' },
+  Spark:    { role: 'design / compute' },
+  Sage:     { role: 'knowledge / research' },
+  Cyber:    { role: 'security / protocol' },
+  Forge:    { role: 'innovation / build' },
+  Atlas:    { role: 'engineering / systems' },
+  Rig:      { role: 'deploys to hardware' }
+};
+
+/** Known agent names, used to validate anything the server sends back. */
+const KNOWN_AGENTS = new Set(Object.keys(AGENTS));
+
+/** @type {Set<string>} */
+let selectedAgents = new Set();
+const metrics = { problems: 0, agents: 0, verified: 0 };
+
+/** @returns {HTMLElement} */
+function el(id) {
+  const node = document.getElementById(id);
+  if (!node) throw new Error(`Missing required element #${id}`);
+  return node;
+}
+
+/** @param {string} message */
+function showError(message) {
+  const box = el('errorBox');
+  const div = document.createElement('div');
+  div.className = 'error';
+  div.textContent = message;
+  box.innerHTML = '';
+  box.appendChild(div);
+}
+
+function clearError() {
+  el('errorBox').innerHTML = '';
+}
+
+/**
+ * Render the agent selection grid. Only agents defined in AGENTS are shown;
+ * `preselected` marks which cards start selected.
+ * @param {string[]} [preselected=[]]
+ */
+function renderAgents(preselected = []) {
+  const panel = el('agentsPanel');
+  panel.innerHTML = '';
+  const preselectedSet = new Set(Array.isArray(preselected) ? preselected : []);
+
+  for (const [name, def] of Object.entries(AGENTS)) {
+    const card = document.createElement('div');
+    card.className = 'agent-card';
+    if (preselectedSet.has(name)) card.classList.add('selected');
+    card.dataset.agent = name;
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'agent-name';
+    nameEl.textContent = name;
+
+    const roleEl = document.createElement('div');
+    roleEl.className = 'agent-role';
+    roleEl.textContent = def.role;
+
+    card.append(nameEl, roleEl);
+    card.addEventListener('click', () => {
+      card.classList.toggle('selected');
+      if (card.classList.contains('selected')) {
+        selectedAgents.add(name);
+      } else {
+        selectedAgents.delete(name);
+      }
+    });
+    panel.appendChild(card);
+  }
+}
+
+/**
+ * Build one agent-work block using safe DOM APIs (no innerHTML for
+ * server-supplied text, so output/verification cannot inject markup).
+ * @param {string} agent
+ * @param {string} output
+ * @param {string} verification
+ * @returns {HTMLElement}
+ */
+function buildWorkBlock(agent, output, verification) {
+  const work = document.createElement('div');
+  work.className = 'agent-work';
+
+  const header = document.createElement('div');
+  header.className = 'agent-header';
+  header.textContent = agent;
+
+  const outEl = document.createElement('div');
+  outEl.className = 'work-output';
+  outEl.textContent = output;
+
+  const verEl = document.createElement('div');
+  verEl.className = 'verification';
+  const label = document.createElement('strong');
+  label.textContent = 'Verify: ';
+  verEl.append(label, document.createTextNode(verification));
+
+  work.append(header, outEl, verEl);
+  return work;
+}
+
+/**
+ * @param {string} agent
+ */
+function markAgentActive(agent) {
+  if (!KNOWN_AGENTS.has(agent)) return;
+  const card = document.querySelector(`[data-agent="${CSS.escape(agent)}"]`);
+  if (card) card.classList.add('active');
+}
+
+/** @param {unknown} evt */
+function handleEvent(evt, workStream) {
+  if (!evt || typeof evt !== 'object') return;
+  const type = /** @type {any} */ (evt).type;
+
+  if (type === 'agent_start') {
+    markAgentActive(String(/** @type {any} */ (evt).agent ?? ''));
+  } else if (type === 'agent_work') {
+    const agent = String(/** @type {any} */ (evt).agent ?? 'Unknown');
+    const output = String(/** @type {any} */ (evt).output ?? '');
+    const verification = String(/** @type {any} */ (evt).verification ?? '');
+    workStream.appendChild(buildWorkBlock(agent, output, verification));
+    metrics.verified++;
+    updateMetrics();
+  } else if (type === 'error') {
+    showError(String(/** @type {any} */ (evt).message ?? 'Agent stream error'));
+  }
+}
+
+function updateMetrics() {
+  el('problemCount').textContent = String(metrics.problems);
+  el('agentCount').textContent = String(metrics.agents);
+  el('verifyCount').textContent = String(metrics.verified);
+}
+
+/**
+ * @param {boolean} disabled
+ */
+function setBusy(disabled) {
+  el('btnAnalyze').disabled = disabled;
+  el('btnRoute').disabled = disabled;
+}
+
+el('btnAnalyze').addEventListener('click', async () => {
+  const problem = /** @type {HTMLTextAreaElement} */ (el('problem')).value.trim();
+  if (!problem) {
+    showError('Enter a problem first.');
+    return;
+  }
+  clearError();
+  setBusy(true);
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ problem })
+    });
+    if (!res.ok) {
+      throw new Error(`Analyze failed: ${res.status} ${res.statusText}`);
+    }
+    const data = await res.json();
+    const agents = Array.isArray(data && data.agents)
+      ? data.agents.filter((a) => KNOWN_AGENTS.has(a))
+      : [];
+    renderAgents(agents);
+    selectedAgents = new Set(agents);
+  } catch (e) {
+    showError(e instanceof Error ? e.message : 'Failed to analyze problem.');
+  } finally {
+    setBusy(false);
+  }
+});
+
+el('btnRoute').addEventListener('click', async () => {
+  const problem = /** @type {HTMLTextAreaElement} */ (el('problem')).value.trim();
+  if (!problem || selectedAgents.size === 0) {
+    showError('Enter a problem and select at least one agent.');
+    return;
+  }
+  clearError();
+  setBusy(true);
+
+  const workStream = el('workStream');
+  workStream.innerHTML = '';
+
+  try {
+    const res = await fetch('/api/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ problem, agents: Array.from(selectedAgents) })
+    });
+    if (!res.ok) {
+      throw new Error(`Route failed: ${res.status} ${res.statusText}`);
+    }
+    if (!res.body) {
+      throw new Error('Streaming is not supported by this browser or response.');
+    }
+
+    metrics.problems++;
+    metrics.agents += selectedAgents.size;
+    updateMetrics();
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    // Server-Sent Events: accumulate across chunk boundaries and only parse
+    // complete `data: ` lines so an event split across two reads still works.
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let newlineIndex;
+      while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, newlineIndex).trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(line.indexOf(':') + 1).trim();
+        if (!payload) continue;
+        try {
+          handleEvent(JSON.parse(payload), workStream);
+        } catch (err) {
+          console.warn('Skipping malformed SSE payload', err);
+        }
+      }
+    }
+  } catch (e) {
+    showError(e instanceof Error ? e.message : 'Failed to route to agents.');
+  } finally {
+    setBusy(false);
+  }
+});
+
+el('btnReset').addEventListener('click', () => {
+  /** @type {HTMLTextAreaElement} */ (el('problem')).value = '';
+  el('workStream').innerHTML = '';
+  clearError();
+  selectedAgents.clear();
+  renderAgents();
+});
+
+renderAgents();
+</script>
+</body>
+</html>
