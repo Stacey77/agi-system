@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from src.tasks.queue import TaskRecord, TaskStatus
+from src.tasks.queue import TaskStatus
 
 logger = logging.getLogger(__name__)
 

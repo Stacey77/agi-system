@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import time
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -32,7 +30,6 @@ class TestTaskRetry:
         task_id = r.json()["task_id"]
 
         # Force it to FAILED status via the queue directly
-        from src.tasks.queue import TaskStatus
         # Poll until not queued (may complete or fail)
         for _ in range(20):
             r2 = client.get(f"/api/v1/tasks/{task_id}")

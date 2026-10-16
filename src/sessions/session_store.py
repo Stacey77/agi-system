@@ -6,7 +6,7 @@ import json
 import logging
 import sqlite3
 import threading
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from src.sessions.session_manager import AgentSession
 

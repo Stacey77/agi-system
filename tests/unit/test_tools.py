@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from src.tools.base_tool import BaseTool, ToolMetadata
 from src.tools.calculator_tool import CalculatorTool
 from src.tools.database_tool import DatabaseTool
 from src.tools.document_parser_tool import DocumentParserTool

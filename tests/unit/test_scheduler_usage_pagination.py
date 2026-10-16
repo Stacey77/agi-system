@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -273,7 +272,6 @@ class TestUsageEndpoints:
 @pytest.fixture()
 def client_with_tasks():
     from src.api.main import create_app
-    from src.tasks.queue import TaskStatus
     app = create_app()
 
     queue = MagicMock()

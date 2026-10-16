@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import time
-from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -136,7 +133,7 @@ class TestTaskRecord:
 class TestTaskQueue:
     @pytest.mark.asyncio
     async def test_submit_and_get(self):
-        from src.tasks.queue import TaskQueue, TaskStatus
+        from src.tasks.queue import TaskQueue
         q = TaskQueue()
         handled = asyncio.Event()
 
@@ -189,7 +186,7 @@ class TestTaskQueue:
 
     @pytest.mark.asyncio
     async def test_cancel_queued_task(self):
-        from src.tasks.queue import TaskQueue, TaskStatus
+        from src.tasks.queue import TaskQueue
         # Use a slow handler so we can cancel before it runs
         q = TaskQueue()
         start_event = asyncio.Event()
@@ -230,7 +227,7 @@ class TestTaskQueue:
 
     @pytest.mark.asyncio
     async def test_subscribe_receives_events(self):
-        from src.tasks.queue import TaskQueue, TaskStatus
+        from src.tasks.queue import TaskQueue
         q = TaskQueue()
         done = asyncio.Event()
 
@@ -253,7 +250,7 @@ class TestTaskQueue:
 
     @pytest.mark.asyncio
     async def test_update_progress(self):
-        from src.tasks.queue import TaskQueue, TaskStatus
+        from src.tasks.queue import TaskQueue
         q = TaskQueue()
         progress_events = []
         done = asyncio.Event()
