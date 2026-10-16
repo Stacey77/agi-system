@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 import pytest
 
@@ -36,7 +37,7 @@ class TestTaskRetry:
             status = r2.json()["status"]
             if status not in ("queued", "running"):
                 break
-            import time; time.sleep(0.1)
+            time.sleep(0.1)
 
         # If completed, we can't retry — skip the rest of this test
         if r2.json()["status"] == "completed":
@@ -50,7 +51,7 @@ class TestTaskRetry:
             r2 = client.get(f"/api/v1/tasks/{task_id}")
             if r2.json()["status"] in ("completed", "failed"):
                 break
-            import time; time.sleep(0.1)
+            time.sleep(0.1)
         if r2.json()["status"] == "completed":
             r3 = client.post(f"/api/v1/tasks/{task_id}/retry")
             assert r3.status_code == 409

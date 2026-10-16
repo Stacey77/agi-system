@@ -198,7 +198,7 @@ class TestTaskQueue:
 
         await q.start(slow_handler)
         # Submit two tasks — cancel the second before it's processed
-        r1 = await q.submit("task one", {})
+        await q.submit("task one", {})
         r2 = await q.submit("task two", {})
         # Wait for first to start, then cancel second
         await asyncio.wait_for(start_event.wait(), timeout=2.0)

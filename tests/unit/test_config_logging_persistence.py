@@ -49,6 +49,7 @@ class TestSettings:
         s2 = Settings()
         # Both are valid hex strings (even if different due to default_factory)
         assert len(s1.jwt_secret) == 64
+        assert len(s2.jwt_secret) == 64
 
 
 # ---------------------------------------------------------------------------

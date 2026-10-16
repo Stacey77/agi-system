@@ -104,7 +104,7 @@ class TestWebhookDispatcher:
     async def test_dispatch_fires_matching_webhooks(self):
         from src.webhooks.dispatcher import WebhookDispatcher
         d = WebhookDispatcher()
-        wid = d.register("http://example.com/hook", ["task.completed"])
+        d.register("http://example.com/hook", ["task.completed"])
         with patch("httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)

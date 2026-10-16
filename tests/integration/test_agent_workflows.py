@@ -133,13 +133,10 @@ class TestTaskLifecycle:
         # Poll until completed or 3 s timeout
         deadline = time.time() + 3.0
         status = None
-        seen_queued = False
         while time.time() < deadline:
             poll_resp = client.get(f"/api/v1/tasks/{task_id}", headers=auth_headers)
             assert poll_resp.status_code == 200
             status = poll_resp.json()["status"]
-            if status in ("queued", "running"):
-                seen_queued = True
             if status == "completed":
                 break
             time.sleep(0.1)

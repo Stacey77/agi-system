@@ -69,7 +69,7 @@ class TestIDESessionManager:
     def test_active_count(self):
         mgr = IDESessionManager()
         s1 = mgr.create_session()
-        s2 = mgr.create_session()
+        mgr.create_session()
         mgr.close_session(s1.session_id)
         assert mgr.active_count() == 1
 
