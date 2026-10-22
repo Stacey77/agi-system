@@ -329,9 +329,11 @@ def create_app() -> FastAPI:
 
     # Middleware (applied in reverse — last added = outermost)
     from src.api.middleware.request_id import RequestIDMiddleware
+    from src.api.middleware.body_limit import BodyLimitMiddleware
     app.add_middleware(MetricsMiddleware)
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(APIKeyMiddleware)
+    app.add_middleware(BodyLimitMiddleware)
     app.add_middleware(RequestIDMiddleware)
 
     # Prometheus metrics endpoint

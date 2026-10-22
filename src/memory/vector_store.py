@@ -22,6 +22,7 @@ class _OfflineEmbeddingFunction:
         return self(input)
 
     def __call__(self, input: List[str]) -> List[List[float]]:  # noqa: A001
+        import math
         embeddings: List[List[float]] = []
         for text in input:
             floats: List[float] = []
@@ -30,7 +31,12 @@ class _OfflineEmbeddingFunction:
             while len(floats) < self._DIM:
                 digest = hashlib.sha256(seed + struct.pack("I", chunk)).digest()
                 for i in range(0, len(digest) - 3, 4):
-                    floats.append(struct.unpack("f", digest[i : i + 4])[0])
+                    raw = struct.unpack("f", digest[i : i + 4])[0]
+                    # Replace NaN/Inf with a deterministic fallback
+                    if math.isfinite(raw):
+                        floats.append(raw)
+                    else:
+                        floats.append(float(digest[i]) / 255.0)
                     if len(floats) == self._DIM:
                         break
                 chunk += 1
