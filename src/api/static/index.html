@@ -2,1590 +2,814 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>AGI System</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:       #0f1117;
-      --surface:  #1a1d27;
-      --border:   #2a2d3a;
-      --accent:   #6c8ef7;
-      --accent2:  #a78bfa;
-      --success:  #34d399;
-      --warn:     #fbbf24;
-      --danger:   #f87171;
-      --text:     #e2e8f0;
-      --muted:    #7c8591;
-      --radius:   8px;
-      --mono:     "JetBrains Mono", "Fira Code", monospace;
-    }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      font-size: 14px;
-      line-height: 1.5;
-      min-height: 100vh;
-    }
-
-    /* ── Header ── */
-    header {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 12px 24px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      flex-wrap: wrap;
-    }
-    header h1 { font-size: 18px; font-weight: 700; letter-spacing: -.3px; }
-    header h1 span { color: var(--accent); }
-    .header-controls { display: flex; gap: 8px; align-items: center; margin-left: auto; flex-wrap: wrap; }
-    .header-controls input {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 5px 10px;
-      border-radius: var(--radius);
-      font-size: 13px;
-      width: 200px;
-    }
-    #health-badge {
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      background: var(--border);
-      color: var(--muted);
-    }
-    #health-badge.healthy { background: rgba(52,211,153,.15); color: var(--success); }
-    #health-badge.degraded { background: rgba(251,191,36,.15); color: var(--warn); }
-    #health-badge.error { background: rgba(248,113,113,.15); color: var(--danger); }
-
-    /* ── Tabs ── */
-    nav {
-      display: flex;
-      gap: 2px;
-      padding: 0 24px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      overflow-x: auto;
-    }
-    nav button {
-      background: none;
-      border: none;
-      color: var(--muted);
-      cursor: pointer;
-      padding: 12px 16px;
-      font-size: 13px;
-      font-weight: 500;
-      border-bottom: 2px solid transparent;
-      white-space: nowrap;
-      transition: color .15s;
-    }
-    nav button:hover { color: var(--text); }
-    nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
-
-    /* ── Main layout ── */
-    main { padding: 24px; max-width: 1100px; }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
-
-    /* ── Cards ── */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-      margin-bottom: 16px;
-    }
-    .card-title {
-      font-size: 13px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .5px;
-      color: var(--muted);
-      margin-bottom: 14px;
-    }
-
-    /* ── Form controls ── */
-    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-    input[type="text"], input[type="number"], select, textarea {
-      width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 8px 12px;
-      border-radius: var(--radius);
-      font-size: 13px;
-      font-family: inherit;
-      margin-bottom: 12px;
-    }
-    textarea { resize: vertical; min-height: 80px; font-family: var(--mono); font-size: 12px; }
-    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
-
-    .row { display: flex; gap: 12px; flex-wrap: wrap; }
-    .row > * { flex: 1; min-width: 160px; }
-
-    /* ── Buttons ── */
-    .btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 8px 16px;
-      border: none; border-radius: var(--radius);
-      font-size: 13px; font-weight: 600; cursor: pointer;
-      transition: opacity .15s;
-    }
-    .btn:hover { opacity: .85; }
-    .btn:disabled { opacity: .4; cursor: not-allowed; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-secondary { background: var(--border); color: var(--text); }
-    .btn-danger { background: var(--danger); color: #fff; }
-    .btn-sm { padding: 4px 10px; font-size: 12px; }
-    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
-
-    /* ── Status chips ── */
-    .chip {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .chip-green  { background: rgba(52,211,153,.15); color: var(--success); }
-    .chip-yellow { background: rgba(251,191,36,.15);  color: var(--warn); }
-    .chip-red    { background: rgba(248,113,113,.15); color: var(--danger); }
-    .chip-blue   { background: rgba(108,142,247,.15); color: var(--accent); }
-    .chip-gray   { background: var(--border);         color: var(--muted); }
-
-    /* ── Output box ── */
-    .output {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px;
-      font-family: var(--mono);
-      font-size: 12px;
-      white-space: pre-wrap;
-      word-break: break-all;
-      max-height: 300px;
-      overflow-y: auto;
-      color: #a3e4b7;
-      margin-top: 12px;
-      display: none;
-    }
-    .output.visible { display: block; }
-    .output.error { color: var(--danger); }
-
-    /* ── Table ── */
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th { text-align: left; padding: 8px 10px; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
-    td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: top; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: rgba(255,255,255,.02); }
-
-    /* ── Grid ── */
-    .grid-2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
-
-    /* ── Component health ── */
-    .health-grid { display: flex; flex-wrap: wrap; gap: 10px; }
-    .health-item {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 10px 14px;
-      min-width: 180px;
-    }
-    .health-item .hi-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
-    .health-item .hi-val { font-size: 13px; font-weight: 600; }
-
-    /* ── Spinner ── */
-    .spinner {
-      display: inline-block;
-      width: 14px; height: 14px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin .6s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── Section header ── */
-    .section-header {
-      display: flex; align-items: center; gap: 10px;
-      margin-bottom: 14px;
-    }
-    .section-header h2 { font-size: 15px; font-weight: 600; }
-    .section-header .count {
-      background: var(--border);
-      color: var(--muted);
-      border-radius: 12px;
-      padding: 1px 8px;
-      font-size: 11px;
-    }
-
-    /* ── Empty state ── */
-    .empty { color: var(--muted); text-align: center; padding: 32px; font-size: 13px; }
-
-    /* ── Tags ── */
-    .tags { display: flex; flex-wrap: wrap; gap: 4px; }
-    .tag {
-      background: var(--border);
-      border-radius: 4px;
-      padding: 1px 6px;
-      font-size: 11px;
-      color: var(--muted);
-    }
+/* ── tokens ──────────────────────────────────────────────── */
+:root {
+  --bg:         #070d1a;
+  --surface:    #0d1628;
+  --surface-hi: #132038;
+  --border:     #1c2e4a;
+  --border-hi:  #243d61;
+  --accent:     #00c8ff;
+  --accent-dim: rgba(0,200,255,.08);
+  --success:    #00e5a0;
+  --warn:       #ffb82e;
+  --danger:     #ff4d6d;
+  --fg:         #d8e8f8;
+  --fg-2:       #9ab4d0;
+  --muted:      #4d6889;
+  --mono:       "IBM Plex Mono", "Fira Code", monospace;
+  --sans:       "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --r:          5px;
+  --r-lg:       8px;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+  padding-left:  max(0px, env(safe-area-inset-left, 0px));
+  padding-right: max(0px, env(safe-area-inset-right, 0px));
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(circle, #1a2e4a 1px, transparent 1px);
+  background-size: 28px 28px;
+  opacity: .35;
+  pointer-events: none;
+  z-index: 0;
+}
+#app { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
+header {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 50;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px max(16px, env(safe-area-inset-left, 0px));
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.logo { font-family: var(--mono); font-size: 1rem; font-weight: 600; color: var(--accent); letter-spacing: -.5px; white-space: nowrap; }
+.logo span { color: var(--fg-2); font-weight: 400; }
+#status-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.chip { font-family: var(--mono); font-size: .7rem; padding: 3px 8px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface-hi); color: var(--fg-2); white-space: nowrap; }
+.chip.ok  { border-color: var(--success); color: var(--success); }
+.chip.warn{ border-color: var(--warn);    color: var(--warn);    }
+.chip.err { border-color: var(--danger);  color: var(--danger);  }
+.chip::before { content: "● "; font-size: .65rem; }
+#base-url-wrap { display: flex; align-items: center; gap: 6px; }
+#base-url-wrap label { font-family: var(--mono); font-size: .75rem; color: var(--fg-2); white-space: nowrap; }
+#base-url { font-family: var(--mono); font-size: .75rem; background: var(--bg); border: 1px solid var(--border); color: var(--fg); padding: 4px 8px; border-radius: var(--r); width: 200px; }
+#base-url:focus { outline: none; border-color: var(--accent); }
+nav { background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; padding-left: max(16px, env(safe-area-inset-left, 0px)); }
+nav::-webkit-scrollbar { display: none; }
+.tab-list { display: flex; list-style: none; white-space: nowrap; }
+.tab-list li button { font-family: var(--mono); font-size: .75rem; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; padding: 10px 14px; cursor: pointer; transition: color .15s, border-color .15s; }
+.tab-list li button:hover { color: var(--fg); }
+.tab-list li button.active { color: var(--accent); border-bottom-color: var(--accent); }
+main { flex: 1; padding: 20px max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 1200px; width: 100%; margin: 0 auto; }
+.panel { display: none; }
+.panel.active { display: block; }
+.section-head { font-family: var(--mono); font-size: .7rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.section-head::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 16px; margin-bottom: 16px; }
+.card:hover { border-color: var(--border-hi); }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+.field { margin-bottom: 12px; }
+.field label { display: block; font-family: var(--mono); font-size: .7rem; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-2); margin-bottom: 5px; }
+input[type=text], input[type=number], select, textarea { width: 100%; font-family: var(--mono); font-size: .8rem; background: var(--bg); border: 1px solid var(--border); color: var(--fg); padding: 7px 10px; border-radius: var(--r); resize: vertical; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+textarea { min-height: 80px; }
+.btn { font-family: var(--mono); font-size: .75rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 7px 16px; border-radius: var(--r); border: 1px solid transparent; cursor: pointer; transition: opacity .15s, filter .15s; white-space: nowrap; }
+.btn:hover { filter: brightness(1.15); }
+.btn:active { filter: brightness(.9); }
+.btn-primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.btn-ghost   { background: transparent; color: var(--fg-2); border-color: var(--border); }
+.btn-ghost:hover { color: var(--fg); border-color: var(--border-hi); }
+.btn-danger  { background: transparent; color: var(--danger); border-color: var(--danger); }
+.btn-sm { padding: 4px 10px; font-size: .7rem; }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.out { font-family: var(--mono); font-size: .75rem; background: #020810; border: 1px solid var(--border); border-radius: var(--r); padding: 12px; min-height: 60px; max-height: 400px; overflow-y: auto; color: #7fff7f; white-space: pre-wrap; word-break: break-all; line-height: 1.6; }
+.out .err-line { color: var(--danger); }
+.out .info-line { color: var(--accent); }
+.out .muted-line { color: var(--muted); }
+.stat-tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.stat-tile .label { font-family: var(--mono); font-size: .65rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.stat-tile .value { font-family: var(--mono); font-size: 1.5rem; font-weight: 600; color: var(--accent); line-height: 1.2; }
+.stat-tile .sub { font-size: .72rem; color: var(--fg-2); }
+.comp-list { display: flex; flex-direction: column; gap: 6px; }
+.comp-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: var(--surface-hi); border-radius: var(--r); font-family: var(--mono); font-size: .75rem; }
+.comp-row .name { color: var(--fg-2); }
+.comp-row .status { font-weight: 600; }
+.comp-row .status.ok    { color: var(--success); }
+.comp-row .status.warn  { color: var(--warn); }
+.comp-row .status.err   { color: var(--danger); }
+.comp-row .status.muted { color: var(--muted); }
+.agent-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 14px; }
+.agent-card h3 { font-family: var(--mono); font-size: .8rem; font-weight: 600; color: var(--fg); margin-bottom: 4px; }
+.agent-card .type { font-family: var(--mono); font-size: .65rem; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+.agent-card .desc { font-size: .8rem; color: var(--fg-2); line-height: 1.5; }
+.agent-card .actions { margin-top: 10px; }
+.task-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: var(--surface-hi); border-radius: var(--r); margin-bottom: 6px; font-size: .8rem; }
+.task-row .tid { font-family: var(--mono); font-size: .65rem; color: var(--muted); flex-shrink: 0; min-width: 80px; }
+.task-row .obj { flex: 1; color: var(--fg); min-width: 0; }
+.task-badge { font-family: var(--mono); font-size: .65rem; font-weight: 600; padding: 2px 7px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+.task-badge.completed { background: rgba(0,229,160,.12); color: var(--success); }
+.task-badge.running   { background: rgba(0,200,255,.12); color: var(--accent); }
+.task-badge.pending   { background: rgba(255,184,46,.1);  color: var(--warn); }
+.task-badge.failed    { background: rgba(255,77,109,.12); color: var(--danger); }
+.task-badge.cancelled { background: rgba(77,104,137,.2);  color: var(--muted); }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
+@media (max-width: 480px) {
+  .stat-tile .value { font-size: 1.2rem; }
+  header { gap: 10px; }
+  #base-url { width: 140px; }
+}
   </style>
 </head>
 <body>
-
-<!-- ═══════════════════════ Header ═══════════════════════ -->
+<div id="app">
 <header>
-  <h1>AGI <span>System</span></h1>
-  <div class="header-controls">
-    <div>
-      <input id="base-url" type="text" placeholder="http://localhost:8000" value="http://localhost:8000" title="API base URL" />
-    </div>
-    <div>
-      <input id="api-key" type="text" placeholder="API Key (optional)" title="X-API-Key header" />
-    </div>
-    <span id="health-badge">●&nbsp;checking…</span>
+  <div class="logo">AGI<span>_system</span></div>
+  <div id="status-bar">
+    <span id="hc-chip" class="chip">checking…</span>
+    <span id="uptime-chip" class="chip" hidden></span>
+  </div>
+  <div id="base-url-wrap">
+    <label for="base-url">base</label>
+    <input id="base-url" type="text" value="" placeholder="http://localhost:8000">
   </div>
 </header>
-
-<!-- ═══════════════════════ Nav ═══════════════════════ -->
-<nav id="tab-nav">
-  <button class="active" data-tab="health">Health</button>
-  <button data-tab="agents">Agents</button>
-  <button data-tab="tasks">Tasks</button>
-  <button data-tab="crew">Crew</button>
-  <button data-tab="stream">Stream</button>
-  <button data-tab="memory">Memory</button>
-  <button data-tab="ide">IDE</button>
-  <button data-tab="cde">CDE</button>
-  <button data-tab="platform">Platform</button>
-  <button data-tab="kally">Kally AI</button>
-  <button data-tab="sessions">Sessions</button>
-  <button data-tab="webhooks">Webhooks</button>
-  <button data-tab="eval">Eval</button>
+<nav>
+  <ul class="tab-list" id="tab-list">
+    <li><button class="active" data-tab="health">health</button></li>
+    <li><button data-tab="agents">agents</button></li>
+    <li><button data-tab="tasks">tasks</button></li>
+    <li><button data-tab="crew">crew</button></li>
+    <li><button data-tab="stream">stream</button></li>
+    <li><button data-tab="memory">memory</button></li>
+    <li><button data-tab="ide">ide</button></li>
+    <li><button data-tab="cde">cde</button></li>
+    <li><button data-tab="platform">platform</button></li>
+    <li><button data-tab="kally">kally</button></li>
+    <li><button data-tab="sessions">sessions</button></li>
+    <li><button data-tab="webhooks">webhooks</button></li>
+    <li><button data-tab="eval">eval</button></li>
+  </ul>
 </nav>
-
-<!-- ═══════════════════════ Main ═══════════════════════ -->
 <main>
 
-  <!-- ── Health ── -->
-  <div id="tab-health" class="tab-panel active">
-    <div class="card">
-      <div class="card-title">System health</div>
-      <div id="health-status" class="health-grid"><div class="spinner"></div></div>
-      <div class="btn-group" style="margin-top:16px">
-        <button class="btn btn-secondary" onclick="loadHealth()">↺ Refresh</button>
-      </div>
-    </div>
-    <div class="card" style="margin-top:16px">
-      <div class="section-header">
-        <h2>System info</h2>
-        <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadSystemInfo()">↺ Refresh</button>
-      </div>
-      <div id="system-info-content"><div class="spinner"></div></div>
-    </div>
+<!-- HEALTH -->
+<div class="panel active" id="panel-health">
+  <div class="section-head">system health</div>
+  <div class="grid-3" style="margin-bottom:16px">
+    <div class="stat-tile"><div class="label">status</div><div class="value" id="hs-status">—</div></div>
+    <div class="stat-tile"><div class="label">uptime</div><div class="value" id="hs-uptime">—</div><div class="sub">seconds</div></div>
+    <div class="stat-tile"><div class="label">components</div><div class="value" id="hs-comps">—</div><div class="sub">total</div></div>
   </div>
-
-  <!-- ── Agents ── -->
-  <div id="tab-agents" class="tab-panel">
-    <div class="card">
-      <div class="section-header">
-        <h2>Registered agents</h2>
-        <span class="count" id="agent-count">–</span>
-        <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadAgents()">↺ Refresh</button>
-      </div>
-      <div id="agents-table"><div class="spinner"></div></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Execute agent task</div>
-      <label>Agent name</label>
-      <input id="exec-agent" type="text" placeholder="e.g. research_agent" />
-      <label>Task</label>
-      <textarea id="exec-task" placeholder="Describe the task…"></textarea>
-      <label>Extra parameters (JSON object)</label>
-      <textarea id="exec-params" placeholder='{"key": "value"}' style="min-height:50px"></textarea>
-      <button class="btn btn-primary" onclick="executeAgent(event)">▶ Execute</button>
-      <div id="exec-output" class="output"></div>
-    </div>
+  <div class="card">
+    <div class="section-head" style="margin-bottom:10px">components</div>
+    <div class="comp-list" id="comp-list"><div class="comp-row"><span class="name">loading…</span></div></div>
   </div>
+  <div class="btn-group"><button class="btn btn-primary" onclick="loadHealth()">refresh</button></div>
+</div>
 
-  <!-- ── Tasks ── -->
-  <div id="tab-tasks" class="tab-panel">
-    <div class="card">
-      <div class="card-title">Submit task</div>
-      <label>Objective</label>
-      <textarea id="task-objective" placeholder="Research and summarise recent AI developments…"></textarea>
-      <label>Parameters (JSON object)</label>
-      <textarea id="task-params" placeholder='{}' style="min-height:50px"></textarea>
-      <button class="btn btn-primary" onclick="submitTask(event)">▶ Submit</button>
-      <div id="task-submit-output" class="output"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Look up task</div>
-      <label>Task ID</label>
-      <input id="task-lookup-id" type="text" placeholder="uuid…" />
-      <div class="btn-group">
-        <button class="btn btn-secondary" onclick="getTask(event)">Get status</button>
-        <button class="btn btn-danger btn-sm" onclick="cancelTask(event)">Cancel</button>
-      </div>
-      <div id="task-lookup-output" class="output"></div>
-    </div>
+<!-- AGENTS -->
+<div class="panel" id="panel-agents">
+  <div class="section-head">agent registry</div>
+  <div class="btn-group" style="margin-bottom:16px">
+    <button class="btn btn-primary" onclick="loadAgents()">refresh</button>
+    <button class="btn btn-ghost" onclick="toggleRegisterForm()">+ register</button>
   </div>
-
-  <!-- ── Crew ── -->
-  <div id="tab-crew" class="tab-panel">
-    <div class="card">
-      <div class="card-title">Multi-agent crew run</div>
-      <label>Objective</label>
-      <textarea id="crew-objective" placeholder="Research and summarise the latest developments in quantum computing…"></textarea>
-      <label>Agents (comma-separated, leave blank for default pipeline)</label>
-      <input id="crew-agents" type="text" placeholder="research_agent, analysis_agent, writing_agent, review_agent" />
-      <div class="row">
-        <div>
-          <label>Engine preference</label>
-          <select id="crew-engine-pref">
-            <option value="auto">Auto (LangGraph → CrewAI → Sequential)</option>
-            <option value="stream">Stream (SSE per-agent)</option>
-          </select>
-        </div>
-      </div>
-      <div class="btn-group">
-        <button class="btn btn-primary" onclick="runCrew(event)">▶ Run crew</button>
-        <button class="btn btn-secondary" onclick="streamCrew(event)">⚡ Stream crew</button>
-      </div>
-      <div id="crew-output" class="output"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Last crew result</div>
-      <div id="crew-steps" style="display:none">
-        <div id="crew-engine-badge" style="margin-bottom:10px"></div>
-        <table>
-          <thead><tr><th>Step</th><th>Agent</th><th>Status</th><th>Summary</th></tr></thead>
-          <tbody id="crew-steps-body"></tbody>
-        </table>
-      </div>
-      <div id="crew-steps-empty" class="empty">No crew run yet</div>
-    </div>
-  </div>
-
-  <!-- ── Stream (WebSocket) ── -->
-  <div id="tab-stream" class="tab-panel">
-    <div class="card">
-      <div class="card-title">WebSocket live stream</div>
-      <div class="row">
-        <div>
-          <label>Agent</label>
-          <select id="ws-agent">
-            <option>research_agent</option>
-            <option>analysis_agent</option>
-            <option>writing_agent</option>
-            <option>review_agent</option>
-            <option>coding_agent</option>
-            <option>summarization_agent</option>
-            <option>planning_agent</option>
-          </select>
-        </div>
-        <div style="align-self:flex-end">
-          <button class="btn btn-primary" id="ws-connect-btn" onclick="wsConnect()">Connect</button>
-          <button class="btn btn-danger btn-sm" id="ws-disconnect-btn" onclick="wsDisconnect()" style="display:none">Disconnect</button>
-        </div>
-      </div>
-      <div id="ws-status" style="margin:8px 0;font-size:12px;color:var(--muted)">Not connected</div>
-      <label>Task</label>
-      <textarea id="ws-task" placeholder="Describe the task to stream…"></textarea>
-      <button class="btn btn-secondary" id="ws-send-btn" onclick="wsSend()" disabled>▶ Send task</button>
-      <div id="ws-output" class="output" style="max-height:400px"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">SSE stream (agent)</div>
-      <div class="row">
-        <div>
-          <label>Agent</label>
-          <input id="sse-agent" type="text" value="writing_agent" />
-        </div>
-      </div>
-      <label>Task</label>
-      <textarea id="sse-task" placeholder="Write a short story about AI…"></textarea>
-      <button class="btn btn-primary" onclick="sseStream(event)">⚡ SSE stream</button>
-      <div id="sse-output" class="output" style="max-height:400px"></div>
-    </div>
-  </div>
-
-  <!-- ── Memory ── -->
-  <div id="tab-memory" class="tab-panel">
-    <div class="card">
-      <div class="card-title">Agent memory recall</div>
-      <div class="row">
-        <div>
-          <label>Agent</label>
-          <input id="mem-agent" type="text" value="research_agent" />
-        </div>
-        <div>
-          <label>Results (k)</label>
-          <input id="mem-k" type="number" value="3" min="1" max="20" />
-        </div>
-      </div>
-      <label>Query</label>
-      <input id="mem-query" type="text" placeholder="Search past tasks…" />
-      <button class="btn btn-primary" onclick="recallMemory(event)">🔍 Recall</button>
-      <div id="mem-output" class="output"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Memory results</div>
-      <div id="mem-results-list"><div class="empty">No recall yet</div></div>
-    </div>
-  </div>
-
-  <!-- ── IDE ── -->
-  <div id="tab-ide" class="tab-panel">
-    <div class="card">
-      <div class="section-header">
-        <h2>IDE sessions</h2>
-        <span class="count" id="ide-session-count">–</span>
-        <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadIDESessions()">↺ Refresh</button>
-      </div>
-      <div id="ide-sessions-table"><div class="spinner"></div></div>
-    </div>
-
+  <div class="card" id="register-form" style="display:none;margin-bottom:16px">
+    <div class="section-head" style="margin-bottom:12px">register agent</div>
     <div class="grid-2">
-      <div class="card">
-        <div class="card-title">New session</div>
-        <label>Language</label>
+      <div class="field"><label>name</label><input type="text" id="ag-name" placeholder="my_agent"></div>
+      <div class="field"><label>agent type</label>
+        <select id="ag-type">
+          <option value="research">research</option>
+          <option value="analysis">analysis</option>
+          <option value="writing">writing</option>
+          <option value="review">review</option>
+          <option value="coding">coding</option>
+          <option value="planning">planning</option>
+          <option value="summarization">summarization</option>
+          <option value="execution">execution</option>
+        </select>
+      </div>
+      <div class="field"><label>description</label><input type="text" id="ag-desc" placeholder="What this agent does"></div>
+      <div class="field"><label>max iterations</label><input type="number" id="ag-max-iter" value="3" min="1" max="20"></div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="registerAgent()">register</button>
+      <button class="btn btn-ghost" onclick="toggleRegisterForm()">cancel</button>
+    </div>
+    <div class="out" id="ag-reg-out" style="margin-top:10px;display:none"></div>
+  </div>
+  <div class="grid-2" id="agents-grid"><div class="card"><div style="color:var(--muted);font-family:var(--mono);font-size:.75rem">loading…</div></div></div>
+  <div class="card" style="margin-top:16px">
+    <div class="section-head" style="margin-bottom:10px">run agent task</div>
+    <div class="grid-2">
+      <div class="field"><label>agent name</label><input type="text" id="run-ag-name" placeholder="research_agent"></div>
+      <div class="field"><label>task</label><input type="text" id="run-ag-task" placeholder="Summarise recent AI papers"></div>
+    </div>
+    <div class="btn-group"><button class="btn btn-primary" onclick="runAgent()">run</button></div>
+    <div class="out" id="ag-run-out" style="margin-top:10px;display:none"></div>
+  </div>
+</div>
+
+<!-- TASKS -->
+<div class="panel" id="panel-tasks">
+  <div class="section-head">task queue</div>
+  <div class="grid-3" style="margin-bottom:16px">
+    <div class="stat-tile"><div class="label">total</div><div class="value" id="tq-total">—</div></div>
+    <div class="stat-tile"><div class="label">running</div><div class="value" id="tq-running">—</div><div class="sub" style="color:var(--accent)">●</div></div>
+    <div class="stat-tile"><div class="label">failed</div><div class="value" id="tq-failed">—</div><div class="sub" style="color:var(--danger)">●</div></div>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="section-head" style="margin-bottom:12px">submit task</div>
+    <div class="field"><label>objective</label><textarea id="task-obj" placeholder="Analyse quarterly performance data…"></textarea></div>
+    <div class="btn-group"><button class="btn btn-primary" onclick="submitTask()">submit</button></div>
+    <div class="out" id="task-sub-out" style="margin-top:10px;display:none"></div>
+  </div>
+  <div class="btn-group" style="margin-bottom:12px">
+    <button class="btn btn-primary" onclick="loadTasks()">refresh list</button>
+    <button class="btn btn-ghost" onclick="loadDLQ()">dead-letter queue</button>
+  </div>
+  <div id="task-list"><div style="color:var(--muted);font-family:var(--mono);font-size:.75rem;padding:8px">no tasks loaded</div></div>
+  <div id="dlq-section" style="display:none;margin-top:16px">
+    <div class="section-head">dead-letter queue</div>
+    <div id="dlq-list"></div>
+  </div>
+</div>
+
+<!-- CREW -->
+<div class="panel" id="panel-crew">
+  <div class="section-head">crew orchestration</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-head" style="margin-bottom:12px">run crew</div>
+      <div class="field"><label>objective</label><textarea id="crew-obj" placeholder="Research and write a technical report on…"></textarea></div>
+      <div class="field"><label>agents (comma-separated, leave blank for default)</label><input type="text" id="crew-agents" placeholder="research_agent,analysis_agent,writing_agent"></div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="runCrew()">run crew</button>
+        <button class="btn btn-ghost" onclick="streamCrew()">stream</button>
+      </div>
+      <div class="out" id="crew-out" style="margin-top:10px;display:none"></div>
+    </div>
+    <div class="card">
+      <div class="section-head" style="margin-bottom:12px">templates</div>
+      <div class="btn-group" style="margin-bottom:10px"><button class="btn btn-ghost btn-sm" onclick="loadTemplates()">refresh</button></div>
+      <div id="template-list" style="margin-bottom:12px"><div style="color:var(--muted);font-family:var(--mono);font-size:.75rem">no templates loaded</div></div>
+      <div class="section-head" style="margin-bottom:10px;font-size:.65rem">create template</div>
+      <div class="field"><label>name</label><input type="text" id="tpl-name" placeholder="my_template"></div>
+      <div class="field"><label>agents</label><input type="text" id="tpl-agents" placeholder="research_agent,writing_agent"></div>
+      <div class="field"><label>description</label><input type="text" id="tpl-desc" placeholder="Optional description"></div>
+      <div class="field"><label>max iterations</label><input type="number" id="tpl-max-iter" value="3" min="1" max="20"></div>
+      <div class="btn-group"><button class="btn btn-primary" onclick="createTemplate()">create</button></div>
+      <div class="out" id="tpl-out" style="margin-top:10px;display:none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- STREAM -->
+<div class="panel" id="panel-stream">
+  <div class="section-head">sse task stream</div>
+  <div class="card">
+    <div class="field"><label>task id</label><input type="text" id="stream-tid" placeholder="task_abc123"></div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="startStream()">connect</button>
+      <button class="btn btn-danger" onclick="stopStream()">disconnect</button>
+    </div>
+    <div style="margin-top:12px;font-family:var(--mono);font-size:.7rem;color:var(--muted)">status: <span id="stream-status">idle</span></div>
+    <div class="out" id="stream-out" style="margin-top:10px;max-height:500px">// waiting for connection…</div>
+  </div>
+</div>
+
+<!-- MEMORY -->
+<div class="panel" id="panel-memory">
+  <div class="section-head">memory store</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-head" style="margin-bottom:12px">store entry</div>
+      <div class="field"><label>key</label><input type="text" id="mem-key" placeholder="session_notes"></div>
+      <div class="field"><label>value</label><textarea id="mem-val" placeholder="Content to remember…"></textarea></div>
+      <div class="field"><label>namespace (optional)</label><input type="text" id="mem-ns" placeholder="default"></div>
+      <div class="btn-group"><button class="btn btn-primary" onclick="storeMemory()">store</button></div>
+      <div class="out" id="mem-store-out" style="margin-top:10px;display:none"></div>
+    </div>
+    <div class="card">
+      <div class="section-head" style="margin-bottom:12px">search / retrieve</div>
+      <div class="field"><label>query</label><input type="text" id="mem-query" placeholder="Find memories about…"></div>
+      <div class="field"><label>namespace (optional)</label><input type="text" id="mem-search-ns" placeholder="default"></div>
+      <div class="field"><label>limit</label><input type="number" id="mem-limit" value="10" min="1" max="100"></div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="searchMemory()">search</button>
+        <button class="btn btn-ghost" onclick="listMemory()">list all</button>
+      </div>
+      <div class="out" id="mem-search-out" style="margin-top:10px;display:none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- IDE -->
+<div class="panel" id="panel-ide">
+  <div class="section-head">ide agent</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="section-head" style="margin-bottom:12px">analyse code</div>
+      <div class="field"><label>language</label>
         <select id="ide-lang">
-          <option>python</option><option>javascript</option><option>typescript</option>
-          <option>go</option><option>rust</option><option>java</option>
+          <option value="python">python</option>
+          <option value="javascript">javascript</option>
+          <option value="typescript">typescript</option>
+          <option value="go">go</option>
+          <option value="rust">rust</option>
+          <option value="java">java</option>
         </select>
-        <label>Context</label>
-        <textarea id="ide-context" placeholder="Any initial context…" style="min-height:50px"></textarea>
-        <button class="btn btn-primary" onclick="createIDESession(event)">Create session</button>
-        <div id="ide-create-output" class="output"></div>
       </div>
-
-      <div class="card">
-        <div class="card-title">Code action</div>
-        <label>Action</label>
-        <select id="ide-action">
-          <option>complete</option><option>explain</option><option>refactor</option>
-          <option>fix</option><option>generate</option><option>review</option>
-        </select>
-        <label>Prompt / code snippet</label>
-        <textarea id="ide-prompt" placeholder="Write a function that…"></textarea>
-        <label>Session ID (optional)</label>
-        <input id="ide-session-id" type="text" placeholder="session-uuid" />
-        <button class="btn btn-primary" onclick="runCodeAction(event)">▶ Run action</button>
-        <div id="ide-action-output" class="output"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── CDE ── -->
-  <div id="tab-cde" class="tab-panel">
-    <div class="card">
-      <div class="section-header">
-        <h2>Environments</h2>
-        <span class="count" id="cde-env-count">–</span>
-        <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadCDEEnvironments()">↺ Refresh</button>
-      </div>
-      <div id="cde-envs-table"><div class="spinner"></div></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Provision environment</div>
-      <div class="row">
-        <div>
-          <label>Name</label>
-          <input id="cde-name" type="text" placeholder="my-cde" value="my-cde" />
-        </div>
-        <div>
-          <label>Runtime</label>
-          <select id="cde-runtime">
-            <option>python</option><option>node</option><option>go</option><option>rust</option>
-          </select>
-        </div>
-        <div>
-          <label>Owner</label>
-          <input id="cde-owner" type="text" placeholder="alice" />
-        </div>
-      </div>
-      <label>Repository URL (optional)</label>
-      <input id="cde-repo" type="text" placeholder="https://github.com/org/repo" />
-      <button class="btn btn-primary" onclick="createCDE(event)">▶ Provision</button>
-      <div id="cde-create-output" class="output"></div>
-    </div>
-  </div>
-
-  <!-- ── Platform ── -->
-  <div id="tab-platform" class="tab-panel">
-    <div class="grid-2">
-      <div class="card">
-        <div class="section-header">
-          <h2>Tool landscape</h2>
-          <span class="count" id="tools-count">–</span>
-          <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadTools()">↺</button>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <input id="tools-search" type="text" placeholder="Search tools…" style="margin-bottom:0;flex:1" oninput="searchTools(this.value)" />
-        </div>
-        <div id="tools-table" style="max-height:320px;overflow-y:auto"><div class="spinner"></div></div>
-      </div>
-
-      <div class="card">
-        <div class="section-header">
-          <h2>Developer portal</h2>
-          <span class="count" id="services-count">–</span>
-          <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadServices()">↺</button>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <input id="services-search" type="text" placeholder="Search services…" style="margin-bottom:0;flex:1" oninput="searchServices(this.value)" />
-        </div>
-        <div id="services-table" style="max-height:320px;overflow-y:auto"><div class="spinner"></div></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Register tool</div>
-      <div class="row">
-        <div>
-          <label>Name</label>
-          <input id="reg-tool-name" type="text" placeholder="my-tool" />
-        </div>
-        <div>
-          <label>Category</label>
-          <select id="reg-tool-cat">
-            <option value="search">search</option><option value="compute">compute</option>
-            <option value="storage">storage</option><option value="ml">ml</option>
-            <option value="devops">devops</option><option value="monitoring">monitoring</option>
-            <option value="communication">communication</option><option value="other">other</option>
-          </select>
-        </div>
-        <div>
-          <label>Tier</label>
-          <select id="reg-tool-tier">
-            <option value="internal">internal</option><option value="external">external</option>
-            <option value="both">both</option>
-          </select>
-        </div>
-      </div>
-      <label>Description</label>
-      <input id="reg-tool-desc" type="text" placeholder="Brief description…" />
-      <button class="btn btn-primary" onclick="registerTool(event)">Register tool</button>
-      <div id="reg-tool-output" class="output"></div>
-    </div>
-  </div>
-
-  <!-- ── Kally AI ── -->
-  <div id="tab-kally" class="tab-panel">
-    <div class="card">
-      <div class="card-title">Kally AI — closed-loop feedback</div>
+      <div class="field"><label>code</label><textarea id="ide-code" style="min-height:140px;font-family:var(--mono);font-size:.75rem" placeholder="def hello():\n    return 'world'"></textarea></div>
+      <div class="field"><label>request</label><input type="text" id="ide-req" value="Analyse this code and suggest improvements"></div>
       <div class="btn-group">
-        <button class="btn btn-secondary" onclick="kallyReport(event)">📊 Report</button>
-        <button class="btn btn-secondary" onclick="kallyAnalyse(event)">🔍 Analyse</button>
-        <button class="btn btn-danger btn-sm" onclick="kallyReset(event)">Reset</button>
+        <button class="btn btn-primary" onclick="ideAnalyse()">analyse</button>
+        <button class="btn btn-ghost" onclick="ideComplete()">complete</button>
       </div>
-      <div id="kally-output" class="output"></div>
+      <div class="out" id="ide-out" style="margin-top:10px;display:none"></div>
     </div>
-
     <div class="card">
-      <div class="card-title">Ingest signal</div>
-      <div class="row">
-        <div>
-          <label>Source</label>
-          <input id="sig-source" type="text" placeholder="api-gateway" />
-        </div>
-        <div>
-          <label>Metric</label>
-          <input id="sig-metric" type="text" placeholder="error_rate" />
-        </div>
-        <div>
-          <label>Value</label>
-          <input id="sig-value" type="number" placeholder="0.42" step="any" />
-        </div>
-        <div>
-          <label>Threshold</label>
-          <input id="sig-threshold" type="number" placeholder="0.1" step="any" />
-        </div>
-        <div>
-          <label>Severity</label>
-          <select id="sig-severity">
-            <option>info</option><option>warning</option><option>critical</option>
-          </select>
-        </div>
+      <div class="section-head" style="margin-bottom:12px">generate snippet</div>
+      <div class="field"><label>description</label><textarea id="ide-gen-desc" placeholder="A Python function that validates email addresses…"></textarea></div>
+      <div class="field"><label>language</label>
+        <select id="ide-gen-lang">
+          <option value="python">python</option>
+          <option value="javascript">javascript</option>
+          <option value="typescript">typescript</option>
+          <option value="go">go</option>
+        </select>
       </div>
-      <button class="btn btn-primary" onclick="ingestSignal(event)">▶ Ingest</button>
-      <div id="sig-output" class="output"></div>
+      <div class="btn-group"><button class="btn btn-primary" onclick="ideGenerate()">generate</button></div>
+      <div class="out" id="ide-gen-out" style="margin-top:10px;display:none"></div>
     </div>
   </div>
+</div>
 
-  <!-- ── Sessions ── -->
-  <div id="tab-sessions" class="tab-panel">
+<!-- CDE -->
+<div class="panel" id="panel-cde">
+  <div class="section-head">cde agent</div>
+  <div class="grid-2">
     <div class="card">
-      <div class="section-header">
-        <h2>Active sessions</h2>
-        <span class="count" id="sessions-count">–</span>
-        <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadSessions()">↺ Refresh</button>
+      <div class="section-head" style="margin-bottom:12px">execute code</div>
+      <div class="field"><label>language</label>
+        <select id="cde-lang">
+          <option value="python">python</option>
+          <option value="javascript">javascript</option>
+          <option value="bash">bash</option>
+        </select>
       </div>
-      <div id="sessions-table"><div class="spinner"></div></div>
+      <div class="field"><label>code</label><textarea id="cde-code" style="min-height:140px;font-family:var(--mono);font-size:.75rem" placeholder="print('hello world')"></textarea></div>
+      <div class="btn-group"><button class="btn btn-primary" onclick="cdeExecute()">execute</button></div>
+      <div class="out" id="cde-out" style="margin-top:10px;display:none"></div>
     </div>
-
     <div class="card">
-      <div class="card-title">New session</div>
-      <label>Agent</label>
-      <select id="new-session-agent">
-        <option>research_agent</option>
-        <option>analysis_agent</option>
-        <option>writing_agent</option>
-        <option>review_agent</option>
-        <option>coding_agent</option>
-        <option>summarization_agent</option>
-        <option>planning_agent</option>
-      </select>
-      <button class="btn btn-primary" onclick="createSession(event)">Create</button>
-      <div id="create-session-output" class="output"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Send message</div>
-      <label>Session ID</label>
-      <input id="send-msg-session-id" type="text" placeholder="session-uuid" />
-      <label>Message</label>
-      <textarea id="send-msg-text" placeholder="Type your message…"></textarea>
-      <button class="btn btn-primary" onclick="sendSessionMessage(event)">Send</button>
-      <div id="send-msg-output" class="output"></div>
+      <div class="section-head" style="margin-bottom:12px">run tests</div>
+      <div class="field"><label>test file path</label><input type="text" id="cde-test-path" placeholder="tests/test_example.py"></div>
+      <div class="field"><label>framework</label>
+        <select id="cde-test-fw">
+          <option value="pytest">pytest</option>
+          <option value="unittest">unittest</option>
+          <option value="jest">jest</option>
+        </select>
+      </div>
+      <div class="btn-group"><button class="btn btn-primary" onclick="cdeRunTests()">run tests</button></div>
+      <div class="out" id="cde-tests-out" style="margin-top:10px;display:none"></div>
     </div>
   </div>
+</div>
 
-  <!-- ── Webhooks ── -->
-  <div id="tab-webhooks" class="tab-panel">
-    <div class="card">
-      <div class="section-header">
-        <h2>Registered webhooks</h2>
-        <span class="count" id="webhooks-count">–</span>
-        <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="loadWebhooks()">↺ Refresh</button>
+<!-- PLATFORM -->
+<div class="panel" id="panel-platform">
+  <div class="section-head">platform tools</div>
+  <div class="btn-group" style="margin-bottom:16px">
+    <button class="btn btn-primary" onclick="loadTools()">refresh tools</button>
+    <button class="btn btn-ghost" onclick="toggleToolForm()">+ register tool</button>
+  </div>
+  <div class="card" id="tool-register-form" style="display:none;margin-bottom:16px">
+    <div class="section-head" style="margin-bottom:12px">register tool</div>
+    <div class="grid-2">
+      <div class="field"><label>name</label><input type="text" id="tool-name" placeholder="my_tool"></div>
+      <div class="field"><label>category</label>
+        <select id="tool-cat">
+          <option value="ci_cd">ci_cd</option>
+          <option value="code_quality">code_quality</option>
+          <option value="testing">testing</option>
+          <option value="deployment">deployment</option>
+          <option value="monitoring">monitoring</option>
+          <option value="security">security</option>
+          <option value="documentation">documentation</option>
+          <option value="general">general</option>
+        </select>
       </div>
-      <div id="webhooks-table"><div class="spinner"></div></div>
+      <div class="field"><label>description</label><input type="text" id="tool-desc" placeholder="What this tool does"></div>
+      <div class="field"><label>version</label><input type="text" id="tool-ver" placeholder="1.0.0"></div>
     </div>
-
-    <div class="card">
-      <div class="card-title">Register webhook</div>
-      <label>URL</label>
-      <input id="webhook-url" type="text" placeholder="https://example.com/webhook" />
-      <label>Events</label>
-      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px">
-        <label style="display:flex;align-items:center;gap:6px;color:var(--text);font-size:13px;margin-bottom:0">
-          <input type="checkbox" id="wh-evt-task-completed" value="task.completed" checked /> task.completed
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;color:var(--text);font-size:13px;margin-bottom:0">
-          <input type="checkbox" id="wh-evt-crew-completed" value="crew.completed" /> crew.completed
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;color:var(--text);font-size:13px;margin-bottom:0">
-          <input type="checkbox" id="wh-evt-session-message" value="session.message" /> session.message
-        </label>
-      </div>
-      <button class="btn btn-primary" onclick="registerWebhook(event)">Register</button>
-      <div id="register-webhook-output" class="output"></div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="registerTool()">register</button>
+      <button class="btn btn-ghost" onclick="toggleToolForm()">cancel</button>
     </div>
+    <div class="out" id="tool-reg-out" style="margin-top:10px;display:none"></div>
+  </div>
+  <div id="tools-list"><div style="color:var(--muted);font-family:var(--mono);font-size:.75rem;padding:8px">no tools loaded</div></div>
+</div>
 
-    <div class="card">
-      <div class="card-title">Test webhook</div>
-      <label>Webhook ID</label>
-      <input id="test-webhook-id" type="text" placeholder="webhook-uuid" />
-      <button class="btn btn-secondary" onclick="testWebhook(event)">Send test ping</button>
-      <div id="test-webhook-output" class="output"></div>
+<!-- KALLY -->
+<div class="panel" id="panel-kally">
+  <div class="section-head">kally agent</div>
+  <div class="card" style="max-width:640px">
+    <div class="section-head" style="margin-bottom:12px">chat with kally</div>
+    <div class="out" id="kally-history" style="min-height:200px;max-height:400px;color:var(--fg);margin-bottom:12px">// kally is ready</div>
+    <div class="field"><label>message</label><textarea id="kally-msg" placeholder="Ask Kally anything…" style="min-height:60px"></textarea></div>
+    <div class="field"><label>session id (optional)</label><input type="text" id="kally-sid" placeholder="session_abc123"></div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="kallyChat()">send</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('kally-history').textContent='// kally is ready'">clear</button>
     </div>
   </div>
+</div>
 
-  <!-- ── Eval ── -->
-  <div id="tab-eval" class="tab-panel">
-    <div class="card">
-      <div class="card-title">Run evaluation</div>
-      <label>Agent name</label>
-      <input id="eval-agent-name" type="text" placeholder="e.g. research_agent" />
-      <label>Benchmark</label>
-      <select id="eval-benchmark">
-        <option value="standard">standard</option>
-      </select>
-      <button class="btn btn-primary" onclick="runEval(event)">▶ Run eval</button>
-      <div id="eval-run-output" class="output"></div>
+<!-- SESSIONS -->
+<div class="panel" id="panel-sessions">
+  <div class="section-head">session management</div>
+  <div class="btn-group" style="margin-bottom:16px"><button class="btn btn-primary" onclick="loadSessions()">refresh sessions</button></div>
+  <div id="sessions-list"><div style="color:var(--muted);font-family:var(--mono);font-size:.75rem;padding:8px">no sessions loaded</div></div>
+  <div class="card" style="margin-top:16px">
+    <div class="section-head" style="margin-bottom:12px">create session</div>
+    <div class="grid-2">
+      <div class="field"><label>agent name</label><input type="text" id="sess-agent" placeholder="research_agent"></div>
+      <div class="field"><label>session name (optional)</label><input type="text" id="sess-name" placeholder="My research session"></div>
     </div>
+    <div class="btn-group"><button class="btn btn-primary" onclick="createSession()">create</button></div>
+    <div class="out" id="sess-out" style="margin-top:10px;display:none"></div>
+  </div>
+</div>
 
+<!-- WEBHOOKS -->
+<div class="panel" id="panel-webhooks">
+  <div class="section-head">webhooks</div>
+  <div class="btn-group" style="margin-bottom:16px">
+    <button class="btn btn-primary" onclick="loadWebhooks()">refresh</button>
+    <button class="btn btn-ghost" onclick="toggleWebhookForm()">+ add webhook</button>
+  </div>
+  <div class="card" id="webhook-form" style="display:none;margin-bottom:16px">
+    <div class="section-head" style="margin-bottom:12px">register webhook</div>
+    <div class="grid-2">
+      <div class="field"><label>url</label><input type="text" id="wh-url" placeholder="https://example.com/webhook"></div>
+      <div class="field"><label>events (comma-separated)</label><input type="text" id="wh-events" placeholder="task.completed,task.failed"></div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="registerWebhook()">register</button>
+      <button class="btn btn-ghost" onclick="toggleWebhookForm()">cancel</button>
+    </div>
+    <div class="out" id="wh-reg-out" style="margin-top:10px;display:none"></div>
+  </div>
+  <div id="webhooks-list"><div style="color:var(--muted);font-family:var(--mono);font-size:.75rem;padding:8px">no webhooks loaded</div></div>
+</div>
+
+<!-- EVAL -->
+<div class="panel" id="panel-eval">
+  <div class="section-head">evaluation suite</div>
+  <div class="grid-2">
     <div class="card">
-      <div class="card-title">Last result</div>
-      <div id="eval-last-result">
-        <div id="eval-score-display" style="display:none;margin-bottom:14px">
-          <span style="font-size:13px;color:var(--muted)">Score: </span>
-          <span id="eval-score-value" style="font-size:20px;font-weight:700;color:var(--accent)">–</span>
-        </div>
-        <div id="eval-tasks-table-wrap" style="display:none">
-          <table>
-            <thead><tr><th>Task</th><th>Status</th><th>Duration (ms)</th></tr></thead>
-            <tbody id="eval-tasks-body"></tbody>
-          </table>
-        </div>
-        <div id="eval-last-empty" class="empty">No evaluation run yet</div>
+      <div class="section-head" style="margin-bottom:12px">run evaluation</div>
+      <div class="field"><label>suite name</label><input type="text" id="eval-suite" placeholder="default"></div>
+      <div class="field"><label>agent to evaluate (optional)</label><input type="text" id="eval-agent" placeholder="research_agent"></div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="runEval()">run suite</button>
+        <button class="btn btn-ghost" onclick="loadEvalSuites()">list suites</button>
       </div>
+      <div class="out" id="eval-out" style="margin-top:10px;display:none"></div>
+    </div>
+    <div class="card">
+      <div class="section-head" style="margin-bottom:12px">results</div>
+      <div id="eval-results"><div style="color:var(--muted);font-family:var(--mono);font-size:.75rem">no results yet</div></div>
     </div>
   </div>
+</div>
 
 </main>
+</div>
 
 <script>
-// ────────────────────────── Helpers ──────────────────────────
-
 function base() { return (document.getElementById('base-url').value || '').replace(/\/$/, ''); }
-function apiKey() { return document.getElementById('api-key').value.trim(); }
-
-async function apiFetch(path, opts = {}) {
-  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-  const key = apiKey();
-  if (key) headers['X-API-Key'] = key;
-  const res = await fetch(base() + path, { ...opts, headers });
-  const data = await res.json().catch(() => ({ detail: res.statusText }));
-  if (!res.ok) throw Object.assign(new Error(data.detail || res.statusText), { data });
-  return data;
+function out(id, txt) { const el = document.getElementById(id); if (!el) return; el.style.display = ''; el.textContent = typeof txt === 'object' ? JSON.stringify(txt, null, 2) : String(txt); }
+function outAppend(id, line, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = '';
+  const span = document.createElement('span');
+  if (cls) span.className = cls;
+  span.textContent = line + '\n';
+  el.appendChild(span);
+  el.scrollTop = el.scrollHeight;
 }
-
-function show(el, content, isError = false) {
-  el.textContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
-  el.classList.add('visible');
-  el.classList.toggle('error', isError);
+async function api(path, opts = {}) {
+  const r = await fetch(base() + path, opts);
+  if (!r.ok) { const t = await r.text(); throw new Error('HTTP ' + r.status + ': ' + t); }
+  const ct = r.headers.get('content-type') || '';
+  return ct.includes('application/json') ? r.json() : r.text();
 }
-
-async function run(btnEl, fn) {
-  const orig = btnEl.innerHTML;
-  btnEl.disabled = true;
-  btnEl.innerHTML = '<span class="spinner"></span>';
-  try { await fn(); } finally { btnEl.disabled = false; btnEl.innerHTML = orig; }
+async function apid(method, path, body) {
+  return api(path, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
 }
-
-function statusChip(s) {
-  if (!s) return '';
-  const map = { healthy:'green', ready:'green', running:'green', active:'green',
-                 degraded:'yellow', pending:'yellow', queued:'yellow', starting:'yellow',
-                 failed:'red', error:'red', unhealthy:'red', cancelled:'red',
-                 stopped:'gray', closed:'gray', completed:'blue' };
-  const cls = map[String(s).toLowerCase()] || 'gray';
-  return `<span class="chip chip-${cls}">${s}</span>`;
-}
-
-// ────────────────────────── Tabs ──────────────────────────
-
-const tabLoaders = {};
-document.getElementById('tab-nav').addEventListener('click', e => {
-  const btn = e.target.closest('[data-tab]');
-  if (!btn) return;
-  document.querySelectorAll('#tab-nav button').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-  if (tabLoaders[btn.dataset.tab]) tabLoaders[btn.dataset.tab]();
+document.querySelectorAll('#tab-list button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#tab-list button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
 });
-
-// ────────────────────────── Health ──────────────────────────
+try { const s = localStorage.getItem('agi_base_url'); if (s) document.getElementById('base-url').value = s; } catch(_) {}
+document.getElementById('base-url').addEventListener('change', e => { try { localStorage.setItem('agi_base_url', e.target.value); } catch(_) {} });
 
 async function loadHealth() {
-  const badge = document.getElementById('health-badge');
-  const grid  = document.getElementById('health-status');
-  grid.innerHTML = '<div class="spinner"></div>';
-  badge.className = '';
-  badge.textContent = '● checking…';
   try {
-    const data = await apiFetch('/health/detailed');
-    badge.className = data.status === 'healthy' ? 'healthy' : 'degraded';
-    badge.textContent = '● ' + (data.status || 'unknown');
-    const comps = data.components || {};
-    const uptime = data.uptime_seconds != null ? ` · uptime ${Math.floor(data.uptime_seconds)}s` : '';
-    grid.innerHTML = Object.entries(comps).map(([k, v]) => {
-      const status = typeof v === 'object' ? (v.status || 'unknown') : v;
-      const ok = ['healthy','mock_mode','not_configured'].includes(status);
-      const detail = typeof v === 'object'
-        ? Object.entries(v).filter(([ek])=>ek!=='status').map(([ek,ev])=>`<span style="opacity:.7">${ek}: ${JSON.stringify(ev)}</span>`).join(' ')
-        : '';
-      return `<div class="health-item">
-        <div class="hi-label">${k.replace(/_/g,' ')}</div>
-        <div class="hi-val" style="color:var(--${ok?'success':'danger'})">${status}</div>
-        ${detail ? `<div style="font-size:11px;margin-top:2px">${detail}</div>` : ''}
-      </div>`;
-    }).join('') + (uptime ? `<div class="health-item" style="opacity:.6"><div class="hi-label">uptime</div><div class="hi-val">${Math.floor(data.uptime_seconds)}s</div></div>` : '');
-  } catch (err) {
-    badge.className = 'error';
-    badge.textContent = '● error';
-    grid.innerHTML = `<span style="color:var(--danger)">${err.message}</span>`;
+    const d = await api('/health/detailed');
+    document.getElementById('hs-status').textContent = d.status || '—';
+    document.getElementById('hs-status').style.color = d.status === 'healthy' ? 'var(--success)' : 'var(--warn)';
+    document.getElementById('hs-uptime').textContent = Math.round(d.uptime_seconds || 0);
+    const comps = d.components || {};
+    document.getElementById('hs-comps').textContent = Object.keys(comps).length;
+    const list = document.getElementById('comp-list');
+    list.innerHTML = '';
+    for (const [name, info] of Object.entries(comps)) {
+      const s = (typeof info === 'object' ? info.status : String(info)) || 'unknown';
+      const cls = s === 'healthy' ? 'ok' : (s === 'not_configured' || s === 'mock_mode' || s === 'unavailable') ? 'muted' : 'err';
+      const extra = typeof info === 'object' && info.agents ? ' [' + info.agents.join(', ') + ']' : '';
+      list.innerHTML += '<div class="comp-row"><span class="name">' + name + '</span><span class="status ' + cls + '">● ' + s + extra + '</span></div>';
+    }
+    const chip = document.getElementById('hc-chip');
+    chip.textContent = d.status || '—';
+    chip.className = 'chip ' + (d.status === 'healthy' ? 'ok' : 'warn');
+    const up = document.getElementById('uptime-chip');
+    up.textContent = '↑ ' + Math.round(d.uptime_seconds || 0) + 's';
+    up.hidden = false;
+  } catch(e) {
+    const chip = document.getElementById('hc-chip');
+    chip.textContent = 'unreachable';
+    chip.className = 'chip err';
+    document.getElementById('comp-list').innerHTML = '<div class="comp-row"><span class="name" style="color:var(--danger)">' + e.message + '</span></div>';
   }
 }
-
-async function loadSystemInfo() {
-  const el = document.getElementById('system-info-content');
-  el.innerHTML = '<div class="spinner"></div>';
-  try {
-    const d = await apiFetch('/api/v1/system/info');
-    el.innerHTML = `<table><tbody>
-      <tr><td style="width:160px;font-weight:600">Version</td><td>${d.version || '—'}</td></tr>
-      <tr><td style="font-weight:600">Python</td><td>${d.python || '—'}</td></tr>
-      <tr><td style="font-weight:600">LLM provider</td><td>${d.llm_provider || '—'}</td></tr>
-      <tr><td style="font-weight:600">Log format</td><td>${d.log_format || '—'}</td></tr>
-      <tr><td style="font-weight:600">Uptime</td><td>${Math.floor(d.uptime_seconds || 0)}s</td></tr>
-      <tr><td style="font-weight:600">Agents</td><td>${(d.agents||[]).join(', ') || '—'}</td></tr>
-      <tr><td style="font-weight:600">Tools</td><td>${(d.tools||[]).join(', ') || '—'}</td></tr>
-      <tr><td style="font-weight:600">Tasks</td><td>${JSON.stringify(d.tasks || {})}</td></tr>
-    </tbody></table>`;
-  } catch (err) {
-    el.innerHTML = `<span style="color:var(--danger)">${err.message}</span>`;
-  }
-}
-
-// ────────────────────────── Agents ──────────────────────────
 
 async function loadAgents() {
-  const container = document.getElementById('agents-table');
-  const countEl   = document.getElementById('agent-count');
-  container.innerHTML = '<div class="spinner"></div>';
   try {
-    const agents = await apiFetch('/api/v1/agents/');
-    countEl.textContent = agents.length;
-    if (!agents.length) { container.innerHTML = '<div class="empty">No agents registered</div>'; return; }
-    container.innerHTML = `<table>
-      <thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Capabilities</th></tr></thead>
-      <tbody>${agents.map(a => `<tr>
-        <td><strong>${a.name}</strong></td>
-        <td><code style="font-size:11px">${a.type || '–'}</code></td>
-        <td>${statusChip(a.status)}</td>
-        <td><div class="tags">${(a.capabilities||[]).map(c=>`<span class="tag">${c}</span>`).join('')}</div></td>
-      </tr>`).join('')}</tbody></table>`;
-  } catch (err) {
-    container.innerHTML = `<div style="color:var(--danger)">${err.message}</div>`;
-  }
+    const d = await api('/api/v1/agents');
+    const grid = document.getElementById('agents-grid');
+    const agents = d.agents || [];
+    if (!agents.length) { grid.innerHTML = '<div class="card"><div style="color:var(--muted);font-family:var(--mono);font-size:.75rem">no agents registered</div></div>'; return; }
+    grid.innerHTML = agents.map(a => {
+      const name = a.name || (a.config && a.config.name) || 'unnamed';
+      const type = (a.config && a.config.agent_type) || a.agent_type || '—';
+      const desc = (a.config && a.config.description) || a.description || '—';
+      return '<div class="agent-card"><h3>' + name + '</h3><div class="type">' + type + '</div><div class="desc">' + desc + '</div><div class="actions btn-group"><button class="btn btn-ghost btn-sm" onclick="runAgentByName(\'' + name + '\')">run</button><button class="btn btn-danger btn-sm" onclick="deleteAgent(\'' + name + '\')">remove</button></div></div>';
+    }).join('');
+  } catch(e) { document.getElementById('agents-grid').innerHTML = '<div class="card"><div style="color:var(--danger);font-family:var(--mono);font-size:.75rem">' + e.message + '</div></div>'; }
 }
-
-async function executeAgent(event) {
-  const btn  = event.target;
-  const name = document.getElementById('exec-agent').value.trim();
-  const task = document.getElementById('exec-task').value.trim();
-  const out  = document.getElementById('exec-output');
-  if (!name || !task) { show(out, 'Agent name and task are required.', true); return; }
-  let params = {};
-  try { params = JSON.parse(document.getElementById('exec-params').value || '{}'); } catch { show(out, 'Invalid JSON in parameters.', true); return; }
-  await run(btn, async () => {
-    try { show(out, await apiFetch(`/api/v1/agents/${encodeURIComponent(name)}/execute`, { method:'POST', body: JSON.stringify({ task, parameters: params }) })); }
-    catch (err) { show(out, err.data || err.message, true); }
-  });
-}
-
-// ────────────────────────── Tasks ──────────────────────────
-
-async function submitTask(event) {
-  const btn = event.target;
-  const out = document.getElementById('task-submit-output');
-  const obj = document.getElementById('task-objective').value.trim();
-  if (!obj) { show(out, 'Objective is required.', true); return; }
-  let params = {};
-  try { params = JSON.parse(document.getElementById('task-params').value || '{}'); } catch { show(out, 'Invalid JSON in parameters.', true); return; }
-  await run(btn, async () => {
-    try {
-      const r = await apiFetch('/api/v1/tasks/', { method:'POST', body: JSON.stringify({ objective: obj, parameters: params }) });
-      document.getElementById('task-lookup-id').value = r.task_id || '';
-      show(out, r);
-    } catch (err) { show(out, err.data || err.message, true); }
-  });
-}
-
-async function getTask(event) {
-  const btn = event.target;
-  const id  = document.getElementById('task-lookup-id').value.trim();
-  const out = document.getElementById('task-lookup-output');
-  if (!id) { show(out, 'Task ID is required.', true); return; }
-  await run(btn, async () => {
-    try { show(out, await apiFetch(`/api/v1/tasks/${encodeURIComponent(id)}`)); }
-    catch (err) { show(out, err.data || err.message, true); }
-  });
-}
-
-async function cancelTask(event) {
-  const btn = event.target;
-  const id  = document.getElementById('task-lookup-id').value.trim();
-  const out = document.getElementById('task-lookup-output');
-  if (!id) { show(out, 'Task ID is required.', true); return; }
-  await run(btn, async () => {
-    try { show(out, await apiFetch(`/api/v1/tasks/${encodeURIComponent(id)}`, { method:'DELETE' })); }
-    catch (err) { show(out, err.data || err.message, true); }
-  });
-}
-
-// ────────────────────────── IDE ──────────────────────────
-
-async function loadIDESessions() {
-  const container = document.getElementById('ide-sessions-table');
-  const countEl   = document.getElementById('ide-session-count');
-  container.innerHTML = '<div class="spinner"></div>';
+function toggleRegisterForm() { const f = document.getElementById('register-form'); f.style.display = f.style.display === 'none' ? '' : 'none'; }
+async function registerAgent() {
   try {
-    const data = await apiFetch('/api/v1/ide/sessions');
-    const sessions = data.sessions || [];
-    countEl.textContent = `${data.active||0} active / ${data.total||0} total`;
-    if (!sessions.length) { container.innerHTML = '<div class="empty">No sessions yet</div>'; return; }
-    container.innerHTML = `<table>
-      <thead><tr><th>ID</th><th>Language</th><th>Status</th><th>Created</th></tr></thead>
-      <tbody>${sessions.map(s => `<tr>
-        <td><code style="font-size:11px">${s.session_id||s.id||'–'}</code></td>
-        <td>${s.language||'–'}</td>
-        <td>${statusChip(s.status)}</td>
-        <td>${s.created_at ? new Date(s.created_at).toLocaleString() : '–'}</td>
-      </tr>`).join('')}</tbody></table>`;
-  } catch (err) {
-    container.innerHTML = `<div style="color:var(--danger)">${err.message}</div>`;
-  }
+    const d = await apid('POST', '/api/v1/agents', { name: document.getElementById('ag-name').value, agent_type: document.getElementById('ag-type').value, description: document.getElementById('ag-desc').value, max_iterations: +document.getElementById('ag-max-iter').value });
+    out('ag-reg-out', d); loadAgents();
+  } catch(e) { out('ag-reg-out', e.message); }
 }
-
-async function createIDESession(event) {
-  const btn  = event.target;
-  const out  = document.getElementById('ide-create-output');
-  await run(btn, async () => {
-    try {
-      const r = await apiFetch('/api/v1/ide/sessions', { method:'POST', body: JSON.stringify({
-        language: document.getElementById('ide-lang').value,
-        context:  document.getElementById('ide-context').value,
-      })});
-      const sid = (r.session || {}).session_id || (r.session || {}).id;
-      if (sid) document.getElementById('ide-session-id').value = sid;
-      show(out, r);
-      loadIDESessions();
-    } catch (err) { show(out, err.data || err.message, true); }
-  });
+async function runAgent() {
+  const name = document.getElementById('run-ag-name').value.trim();
+  const task = document.getElementById('run-ag-task').value.trim();
+  if (!name || !task) return;
+  try { const d = await apid('POST', '/api/v1/agents/' + name + '/run', { task, parameters: {} }); out('ag-run-out', d); }
+  catch(e) { out('ag-run-out', e.message); }
 }
+function runAgentByName(name) { document.getElementById('run-ag-name').value = name; }
+async function deleteAgent(name) { try { await api('/api/v1/agents/' + name, { method: 'DELETE' }); loadAgents(); } catch(e) { alert(e.message); } }
 
-async function runCodeAction(event) {
-  const btn = event.target;
-  const out = document.getElementById('ide-action-output');
-  const prompt = document.getElementById('ide-prompt').value.trim();
-  if (!prompt) { show(out, 'Prompt is required.', true); return; }
-  await run(btn, async () => {
-    try { show(out, await apiFetch('/api/v1/ide/actions', { method:'POST', body: JSON.stringify({
-      action:     document.getElementById('ide-action').value,
-      prompt,
-      language:   document.getElementById('ide-lang').value,
-      session_id: document.getElementById('ide-session-id').value.trim() || null,
-    })})); }
-    catch (err) { show(out, err.data || err.message, true); }
-  });
-}
-
-// ────────────────────────── CDE ──────────────────────────
-
-async function loadCDEEnvironments() {
-  const container = document.getElementById('cde-envs-table');
-  const countEl   = document.getElementById('cde-env-count');
-  container.innerHTML = '<div class="spinner"></div>';
+async function loadTasks() {
   try {
-    const data = await apiFetch('/api/v1/cde/environments');
-    const envs = data.environments || [];
-    countEl.textContent = envs.length;
-    if (!envs.length) { container.innerHTML = '<div class="empty">No environments provisioned</div>'; return; }
-    container.innerHTML = `<table>
-      <thead><tr><th>ID</th><th>Name</th><th>Runtime</th><th>Status</th><th>Owner</th><th>Actions</th></tr></thead>
-      <tbody>${envs.map(e => `<tr>
-        <td><code style="font-size:11px">${e.env_id||e.id||'–'}</code></td>
-        <td>${e.name||'–'}</td>
-        <td>${e.runtime||'–'}</td>
-        <td>${statusChip(e.status)}</td>
-        <td>${e.owner||'–'}</td>
-        <td>
-          <button class="btn btn-secondary btn-sm" onclick="cdeAction('start','${e.env_id||e.id}')">Start</button>
-          <button class="btn btn-secondary btn-sm" onclick="cdeAction('stop','${e.env_id||e.id}')">Stop</button>
-          <button class="btn btn-danger btn-sm" onclick="cdeDelete('${e.env_id||e.id}')">Delete</button>
-        </td>
-      </tr>`).join('')}</tbody></table>`;
-  } catch (err) {
-    container.innerHTML = `<div style="color:var(--danger)">${err.message}</div>`;
-  }
+    const d = await api('/api/v1/tasks/');
+    document.getElementById('tq-total').textContent = d.total_all != null ? d.total_all : (d.total || '—');
+    const bs = d.by_status || {};
+    document.getElementById('tq-running').textContent = bs['running'] || bs['RUNNING'] || 0;
+    document.getElementById('tq-failed').textContent = bs['failed'] || bs['FAILED'] || 0;
+    const list = document.getElementById('task-list');
+    const tasks = d.tasks || [];
+    if (!tasks.length) { list.innerHTML = '<div style="color:var(--muted);font-family:var(--mono);font-size:.75rem;padding:8px">no tasks</div>'; return; }
+    list.innerHTML = tasks.map(t => {
+      const s = (t.status || '').toLowerCase();
+      const retry = (s === 'failed' || s === 'cancelled') ? '<button class="btn btn-ghost btn-sm" onclick="retryTask(\'' + t.task_id + '\')">retry</button>' : '';
+      return '<div class="task-row"><span class="tid">' + (t.task_id || '').slice(0,12) + '</span><span class="obj">' + (t.objective || '—') + '</span><span class="task-badge ' + s + '">' + (t.status || '?') + '</span>' + retry + '<button class="btn btn-ghost btn-sm" onclick="cancelTask(\'' + t.task_id + '\')">×</button></div>';
+    }).join('');
+  } catch(e) { document.getElementById('task-list').innerHTML = '<div style="color:var(--danger);font-family:var(--mono);font-size:.75rem;padding:8px">' + e.message + '</div>'; }
 }
-
-async function createCDE(event) {
-  const btn = event.target;
-  const out = document.getElementById('cde-create-output');
-  await run(btn, async () => {
-    try {
-      const r = await apiFetch('/api/v1/cde/environments', { method:'POST', body: JSON.stringify({
-        name:           document.getElementById('cde-name').value,
-        runtime:        document.getElementById('cde-runtime').value,
-        owner:          document.getElementById('cde-owner').value,
-        repository_url: document.getElementById('cde-repo').value || null,
-      })});
-      show(out, r);
-      loadCDEEnvironments();
-    } catch (err) { show(out, err.data || err.message, true); }
-  });
+async function submitTask() {
+  const obj = document.getElementById('task-obj').value.trim();
+  if (!obj) return;
+  try { const d = await apid('POST', '/api/v1/tasks/', { objective: obj, parameters: {} }); out('task-sub-out', d); loadTasks(); }
+  catch(e) { out('task-sub-out', e.message); }
 }
-
-async function cdeAction(action, envId) {
+async function retryTask(id) { try { await apid('POST', '/api/v1/tasks/' + id + '/retry'); loadTasks(); } catch(e) { alert(e.message); } }
+async function cancelTask(id) { try { await api('/api/v1/tasks/' + id, { method: 'DELETE' }); loadTasks(); } catch(e) { alert(e.message); } }
+async function loadDLQ() {
+  document.getElementById('dlq-section').style.display = '';
   try {
-    await apiFetch(`/api/v1/cde/environments/${encodeURIComponent(envId)}/${action}`, { method:'POST' });
-    loadCDEEnvironments();
-  } catch (err) { alert(err.message); }
+    const d = await api('/api/v1/tasks/dead-letter?limit=50');
+    const tasks = d.tasks || [];
+    const list = document.getElementById('dlq-list');
+    if (!tasks.length) { list.innerHTML = '<div style="color:var(--muted);font-family:var(--mono);font-size:.75rem;padding:8px">dead-letter queue empty</div>'; return; }
+    list.innerHTML = tasks.map(t => '<div class="task-row"><span class="tid">' + (t.task_id || '').slice(0,12) + '</span><span class="obj">' + (t.objective || '—') + '</span><span class="task-badge failed">failed</span><button class="btn btn-ghost btn-sm" onclick="retryTask(\'' + t.task_id + '\')">retry</button></div>').join('');
+  } catch(e) { document.getElementById('dlq-list').innerHTML = '<div style="color:var(--danger);font-family:var(--mono);font-size:.75rem">' + e.message + '</div>'; }
 }
 
-async function cdeDelete(envId) {
-  if (!confirm(`Delete environment ${envId}?`)) return;
+async function runCrew() {
+  const obj = document.getElementById('crew-obj').value.trim();
+  const raw = document.getElementById('crew-agents').value.trim();
+  const agents = raw ? raw.split(',').map(s => s.trim()).filter(Boolean) : undefined;
+  try { out('crew-out', await apid('POST', '/api/v1/crew/run', { objective: obj, agents })); }
+  catch(e) { out('crew-out', e.message); }
+}
+async function streamCrew() {
+  const obj = document.getElementById('crew-obj').value.trim();
+  const raw = document.getElementById('crew-agents').value.trim();
+  const agents = raw ? raw.split(',').map(s => s.trim()).filter(Boolean) : undefined;
+  const el = document.getElementById('crew-out');
+  el.style.display = ''; el.textContent = '';
   try {
-    await apiFetch(`/api/v1/cde/environments/${encodeURIComponent(envId)}`, { method:'DELETE' });
-    loadCDEEnvironments();
-  } catch (err) { alert(err.message); }
+    const r = await fetch(base() + '/api/v1/crew/run/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ objective: obj, agents, stream: true }) });
+    const reader = r.body.getReader(); const dec = new TextDecoder();
+    while (true) { const { done, value } = await reader.read(); if (done) break; el.textContent += dec.decode(value); el.scrollTop = el.scrollHeight; }
+  } catch(e) { out('crew-out', e.message); }
+}
+async function loadTemplates() {
+  try {
+    const d = await api('/api/v1/crew/templates');
+    const list = document.getElementById('template-list');
+    if (!d.length) { list.innerHTML = '<div style="color:var(--muted);font-family:var(--mono);font-size:.75rem">no templates</div>'; return; }
+    list.innerHTML = d.map(t => '<div class="comp-row" style="margin-bottom:4px"><span class="name">' + t.name + '</span><span style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" onclick="runTemplate(\'' + t.name + '\')">run</button><button class="btn btn-danger btn-sm" onclick="deleteTemplate(\'' + t.name + '\')">×</button></span></div>').join('');
+  } catch(e) { document.getElementById('template-list').innerHTML = '<div style="color:var(--danger);font-family:var(--mono);font-size:.75rem">' + e.message + '</div>'; }
+}
+async function createTemplate() {
+  try {
+    const d = await apid('POST', '/api/v1/crew/templates', { name: document.getElementById('tpl-name').value, agent_names: document.getElementById('tpl-agents').value.split(',').map(s => s.trim()).filter(Boolean), description: document.getElementById('tpl-desc').value, max_iterations: +document.getElementById('tpl-max-iter').value });
+    out('tpl-out', d); loadTemplates();
+  } catch(e) { out('tpl-out', e.message); }
+}
+async function runTemplate(name) {
+  const obj = document.getElementById('crew-obj').value.trim() || 'Default task';
+  try { out('crew-out', await apid('POST', '/api/v1/crew/templates/' + name + '/run', { objective: obj })); }
+  catch(e) { out('crew-out', e.message); }
+}
+async function deleteTemplate(name) { try { await api('/api/v1/crew/templates/' + name, { method: 'DELETE' }); loadTemplates(); } catch(e) { alert(e.message); } }
+
+let _evtSrc = null;
+function startStream() {
+  if (_evtSrc) _evtSrc.close();
+  const tid = document.getElementById('stream-tid').value.trim();
+  if (!tid) return;
+  document.getElementById('stream-out').textContent = '';
+  document.getElementById('stream-status').textContent = 'connecting…';
+  _evtSrc = new EventSource(base() + '/api/v1/tasks/' + tid + '/stream');
+  _evtSrc.onmessage = e => {
+    document.getElementById('stream-status').textContent = 'streaming';
+    outAppend('stream-out', e.data === '[DONE]' ? '// ── done ──' : e.data, e.data === '[DONE]' ? 'info-line' : '');
+    if (e.data === '[DONE]') { _evtSrc.close(); document.getElementById('stream-status').textContent = 'done'; }
+  };
+  _evtSrc.onerror = () => { document.getElementById('stream-status').textContent = 'error'; _evtSrc.close(); };
+}
+function stopStream() { if (_evtSrc) { _evtSrc.close(); _evtSrc = null; } document.getElementById('stream-status').textContent = 'disconnected'; }
+
+async function storeMemory() {
+  try { out('mem-store-out', await apid('POST', '/api/v1/memory', { key: document.getElementById('mem-key').value, value: document.getElementById('mem-val').value, namespace: document.getElementById('mem-ns').value || 'default' })); }
+  catch(e) { out('mem-store-out', e.message); }
+}
+async function searchMemory() {
+  try { out('mem-search-out', await api('/api/v1/memory/search?query=' + encodeURIComponent(document.getElementById('mem-query').value) + '&namespace=' + (document.getElementById('mem-search-ns').value || 'default') + '&limit=' + document.getElementById('mem-limit').value)); }
+  catch(e) { out('mem-search-out', e.message); }
+}
+async function listMemory() {
+  try { out('mem-search-out', await api('/api/v1/memory?namespace=' + (document.getElementById('mem-search-ns').value || 'default'))); }
+  catch(e) { out('mem-search-out', e.message); }
 }
 
-// ────────────────────────── Platform tools ──────────────────────────
+async function ideAnalyse() {
+  try { out('ide-out', await apid('POST', '/api/v1/ide/analyse', { code: document.getElementById('ide-code').value, language: document.getElementById('ide-lang').value, request: document.getElementById('ide-req').value })); }
+  catch(e) { out('ide-out', e.message); }
+}
+async function ideComplete() {
+  try { out('ide-out', await apid('POST', '/api/v1/ide/complete', { code: document.getElementById('ide-code').value, language: document.getElementById('ide-lang').value })); }
+  catch(e) { out('ide-out', e.message); }
+}
+async function ideGenerate() {
+  try { out('ide-gen-out', await apid('POST', '/api/v1/ide/generate', { description: document.getElementById('ide-gen-desc').value, language: document.getElementById('ide-gen-lang').value })); }
+  catch(e) { out('ide-gen-out', e.message); }
+}
 
-let _allTools = [];
+async function cdeExecute() {
+  try { out('cde-out', await apid('POST', '/api/v1/cde/execute', { code: document.getElementById('cde-code').value, language: document.getElementById('cde-lang').value })); }
+  catch(e) { out('cde-out', e.message); }
+}
+async function cdeRunTests() {
+  try { out('cde-tests-out', await apid('POST', '/api/v1/cde/test', { test_path: document.getElementById('cde-test-path').value, framework: document.getElementById('cde-test-fw').value })); }
+  catch(e) { out('cde-tests-out', e.message); }
+}
+
 async function loadTools() {
-  const container = document.getElementById('tools-table');
-  const countEl   = document.getElementById('tools-count');
-  container.innerHTML = '<div class="spinner"></div>';
   try {
-    const data = await apiFetch('/api/v1/platform/tools');
-    _allTools = data.tools || [];
-    countEl.textContent = data.total || 0;
-    renderTools(_allTools);
-  } catch (err) {
-    container.innerHTML = `<div style="color:var(--danger)">${err.message}</div>`;
-  }
+    const d = await api('/api/v1/platform/tools');
+    const tools = d.tools || [];
+    const list = document.getElementById('tools-list');
+    if (!tools.length) { list.innerHTML = '<div style="color:var(--muted);font-family:var(--mono);font-size:.75rem;padding:8px">no tools registered</div>'; return; }
+    list.innerHTML = '<div class="grid-2">' + tools.map(t => '<div class="agent-card"><h3>' + t.name + '</h3><div class="type">' + (t.category || '—') + ' · v' + (t.version || '1.0') + '</div><div class="desc">' + (t.description || '—') + '</div><div class="actions btn-group"><button class="btn btn-danger btn-sm" onclick="deleteTool(\'' + t.tool_id + '\')">remove</button></div></div>').join('') + '</div>';
+  } catch(e) { document.getElementById('tools-list').innerHTML = '<div style="color:var(--danger);font-family:var(--mono);font-size:.75rem">' + e.message + '</div>'; }
 }
-
-function renderTools(tools) {
-  const container = document.getElementById('tools-table');
-  if (!tools.length) { container.innerHTML = '<div class="empty">No tools registered</div>'; return; }
-  container.innerHTML = `<table>
-    <thead><tr><th>Name</th><th>Category</th><th>Tier</th></tr></thead>
-    <tbody>${tools.map(t => `<tr>
-      <td><strong>${t.name}</strong><br/><span style="color:var(--muted);font-size:11px">${t.description||''}</span></td>
-      <td><span class="chip chip-blue">${t.category||'–'}</span></td>
-      <td>${t.tier||'–'}</td>
-    </tr>`).join('')}</tbody></table>`;
+function toggleToolForm() { const f = document.getElementById('tool-register-form'); f.style.display = f.style.display === 'none' ? '' : 'none'; }
+async function registerTool() {
+  try { out('tool-reg-out', await apid('POST', '/api/v1/platform/tools', { name: document.getElementById('tool-name').value, category: document.getElementById('tool-cat').value, description: document.getElementById('tool-desc').value, version: document.getElementById('tool-ver').value || '1.0.0' })); loadTools(); }
+  catch(e) { out('tool-reg-out', e.message); }
 }
+async function deleteTool(id) { try { await api('/api/v1/platform/tools/' + id, { method: 'DELETE' }); loadTools(); } catch(e) { alert(e.message); } }
 
-async function searchTools(q) {
-  if (!q.trim()) { renderTools(_allTools); return; }
+async function kallyChat() {
+  const msg = document.getElementById('kally-msg').value.trim();
+  if (!msg) return;
+  const sid = document.getElementById('kally-sid').value.trim();
+  outAppend('kally-history', '> ' + msg, 'info-line');
+  document.getElementById('kally-msg').value = '';
   try {
-    const data = await apiFetch(`/api/v1/platform/tools/search?q=${encodeURIComponent(q)}`);
-    renderTools(data.tools || []);
-  } catch { renderTools(_allTools.filter(t => t.name.includes(q))); }
+    const d = await apid('POST', '/api/v1/agents/kally/run', { task: msg, session_id: sid || undefined, parameters: {} });
+    outAppend('kally-history', d.response || d.result || d.content || JSON.stringify(d));
+  } catch(e) { outAppend('kally-history', e.message, 'err-line'); }
 }
-
-let _allServices = [];
-async function loadServices() {
-  const container = document.getElementById('services-table');
-  const countEl   = document.getElementById('services-count');
-  container.innerHTML = '<div class="spinner"></div>';
-  try {
-    const data = await apiFetch('/api/v1/platform/portal/services');
-    _allServices = data.services || [];
-    countEl.textContent = data.total || 0;
-    renderServices(_allServices);
-  } catch (err) {
-    container.innerHTML = `<div style="color:var(--danger)">${err.message}</div>`;
-  }
-}
-
-function renderServices(services) {
-  const container = document.getElementById('services-table');
-  if (!services.length) { container.innerHTML = '<div class="empty">No services registered</div>'; return; }
-  container.innerHTML = `<table>
-    <thead><tr><th>Name</th><th>Tier</th><th>Status</th></tr></thead>
-    <tbody>${services.map(s => `<tr>
-      <td><strong>${s.name}</strong><br/><span style="color:var(--muted);font-size:11px">${s.description||''}</span></td>
-      <td><span class="chip chip-blue">${s.tier||'–'}</span></td>
-      <td>${statusChip(s.status||'healthy')}</td>
-    </tr>`).join('')}</tbody></table>`;
-}
-
-function searchServices(q) {
-  if (!q.trim()) { renderServices(_allServices); return; }
-  const lq = q.toLowerCase();
-  renderServices(_allServices.filter(s => s.name.toLowerCase().includes(lq) || (s.description||'').toLowerCase().includes(lq)));
-}
-
-async function registerTool(event) {
-  const btn = event.target;
-  const out = document.getElementById('reg-tool-output');
-  const name = document.getElementById('reg-tool-name').value.trim();
-  if (!name) { show(out, 'Name is required.', true); return; }
-  await run(btn, async () => {
-    try {
-      const r = await apiFetch('/api/v1/platform/tools', { method:'POST', body: JSON.stringify({
-        name,
-        description: document.getElementById('reg-tool-desc').value,
-        category:    document.getElementById('reg-tool-cat').value,
-        tier:        document.getElementById('reg-tool-tier').value,
-      })});
-      show(out, r);
-      loadTools();
-    } catch (err) { show(out, err.data || err.message, true); }
-  });
-}
-
-// ────────────────────────── Kally ──────────────────────────
-
-async function kallyReport(event) {
-  const btn = event.target;
-  const out = document.getElementById('kally-output');
-  await run(btn, async () => {
-    try { show(out, await apiFetch('/api/v1/platform/kally/report')); }
-    catch (err) { show(out, err.data || err.message, true); }
-  });
-}
-
-async function kallyAnalyse(event) {
-  const btn = event.target;
-  const out = document.getElementById('kally-output');
-  await run(btn, async () => {
-    try { show(out, await apiFetch('/api/v1/platform/kally/analyse', { method:'POST' })); }
-    catch (err) { show(out, err.data || err.message, true); }
-  });
-}
-
-async function kallyReset(event) {
-  if (!confirm('Reset Kally signal buffer?')) return;
-  const btn = event.target;
-  const out = document.getElementById('kally-output');
-  await run(btn, async () => {
-    try { show(out, await apiFetch('/api/v1/platform/kally/reset', { method:'POST' })); }
-    catch (err) { show(out, err.data || err.message, true); }
-  });
-}
-
-async function ingestSignal(event) {
-  const btn = event.target;
-  const out = document.getElementById('sig-output');
-  await run(btn, async () => {
-    try { show(out, await apiFetch('/api/v1/platform/kally/signals', { method:'POST', body: JSON.stringify({
-      source:    document.getElementById('sig-source').value,
-      metric:    document.getElementById('sig-metric').value,
-      value:     parseFloat(document.getElementById('sig-value').value) || 0,
-      threshold: parseFloat(document.getElementById('sig-threshold').value) || 0,
-      severity:  document.getElementById('sig-severity').value,
-    })})); }
-    catch (err) { show(out, err.data || err.message, true); }
-  });
-}
-
-// ────────────────────────── Crew ──────────────────────────
-
-function _parseAgentList(val) {
-  if (!val.trim()) return undefined;
-  return val.split(',').map(s => s.trim()).filter(Boolean);
-}
-
-async function runCrew(event) {
-  const btn = event.target;
-  const out = document.getElementById('crew-output');
-  const objective = document.getElementById('crew-objective').value.trim();
-  if (!objective) { show(out, 'Objective is required.', true); return; }
-  const agentList = _parseAgentList(document.getElementById('crew-agents').value);
-  await run(btn, async () => {
-    try {
-      const body = { objective };
-      if (agentList) body.agents = agentList;
-      const r = await apiFetch('/api/v1/crew/run', { method: 'POST', body: JSON.stringify(body) });
-      show(out, r);
-      _renderCrewSteps(r);
-    } catch (err) { show(out, err.data || err.message, true); }
-  });
-}
-
-function _renderCrewSteps(r) {
-  const stepsEl = document.getElementById('crew-steps');
-  const emptyEl = document.getElementById('crew-steps-empty');
-  const tbody   = document.getElementById('crew-steps-body');
-  const badge   = document.getElementById('crew-engine-badge');
-
-  const steps = r.steps || (r.result ? [{ agent: 'crew', result: r.result }] : []);
-  if (!steps.length) return;
-
-  badge.innerHTML = `Engine: <span class="chip chip-blue">${r.engine || 'unknown'}</span>`;
-  tbody.innerHTML = steps.map((s, i) => {
-    const res = s.result || {};
-    const summary = res.summary || res.content || res.analysis || res.code || res.review || JSON.stringify(res).slice(0, 120);
-    const status = s.error ? 'error' : (res.status || 'done');
-    return `<tr>
-      <td>${i + 1}</td>
-      <td><strong>${s.agent || '–'}</strong></td>
-      <td>${statusChip(status)}</td>
-      <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(summary||'').replace(/"/g,"'")}">${summary || s.error || '–'}</td>
-    </tr>`;
-  }).join('');
-  stepsEl.style.display = 'block';
-  emptyEl.style.display = 'none';
-}
-
-async function streamCrew(event) {
-  const btn = event.target;
-  const out = document.getElementById('crew-output');
-  const objective = document.getElementById('crew-objective').value.trim();
-  if (!objective) { show(out, 'Objective is required.', true); return; }
-  const agentList = _parseAgentList(document.getElementById('crew-agents').value);
-
-  out.textContent = '';
-  out.classList.add('visible');
-  out.classList.remove('error');
-
-  btn.disabled = true;
-  try {
-    const headers = { 'Content-Type': 'application/json' };
-    const key = apiKey();
-    if (key) headers['X-API-Key'] = key;
-    const body = { objective };
-    if (agentList) body.agents = agentList;
-
-    const res = await fetch(base() + '/api/v1/crew/run/stream', {
-      method: 'POST', headers, body: JSON.stringify(body),
-    });
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const text = dec.decode(value);
-      for (const line of text.split('\n')) {
-        if (!line.startsWith('data:')) continue;
-        const payload = line.slice(5).trim();
-        if (payload === '[DONE]') { out.textContent += '\n[DONE]'; break; }
-        try {
-          const d = JSON.parse(payload);
-          if (d.agent && d.status) out.textContent += `\n[${d.agent}] ${d.status}`;
-          else if (d.agent && d.chunk) out.textContent += d.chunk.replace(/\\n/g, '\n');
-          else if (d.agent && d.error) out.textContent += `\n[${d.agent}] ERROR: ${d.error}`;
-        } catch { out.textContent += payload; }
-      }
-      out.scrollTop = out.scrollHeight;
-    }
-  } catch (err) { show(out, err.message, true); }
-  finally { btn.disabled = false; }
-}
-
-// ────────────────────────── WebSocket stream ──────────────────────────
-
-let _ws = null;
-
-function wsConnect() {
-  const agentName = document.getElementById('ws-agent').value;
-  const statusEl  = document.getElementById('ws-status');
-  const out       = document.getElementById('ws-output');
-  const connectBtn    = document.getElementById('ws-connect-btn');
-  const disconnectBtn = document.getElementById('ws-disconnect-btn');
-  const sendBtn       = document.getElementById('ws-send-btn');
-
-  const wsUrl = base().replace(/^http/, 'ws') + `/api/v1/agents/${encodeURIComponent(agentName)}/ws`;
-  statusEl.textContent = `Connecting to ${agentName}…`;
-
-  _ws = new WebSocket(wsUrl);
-
-  _ws.onopen = () => {
-    statusEl.textContent = `Connected to ${agentName}`;
-    statusEl.style.color = 'var(--success)';
-    connectBtn.style.display = 'none';
-    disconnectBtn.style.display = 'inline-flex';
-    sendBtn.disabled = false;
-    out.textContent = '';
-    out.classList.add('visible');
-  };
-
-  _ws.onmessage = (e) => {
-    if (e.data === '[DONE]') {
-      out.textContent += '\n[DONE]';
-    } else {
-      try {
-        const d = JSON.parse(e.data);
-        out.textContent += '\n' + JSON.stringify(d, null, 2);
-      } catch {
-        out.textContent += e.data;
-      }
-    }
-    out.scrollTop = out.scrollHeight;
-  };
-
-  _ws.onerror = (e) => {
-    statusEl.textContent = 'Connection error';
-    statusEl.style.color = 'var(--danger)';
-  };
-
-  _ws.onclose = () => {
-    statusEl.textContent = 'Disconnected';
-    statusEl.style.color = 'var(--muted)';
-    connectBtn.style.display = 'inline-flex';
-    disconnectBtn.style.display = 'none';
-    sendBtn.disabled = true;
-    _ws = null;
-  };
-}
-
-function wsDisconnect() {
-  if (_ws) { _ws.close(); _ws = null; }
-}
-
-function wsSend() {
-  if (!_ws || _ws.readyState !== WebSocket.OPEN) return;
-  const task = document.getElementById('ws-task').value.trim();
-  if (!task) return;
-  _ws.send(JSON.stringify({ task, parameters: {} }));
-}
-
-async function sseStream(event) {
-  const btn = event.target;
-  const out = document.getElementById('sse-output');
-  const agentName = document.getElementById('sse-agent').value.trim();
-  const task = document.getElementById('sse-task').value.trim();
-  if (!agentName || !task) { show(out, 'Agent and task are required.', true); return; }
-
-  out.textContent = '';
-  out.classList.add('visible');
-  out.classList.remove('error');
-  btn.disabled = true;
-
-  try {
-    const headers = { 'Content-Type': 'application/json' };
-    const key = apiKey();
-    if (key) headers['X-API-Key'] = key;
-    const res = await fetch(base() + `/api/v1/agents/${encodeURIComponent(agentName)}/stream`, {
-      method: 'POST', headers, body: JSON.stringify({ task, parameters: {} }),
-    });
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const text = dec.decode(value);
-      for (const line of text.split('\n')) {
-        if (!line.startsWith('data:')) continue;
-        const payload = line.slice(5).trim();
-        if (payload === '[DONE]') { out.textContent += '\n[DONE]'; break; }
-        out.textContent += payload.replace(/\\n/g, '\n');
-      }
-      out.scrollTop = out.scrollHeight;
-    }
-  } catch (err) { show(out, err.message, true); }
-  finally { btn.disabled = false; }
-}
-
-// ────────────────────────── Memory ──────────────────────────
-
-async function recallMemory(event) {
-  const btn   = event.target;
-  const out   = document.getElementById('mem-output');
-  const list  = document.getElementById('mem-results-list');
-  const agent = document.getElementById('mem-agent').value.trim();
-  const query = document.getElementById('mem-query').value.trim();
-  const k     = parseInt(document.getElementById('mem-k').value, 10) || 3;
-  if (!agent || !query) { show(out, 'Agent and query are required.', true); return; }
-
-  await run(btn, async () => {
-    try {
-      const r = await apiFetch(`/api/v1/agents/${encodeURIComponent(agent)}/memory?query=${encodeURIComponent(query)}&k=${k}`);
-      show(out, r);
-      const results = r.results || [];
-      if (!results.length) {
-        list.innerHTML = '<div class="empty">No similar tasks found in memory</div>';
-        return;
-      }
-      list.innerHTML = results.map((item, i) => `
-        <div class="card" style="margin-bottom:10px">
-          <div class="card-title">Result ${i + 1}</div>
-          <pre style="font-size:11px;white-space:pre-wrap;word-break:break-all;color:var(--text)">${JSON.stringify(item, null, 2)}</pre>
-        </div>`).join('');
-    } catch (err) { show(out, err.data || err.message, true); }
-  });
-}
-
-// ────────────────────────── Sessions ──────────────────────────
 
 async function loadSessions() {
-  const container = document.getElementById('sessions-table');
-  const countEl   = document.getElementById('sessions-count');
-  container.innerHTML = '<div class="spinner"></div>';
   try {
-    const data = await apiFetch('/api/v1/sessions');
-    const sessions = data.sessions || data || [];
-    const list = Array.isArray(sessions) ? sessions : [];
-    countEl.textContent = list.length;
-    if (!list.length) { container.innerHTML = '<div class="empty">No active sessions</div>'; return; }
-    container.innerHTML = `<table>
-      <thead><tr><th>ID</th><th>Agent</th><th>Created</th><th>Messages</th></tr></thead>
-      <tbody>${list.map(s => `<tr>
-        <td><code style="font-size:11px">${s.id||s.session_id||'–'}</code></td>
-        <td>${s.agent||s.agent_name||'–'}</td>
-        <td>${s.created_at ? new Date(s.created_at).toLocaleString() : '–'}</td>
-        <td>${s.message_count ?? s.messages ?? '–'}</td>
-      </tr>`).join('')}</tbody></table>`;
-  } catch (err) {
-    container.innerHTML = `<div style="color:var(--danger)">${err.message}</div>`;
-  }
+    const d = await api('/api/v1/sessions');
+    const sessions = d.sessions || [];
+    const list = document.getElementById('sessions-list');
+    if (!sessions.length) { list.innerHTML = '<div style="color:var(--muted);font-family:var(--mono);font-size:.75rem;padding:8px">no sessions</div>'; return; }
+    list.innerHTML = sessions.map(s => '<div class="task-row"><span class="tid">' + (s.session_id || '').slice(0,12) + '</span><span class="obj">' + (s.name || s.agent_name || '—') + '</span><span class="task-badge ' + (s.status === 'active' ? 'running' : 'cancelled') + '">' + (s.status || '?') + '</span><button class="btn btn-danger btn-sm" onclick="deleteSession(\'' + s.session_id + '\')">×</button></div>').join('');
+  } catch(e) { document.getElementById('sessions-list').innerHTML = '<div style="color:var(--danger);font-family:var(--mono);font-size:.75rem">' + e.message + '</div>'; }
 }
-
-async function createSession(event) {
-  const btn = event.target;
-  const out = document.getElementById('create-session-output');
-  const agent = document.getElementById('new-session-agent').value;
-  await run(btn, async () => {
-    try {
-      const r = await apiFetch('/api/v1/sessions', { method: 'POST', body: JSON.stringify({ agent }) });
-      const sid = r.id || r.session_id || (r.session && (r.session.id || r.session.session_id));
-      if (sid) document.getElementById('send-msg-session-id').value = sid;
-      show(out, r);
-      loadSessions();
-    } catch (err) { show(out, err.data || err.message, true); }
-  });
+async function createSession() {
+  try { out('sess-out', await apid('POST', '/api/v1/sessions', { agent_name: document.getElementById('sess-agent').value, name: document.getElementById('sess-name').value })); loadSessions(); }
+  catch(e) { out('sess-out', e.message); }
 }
-
-async function sendSessionMessage(event) {
-  const btn = event.target;
-  const out = document.getElementById('send-msg-output');
-  const sid = document.getElementById('send-msg-session-id').value.trim();
-  const msg = document.getElementById('send-msg-text').value.trim();
-  if (!sid) { show(out, 'Session ID is required.', true); return; }
-  if (!msg) { show(out, 'Message is required.', true); return; }
-  await run(btn, async () => {
-    try {
-      show(out, await apiFetch(`/api/v1/sessions/${encodeURIComponent(sid)}/message`, {
-        method: 'POST', body: JSON.stringify({ message: msg }),
-      }));
-    } catch (err) { show(out, err.data || err.message, true); }
-  });
-}
-
-// ────────────────────────── Webhooks ──────────────────────────
+async function deleteSession(id) { try { await api('/api/v1/sessions/' + id, { method: 'DELETE' }); loadSessions(); } catch(e) { alert(e.message); } }
 
 async function loadWebhooks() {
-  const container = document.getElementById('webhooks-table');
-  const countEl   = document.getElementById('webhooks-count');
-  container.innerHTML = '<div class="spinner"></div>';
   try {
-    const data = await apiFetch('/api/v1/webhooks');
-    const hooks = data.webhooks || data || [];
-    const list = Array.isArray(hooks) ? hooks : [];
-    countEl.textContent = list.length;
-    if (!list.length) { container.innerHTML = '<div class="empty">No webhooks registered</div>'; return; }
-    container.innerHTML = `<table>
-      <thead><tr><th>ID</th><th>URL</th><th>Events</th></tr></thead>
-      <tbody>${list.map(w => `<tr>
-        <td><code style="font-size:11px">${w.id||w.webhook_id||'–'}</code></td>
-        <td style="word-break:break-all;max-width:260px">${w.url||'–'}</td>
-        <td><div class="tags">${(w.events||[]).map(e=>`<span class="tag">${e}</span>`).join('')}</div></td>
-      </tr>`).join('')}</tbody></table>`;
-  } catch (err) {
-    container.innerHTML = `<div style="color:var(--danger)">${err.message}</div>`;
-  }
+    const d = await api('/api/v1/webhooks');
+    const hooks = d.webhooks || [];
+    const list = document.getElementById('webhooks-list');
+    if (!hooks.length) { list.innerHTML = '<div style="color:var(--muted);font-family:var(--mono);font-size:.75rem;padding:8px">no webhooks</div>'; return; }
+    list.innerHTML = hooks.map(w => '<div class="task-row"><span class="obj" style="font-family:var(--mono);font-size:.75rem">' + (w.url || '—') + '</span><span style="font-family:var(--mono);font-size:.65rem;color:var(--fg-2)">' + ((w.events || []).join(', ')) + '</span><button class="btn btn-danger btn-sm" onclick="deleteWebhook(\'' + (w.id || w.webhook_id) + '\')">×</button></div>').join('');
+  } catch(e) { document.getElementById('webhooks-list').innerHTML = '<div style="color:var(--danger);font-family:var(--mono);font-size:.75rem">' + e.message + '</div>'; }
 }
-
-async function registerWebhook(event) {
-  const btn = event.target;
-  const out = document.getElementById('register-webhook-output');
-  const url = document.getElementById('webhook-url').value.trim();
-  if (!url) { show(out, 'URL is required.', true); return; }
-  const events = ['wh-evt-task-completed', 'wh-evt-crew-completed', 'wh-evt-session-message']
-    .filter(id => document.getElementById(id).checked)
-    .map(id => document.getElementById(id).value);
-  if (!events.length) { show(out, 'Select at least one event.', true); return; }
-  await run(btn, async () => {
-    try {
-      const r = await apiFetch('/api/v1/webhooks', { method: 'POST', body: JSON.stringify({ url, events }) });
-      const wid = r.id || r.webhook_id || (r.webhook && (r.webhook.id || r.webhook.webhook_id));
-      if (wid) document.getElementById('test-webhook-id').value = wid;
-      show(out, r);
-      loadWebhooks();
-    } catch (err) { show(out, err.data || err.message, true); }
-  });
+function toggleWebhookForm() { const f = document.getElementById('webhook-form'); f.style.display = f.style.display === 'none' ? '' : 'none'; }
+async function registerWebhook() {
+  try { out('wh-reg-out', await apid('POST', '/api/v1/webhooks', { url: document.getElementById('wh-url').value, events: document.getElementById('wh-events').value.split(',').map(s => s.trim()).filter(Boolean) })); loadWebhooks(); }
+  catch(e) { out('wh-reg-out', e.message); }
 }
+async function deleteWebhook(id) { try { await api('/api/v1/webhooks/' + id, { method: 'DELETE' }); loadWebhooks(); } catch(e) { alert(e.message); } }
 
-async function testWebhook(event) {
-  const btn = event.target;
-  const out = document.getElementById('test-webhook-output');
-  const wid = document.getElementById('test-webhook-id').value.trim();
-  if (!wid) { show(out, 'Webhook ID is required.', true); return; }
-  await run(btn, async () => {
-    try {
-      show(out, await apiFetch(`/api/v1/webhooks/${encodeURIComponent(wid)}/test`, { method: 'POST' }));
-    } catch (err) { show(out, err.data || err.message, true); }
-  });
+async function runEval() {
+  const suite = document.getElementById('eval-suite').value || 'default';
+  const agent = document.getElementById('eval-agent').value.trim();
+  try { out('eval-out', await apid('POST', '/api/v1/eval/' + suite + '/run', agent ? { agent_name: agent } : {})); loadEvalResults(); }
+  catch(e) { out('eval-out', e.message); }
 }
-
-// ────────────────────────── Eval ──────────────────────────
-
-async function loadEvalBenchmarks() {
+async function loadEvalSuites() { try { out('eval-out', await api('/api/v1/eval')); } catch(e) { out('eval-out', e.message); } }
+async function loadEvalResults() {
+  const suite = document.getElementById('eval-suite').value || 'default';
   try {
-    const data = await apiFetch('/api/v1/eval/benchmarks');
-    const benchmarks = data.benchmarks || [];
-    const sel = document.getElementById('eval-benchmark');
-    if (benchmarks.length) {
-      sel.innerHTML = benchmarks.map(b => `<option value="${b.id||b}">${b.name||b}</option>`).join('');
-    }
-  } catch { /* keep default "standard" option */ }
+    const d = await api('/api/v1/eval/' + suite + '/results');
+    document.getElementById('eval-results').innerHTML = '<pre style="font-family:var(--mono);font-size:.72rem;color:var(--fg-2);white-space:pre-wrap">' + JSON.stringify(d, null, 2) + '</pre>';
+  } catch(e) { document.getElementById('eval-results').innerHTML = '<div style="color:var(--danger);font-family:var(--mono);font-size:.75rem">' + e.message + '</div>'; }
 }
-
-async function runEval(event) {
-  const btn   = event.target;
-  const out   = document.getElementById('eval-run-output');
-  const agent = document.getElementById('eval-agent-name').value.trim();
-  const bench = document.getElementById('eval-benchmark').value;
-  if (!agent) { show(out, 'Agent name is required.', true); return; }
-  await run(btn, async () => {
-    try {
-      const r = await apiFetch('/api/v1/eval/run', {
-        method: 'POST', body: JSON.stringify({ agent, benchmark: bench }),
-      });
-      show(out, r);
-      _renderEvalResult(r);
-    } catch (err) { show(out, err.data || err.message, true); }
-  });
-}
-
-function _renderEvalResult(r) {
-  const scoreDisplay = document.getElementById('eval-score-display');
-  const scoreValue   = document.getElementById('eval-score-value');
-  const tableWrap    = document.getElementById('eval-tasks-table-wrap');
-  const tbody        = document.getElementById('eval-tasks-body');
-  const emptyEl      = document.getElementById('eval-last-empty');
-
-  const score = r.score ?? r.result?.score;
-  if (score !== undefined && score !== null) {
-    scoreValue.textContent = typeof score === 'number' ? score.toFixed(2) : score;
-    scoreDisplay.style.display = 'block';
-  }
-
-  const tasks = r.tasks || r.result?.tasks || [];
-  if (tasks.length) {
-    tbody.innerHTML = tasks.map(t => `<tr>
-      <td>${t.description || t.task || t.name || '–'}</td>
-      <td>${statusChip(t.status || 'done')}</td>
-      <td>${t.duration_ms ?? t.duration ?? '–'}</td>
-    </tr>`).join('');
-    tableWrap.style.display = 'block';
-    emptyEl.style.display = 'none';
-  } else if (score !== undefined && score !== null) {
-    emptyEl.style.display = 'none';
-  }
-}
-
-// ────────────────────────── Tab loaders ──────────────────────────
-
-tabLoaders['agents']   = loadAgents;
-tabLoaders['ide']      = loadIDESessions;
-tabLoaders['cde']      = loadCDEEnvironments;
-tabLoaders['platform'] = () => { loadTools(); loadServices(); };
-tabLoaders['sessions'] = loadSessions;
-tabLoaders['webhooks'] = loadWebhooks;
-tabLoaders['eval']     = () => loadEvalBenchmarks();
-
-// ────────────────────────── Init ──────────────────────────
 
 loadHealth();
-loadSystemInfo();
+setInterval(loadHealth, 30000);
 </script>
 </body>
 </html>
