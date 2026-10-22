@@ -88,8 +88,9 @@ async def notion_status(request: Request) -> Dict[str, Any]:
 @router.get("/pages/{page_id}")
 async def get_page(page_id: str, request: Request) -> Dict[str, Any]:
     """Fetch a Notion page by ID."""
+    notion = _client(request)
     try:
-        return await _client(request).get_page(page_id)
+        return await notion.get_page(page_id)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -97,8 +98,9 @@ async def get_page(page_id: str, request: Request) -> Dict[str, Any]:
 @router.get("/pages/{page_id}/content")
 async def get_page_content(page_id: str, request: Request) -> Dict[str, Any]:
     """Return all block children of a Notion page."""
+    notion = _client(request)
     try:
-        blocks = await _client(request).get_page_content(page_id)
+        blocks = await notion.get_page_content(page_id)
         return {"page_id": page_id, "blocks": blocks, "count": len(blocks)}
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -107,8 +109,9 @@ async def get_page_content(page_id: str, request: Request) -> Dict[str, Any]:
 @router.post("/pages")
 async def create_page(body: CreatePageRequest, request: Request) -> Dict[str, Any]:
     """Create a new Notion page under a database or page parent."""
+    notion = _client(request)
     try:
-        return await _client(request).create_page(
+        return await notion.create_page(
             parent_id=body.parent_id,
             title=body.title,
             content=body.content,
@@ -123,8 +126,9 @@ async def update_page(
     page_id: str, body: UpdatePageRequest, request: Request
 ) -> Dict[str, Any]:
     """Update properties on an existing Notion page."""
+    notion = _client(request)
     try:
-        return await _client(request).update_page(page_id, body.properties)
+        return await notion.update_page(page_id, body.properties)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -132,8 +136,9 @@ async def update_page(
 @router.delete("/pages/{page_id}")
 async def archive_page(page_id: str, request: Request) -> Dict[str, Any]:
     """Archive (soft-delete) a Notion page."""
+    notion = _client(request)
     try:
-        return await _client(request).archive_page(page_id)
+        return await notion.archive_page(page_id)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -143,8 +148,9 @@ async def append_blocks(
     page_id: str, body: AppendBlocksRequest, request: Request
 ) -> Dict[str, Any]:
     """Append block children to a Notion page."""
+    notion = _client(request)
     try:
-        return await _client(request).append_blocks(page_id, body.blocks)
+        return await notion.append_blocks(page_id, body.blocks)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -157,8 +163,9 @@ async def append_blocks(
 @router.get("/databases/{database_id}")
 async def get_database(database_id: str, request: Request) -> Dict[str, Any]:
     """Fetch a Notion database schema."""
+    notion = _client(request)
     try:
-        return await _client(request).get_database(database_id)
+        return await notion.get_database(database_id)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -168,8 +175,9 @@ async def query_database(
     database_id: str, body: QueryDatabaseRequest, request: Request
 ) -> Dict[str, Any]:
     """Query a Notion database with optional filter and sort."""
+    notion = _client(request)
     try:
-        return await _client(request).query_database(
+        return await notion.query_database(
             database_id=database_id,
             filter_obj=body.filter,
             sorts=body.sorts,
@@ -184,8 +192,9 @@ async def list_database_rows(
     database_id: str, request: Request
 ) -> Dict[str, Any]:
     """Return all rows from a Notion database (handles pagination automatically)."""
+    notion = _client(request)
     try:
-        rows = await _client(request).list_database_rows(database_id)
+        rows = await notion.list_database_rows(database_id)
         return {"database_id": database_id, "rows": rows, "count": len(rows)}
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -199,8 +208,9 @@ async def list_database_rows(
 @router.post("/search")
 async def search_notion(body: NotionSearchRequest, request: Request) -> Dict[str, Any]:
     """Search across all Notion pages and databases the integration can access."""
+    notion = _client(request)
     try:
-        return await _client(request).search(
+        return await notion.search(
             query=body.query,
             filter_type=body.filter_type,
             page_size=body.page_size,

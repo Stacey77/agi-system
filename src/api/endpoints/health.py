@@ -99,8 +99,8 @@ async def detailed_health(request: Request) -> Dict[str, Any]:
         rss_bytes = rusage.ru_maxrss * (1 if sys.platform == "darwin" else 1024)
         components["process_memory"] = {
             "status": "healthy",
-            "rss_bytes": rss_bytes,
-            "rss_mb": round(rss_bytes / (1024 * 1024), 2),
+            "peak_rss_bytes": rss_bytes,
+            "peak_rss_mb": round(rss_bytes / (1024 * 1024), 2),
         }
     except Exception as exc:  # noqa: BLE001
         components["process_memory"] = {"status": "unavailable", "error": str(exc)}

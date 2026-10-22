@@ -134,7 +134,11 @@ async def run_template(name: str, body: TemplateRunRequest, request: Request) ->
         raise HTTPException(status_code=503, detail="Crew orchestrator not initialised")
 
     try:
-        result = await orchestrator.run(body.objective, agent_names=template.agent_names)
+        result = await orchestrator.run(
+            body.objective,
+            agent_names=template.agent_names,
+            max_iterations=template.max_iterations,
+        )
         result["template"] = name
         return result
     except Exception as exc:  # noqa: BLE001

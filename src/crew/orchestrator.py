@@ -19,6 +19,7 @@ class CrewOrchestrator:
         self,
         objective: str,
         agent_names: Optional[List[str]] = None,
+        max_iterations: int = 3,
     ) -> Dict[str, Any]:
         """Execute *objective* using a collaborative crew.
 

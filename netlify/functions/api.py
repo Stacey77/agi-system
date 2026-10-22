@@ -14,4 +14,4 @@ from src.api.main import app
 
 # Mangum adapts ASGI (FastAPI) to the AWS Lambda / Netlify Functions handler
 # signature: handler(event, context) -> dict
-handler = Mangum(app, lifespan="off")
+handler = Mangum(app, lifespan="auto")

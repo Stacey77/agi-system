@@ -16,7 +16,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
 
 # Built-in agents that cannot be removed at runtime
-_PROTECTED_AGENTS = {"planning_agent", "execution_agent"}
+_PROTECTED_AGENTS = {
+    "planning_agent", "execution_agent", "research_agent", "analysis_agent",
+    "writing_agent", "review_agent", "coding_agent", "summarization_agent",
+}
 
 
 class TaskRequest(BaseModel):
@@ -82,9 +85,15 @@ async def register_agent(body: AgentCreateRequest, request: Request) -> Dict[str
         max_retries=body.max_retries,
         temperature=body.temperature,
     )
-    agent = factory.create_agent(config)
+    try:
+        agent = factory.create_agent(config)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    # Wire token tracker if available and supported
+    # Wire tool registry and token tracker
+    tool_registry = getattr(request.app.state, "tool_registry", None)
+    if tool_registry is not None and hasattr(agent, "set_tool_registry"):
+        agent.set_tool_registry(tool_registry)
     tracker = getattr(request.app.state, "token_tracker", None)
     if tracker is not None and hasattr(agent, "set_token_tracker"):
         agent.set_token_tracker(tracker)

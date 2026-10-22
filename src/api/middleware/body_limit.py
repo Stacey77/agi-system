@@ -38,4 +38,30 @@ class BodyLimitMiddleware(BaseHTTPMiddleware):
                     )
             except ValueError:
                 pass
+        else:
+            # No Content-Length (chunked transfer) — stream and count bytes
+            received = 0
+            chunks = []
+            async for chunk in request.stream():
+                received += len(chunk)
+                if received > self._max_bytes:
+                    logger.warning(
+                        "Chunked request body too large: >%s bytes (limit %s)",
+                        received,
+                        self._max_bytes,
+                    )
+                    return Response(
+                        content='{"detail":"Request body too large"}',
+                        status_code=413,
+                        media_type="application/json",
+                    )
+                chunks.append(chunk)
+
+            # Re-inject the already-read body so downstream can read it
+            async def _body_stream():
+                for c in chunks:
+                    yield c
+
+            request._stream = _body_stream()  # type: ignore[attr-defined]
+
         return await call_next(request)

@@ -235,5 +235,5 @@ class TestHealthMemoryMetric:
         data = resp.json()
         mem = data["components"]["process_memory"]
         if mem["status"] == "healthy":
-            assert mem["rss_bytes"] > 0
-            assert mem["rss_mb"] > 0
+            assert mem["peak_rss_bytes"] > 0
+            assert mem["peak_rss_mb"] > 0

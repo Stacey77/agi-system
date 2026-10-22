@@ -7,7 +7,7 @@ import json
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -38,7 +38,7 @@ async def submit_task(body: TaskSubmission, request: Request) -> Dict[str, Any]:
 async def list_dead_letter(
     request: Request,
     limit: int = 50,
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
 ) -> Dict[str, Any]:
     """Return failed tasks (dead-letter queue) for inspection and retry."""
     queue = getattr(request.app.state, "task_queue", None)

@@ -118,15 +118,25 @@ class NotionClient:
     # ------------------------------------------------------------------
 
     async def get_page_content(self, page_id: str) -> List[Dict[str, Any]]:
-        """Return the block children of a page."""
-        data = await self._get(f"/blocks/{page_id}/children")
-        return data.get("results", [])
+        """Return the block children of a page (handles Notion pagination)."""
+        results: List[Dict[str, Any]] = []
+        has_more = True
+        cursor: Optional[str] = None
+        while has_more:
+            params: Dict[str, Any] = {"page_size": 100}
+            if cursor:
+                params["start_cursor"] = cursor
+            data = await self._get(f"/blocks/{page_id}/children", params=params)
+            results.extend(data.get("results", []))
+            has_more = data.get("has_more", False)
+            cursor = data.get("next_cursor")
+        return results
 
     async def append_blocks(
         self, page_id: str, blocks: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Append block children to a page."""
-        return await self._post(f"/blocks/{page_id}/children", {"children": blocks})
+        return await self._patch(f"/blocks/{page_id}/children", {"children": blocks})
 
     # ------------------------------------------------------------------
     # Databases
