@@ -29,6 +29,7 @@ from src.api.endpoints.cde import router as cde_router
 from src.api.endpoints.crew import router as crew_router
 from src.api.endpoints.eval import router as eval_router
 from src.api.endpoints.ide import router as ide_router
+from src.api.endpoints.notion import router as notion_router
 from src.api.endpoints.platform import router as platform_router
 from src.api.endpoints.sessions import router as sessions_router
 from src.api.endpoints.webhooks import router as webhooks_router
@@ -146,6 +147,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.eval_results = {}
     from src.eval.eval_store import EvalStore
     app.state.eval_store = EvalStore(db_path=cfg.task_db_path.replace("tasks.db", "evals.db"))
+
+    # Notion integration client
+    from src.integrations.notion_client import NotionClient
+    app.state.notion_client = NotionClient()
 
     # Kally AI closed-loop agent
     kally_config = AgentConfig(
@@ -295,6 +300,7 @@ _OPENAPI_TAGS = [
     {"name": "cde", "description": "Cloud Development Environment lifecycle management"},
     {"name": "platform", "description": "Developer portal and tool landscape registry"},
     {"name": "memory", "description": "Short-term, long-term, episodic and hybrid vector memory management"},
+    {"name": "notion", "description": "Notion integration — read/write pages, query databases, and use Notion as a CMS for agents"},
 ]
 
 
@@ -353,6 +359,7 @@ def create_app() -> FastAPI:
     app.include_router(webhooks_router)
     app.include_router(sessions_router)
     app.include_router(eval_router)
+    app.include_router(notion_router)
 
     from src.api.endpoints.auth import router as auth_router
     app.include_router(auth_router)

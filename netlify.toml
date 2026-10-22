@@ -1,0 +1,50 @@
+# Netlify configuration for AGI System
+# - Static dashboard deployed from src/api/static/
+# - FastAPI backend served via Netlify Functions (mangum ASGI adapter)
+
+[build]
+  publish = "src/api/static"
+  command = "pip install -r requirements.txt mangum && echo 'build ok'"
+  functions = "netlify/functions"
+
+[build.environment]
+  PYTHON_VERSION = "3.11"
+
+# Proxy all /api/* requests to the ASGI function
+[[redirects]]
+  from   = "/api/*"
+  to     = "/.netlify/functions/api/:splat"
+  status = 200
+
+[[redirects]]
+  from   = "/health"
+  to     = "/.netlify/functions/api/health"
+  status = 200
+
+[[redirects]]
+  from   = "/metrics"
+  to     = "/.netlify/functions/api/metrics"
+  status = 200
+
+# SPA fallback — serve index.html for any path not matched above
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+[functions]
+  directory       = "netlify/functions"
+  node_bundler    = "esbuild"
+
+# Cache control for static assets
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options        = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy        = "strict-origin-when-cross-origin"
