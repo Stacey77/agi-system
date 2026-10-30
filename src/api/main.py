@@ -152,6 +152,45 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from src.integrations.notion_client import NotionClient
     app.state.notion_client = NotionClient()
 
+    # Conversational AI
+    from src.conversational.conversation_manager import ConversationManager
+    from src.conversational.intent_classifier import IntentClassifier
+    from src.conversational.context_tracker import ContextTracker
+    app.state.conversation_manager = ConversationManager()
+    app.state.intent_classifier = IntentClassifier(llm=llm)
+    app.state.context_tracker = ContextTracker()
+
+    # Workforce
+    from src.workforce.workforce_manager import WorkforceManager
+    workforce_manager = WorkforceManager(agent_factory=factory)
+    app.state.workforce_manager = workforce_manager
+
+    # Enterprise governance
+    from src.enterprise.audit_log import AuditLog
+    from src.enterprise.rbac import RBACManager
+    from src.enterprise.tenant_manager import TenantManager
+    app.state.audit_log = AuditLog(db_path=cfg.task_db_path.replace("tasks.db", "audit.db"))
+    app.state.rbac_manager = RBACManager()
+    app.state.tenant_manager = TenantManager()
+
+    # External integrations (configure via env vars)
+    from src.integrations.slack_integration import SlackIntegration
+    from src.integrations.jira_integration import JiraIntegration
+    from src.integrations.github_integration import GitHubIntegration
+    from src.integrations.teams_integration import TeamsIntegration
+    app.state.slack_integration = SlackIntegration(
+        bot_token=os.getenv("SLACK_BOT_TOKEN", ""),
+        signing_secret=os.getenv("SLACK_SIGNING_SECRET", ""),
+        webhook_url=os.getenv("SLACK_WEBHOOK_URL", ""),
+    )
+    app.state.jira_integration = JiraIntegration(
+        base_url=os.getenv("JIRA_BASE_URL", ""),
+        email=os.getenv("JIRA_EMAIL", ""),
+        api_token=os.getenv("JIRA_API_TOKEN", ""),
+    )
+    app.state.github_integration = GitHubIntegration(token=os.getenv("GITHUB_TOKEN", ""))
+    app.state.teams_integration = TeamsIntegration(webhook_url=os.getenv("TEAMS_WEBHOOK_URL", ""))
+
     # Kally AI closed-loop agent
     kally_config = AgentConfig(
         name="kally_agent",
@@ -301,6 +340,10 @@ _OPENAPI_TAGS = [
     {"name": "platform", "description": "Developer portal and tool landscape registry"},
     {"name": "memory", "description": "Short-term, long-term, episodic and hybrid vector memory management"},
     {"name": "notion", "description": "Notion integration — read/write pages, query databases, and use Notion as a CMS for agents"},
+    {"name": "conversational", "description": "Session-persistent Conversational AI with intent classification and context windows"},
+    {"name": "workforce", "description": "Autonomous Intelligent Workforce — hire/fire workers, assign objectives, auto-scale"},
+    {"name": "enterprise", "description": "Enterprise governance — immutable audit log, multi-tenancy, and RBAC"},
+    {"name": "integrations", "description": "Integration hub — Slack, Jira, GitHub, Teams connectors"},
 ]
 
 
@@ -375,6 +418,18 @@ def create_app() -> FastAPI:
 
     from src.api.endpoints.memory import router as memory_router
     app.include_router(memory_router)
+
+    from src.api.endpoints.conversational import router as conversational_router
+    app.include_router(conversational_router)
+
+    from src.api.endpoints.workforce import router as workforce_router
+    app.include_router(workforce_router)
+
+    from src.api.endpoints.enterprise import router as enterprise_router
+    app.include_router(enterprise_router)
+
+    from src.api.endpoints.integrations_hub import router as integrations_router
+    app.include_router(integrations_router)
 
     # Static dashboard — served at / and /static
     _static_dir = os.path.join(os.path.dirname(__file__), "static")
