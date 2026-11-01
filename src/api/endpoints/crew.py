@@ -24,7 +24,6 @@ class CrewTemplate(BaseModel):
     name: str
     description: str = ""
     agent_names: List[str]
-    max_iterations: int = 3
 
 
 class TemplateRunRequest(BaseModel):
