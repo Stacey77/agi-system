@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Request
 
@@ -16,15 +16,15 @@ _START_TIME = time.time()
 
 
 @router.get("/health")
-async def health_check() -> Dict[str, str]:
+async def health_check() -> dict[str, str]:
     """Liveness probe — always returns 200 if the process is alive."""
     return {"status": "healthy"}
 
 
 @router.get("/health/detailed")
-async def detailed_health(request: Request) -> Dict[str, Any]:
+async def detailed_health(request: Request) -> dict[str, Any]:
     """Readiness probe — checks each runtime component via app.state."""
-    components: Dict[str, Any] = {}
+    components: dict[str, Any] = {}
 
     # Task queue
     try:
@@ -90,10 +90,7 @@ async def detailed_health(request: Request) -> Dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         components["auth"] = {"status": "unhealthy", "error": str(exc)}
 
-    statuses = [
-        v["status"] if isinstance(v, dict) else v
-        for v in components.values()
-    ]
+    statuses = [v["status"] if isinstance(v, dict) else v for v in components.values()]
     all_ok = all(s in ("healthy", "mock_mode", "not_configured") for s in statuses)
 
     return {

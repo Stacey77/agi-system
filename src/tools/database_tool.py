@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.tools.base_tool import BaseTool, ToolMetadata
 
@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 class DatabaseTool(BaseTool):
     """Executes SQL queries against a configured database."""
 
-    def __init__(self, database_url: Optional[str] = None) -> None:
+    def __init__(self, database_url: str | None = None) -> None:
         self._database_url = database_url
-        self._connection: Optional[Any] = None
+        self._connection: Any | None = None
 
     @property
     def metadata(self) -> ToolMetadata:
@@ -40,7 +40,7 @@ class DatabaseTool(BaseTool):
             required_permissions=["database_read"],
         )
 
-    def execute(self, **kwargs: Any) -> Dict[str, Any]:
+    def execute(self, **kwargs: Any) -> dict[str, Any]:
         if not self.validate_parameters(**kwargs):
             return {"error": "Missing required parameters", "rows": []}
 
@@ -51,7 +51,11 @@ class DatabaseTool(BaseTool):
         try:
             conn = self._get_connection()
             rows = self._run_query(conn, query, params, fetch)
-            return {"query": query, "rows": rows, "row_count": len(rows) if isinstance(rows, list) else 0}
+            return {
+                "query": query,
+                "rows": rows,
+                "row_count": len(rows) if isinstance(rows, list) else 0,
+            }
         except Exception as exc:  # noqa: BLE001
             logger.error("Database query failed: %s", exc)
             return {"error": str(exc), "rows": []}
@@ -81,7 +85,7 @@ class DatabaseTool(BaseTool):
         self,
         conn: Any,
         query: str,
-        params: List[Any],
+        params: list[Any],
         fetch: str,
     ) -> Any:
         if isinstance(conn, _MockConnection):
@@ -99,7 +103,7 @@ class DatabaseTool(BaseTool):
         if self._connection is not None:
             try:
                 self._connection.close()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001, S110
                 pass
             finally:
                 self._connection = None
@@ -108,7 +112,7 @@ class DatabaseTool(BaseTool):
 class _MockConnection:
     """In-memory mock connection for testing without a real database."""
 
-    def execute(self, query: str, params: List[Any], fetch: str) -> Any:
+    def execute(self, query: str, params: list[Any], fetch: str) -> Any:
         logger.debug("MockConnection executing: %s (params=%s)", query, params)
         if fetch == "one":
             return {"id": 1, "value": "mock_result"}

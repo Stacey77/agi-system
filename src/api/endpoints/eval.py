@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/eval", tags=["eval"])
 
-_BENCHMARKS: Dict[str, List[str]] = {
+_BENCHMARKS: dict[str, list[str]] = {
     "standard": [
         "Summarise the following text: The quick brown fox jumps over the lazy dog",
         "What is 2 + 2?",
@@ -26,14 +26,14 @@ _BENCHMARKS: Dict[str, List[str]] = {
 class EvalRequest(BaseModel):
     agent_name: str
     benchmark: str = "standard"
-    tasks: Optional[List[str]] = None
+    tasks: list[str] | None = None
 
 
 def _get_factory(request: Request):
     return getattr(request.app.state, "agent_factory", None)
 
 
-def _get_eval_results(request: Request) -> Dict[str, Any]:
+def _get_eval_results(request: Request) -> dict[str, Any]:
     return getattr(request.app.state, "eval_results", {})
 
 
@@ -42,14 +42,16 @@ def _get_eval_store(request: Request):
 
 
 @router.post("/run")
-async def run_evaluation(body: EvalRequest, request: Request) -> Dict[str, Any]:
+async def run_evaluation(body: EvalRequest, request: Request) -> dict[str, Any]:
     factory = _get_factory(request)
     if factory is None:
         raise HTTPException(status_code=503, detail="Agent system not initialised")
 
     agent = factory.get_agent(body.agent_name)
     if agent is None:
-        raise HTTPException(status_code=404, detail=f"Agent '{body.agent_name}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Agent '{body.agent_name}' not found"
+        )
 
     if body.tasks:
         tasks_to_run = body.tasks
@@ -62,7 +64,7 @@ async def run_evaluation(body: EvalRequest, request: Request) -> Dict[str, Any]:
 
     eval_id = str(uuid.uuid4())
     started = time.monotonic()
-    task_results: List[Dict[str, Any]] = []
+    task_results: list[dict[str, Any]] = []
 
     for task_prompt in tasks_to_run:
         t0 = time.monotonic()
@@ -91,10 +93,12 @@ async def run_evaluation(body: EvalRequest, request: Request) -> Dict[str, Any]:
 
     total_duration = round(time.monotonic() - started, 3)
     total_score = (
-        sum(t["score"] for t in task_results) / len(task_results) if task_results else 0.0
+        sum(t["score"] for t in task_results) / len(task_results)
+        if task_results
+        else 0.0
     )
 
-    eval_record: Dict[str, Any] = {
+    eval_record: dict[str, Any] = {
         "eval_id": eval_id,
         "agent": body.agent_name,
         "benchmark": body.benchmark,
@@ -114,7 +118,7 @@ async def run_evaluation(body: EvalRequest, request: Request) -> Dict[str, Any]:
 
 
 @router.get("/results")
-async def list_eval_results(request: Request) -> List[Dict[str, Any]]:
+async def list_eval_results(request: Request) -> list[dict[str, Any]]:
     store = _get_eval_store(request)
     if store is not None:
         return store.load_all()
@@ -122,19 +126,21 @@ async def list_eval_results(request: Request) -> List[Dict[str, Any]]:
 
 
 @router.get("/results/{eval_id}")
-async def get_eval_result(eval_id: str, request: Request) -> Dict[str, Any]:
+async def get_eval_result(eval_id: str, request: Request) -> dict[str, Any]:
     store = _get_eval_store(request)
     if store is not None:
         result = store.get(eval_id)
     else:
         result = _get_eval_results(request).get(eval_id)
     if result is None:
-        raise HTTPException(status_code=404, detail=f"Eval result '{eval_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Eval result '{eval_id}' not found"
+        )
     return result
 
 
 @router.delete("/results/{eval_id}")
-async def delete_eval_result(eval_id: str, request: Request) -> Dict[str, str]:
+async def delete_eval_result(eval_id: str, request: Request) -> dict[str, str]:
     store = _get_eval_store(request)
     deleted = False
     if store is not None:
@@ -144,12 +150,14 @@ async def delete_eval_result(eval_id: str, request: Request) -> Dict[str, str]:
         del eval_results[eval_id]
         deleted = True
     if not deleted:
-        raise HTTPException(status_code=404, detail=f"Eval result '{eval_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Eval result '{eval_id}' not found"
+        )
     return {"message": f"Eval result '{eval_id}' deleted"}
 
 
 @router.get("/benchmarks")
-async def list_benchmarks() -> Dict[str, Any]:
+async def list_benchmarks() -> dict[str, Any]:
     return {
         "benchmarks": [
             {"name": name, "task_count": len(tasks)}

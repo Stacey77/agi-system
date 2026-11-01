@@ -27,16 +27,24 @@ def _mock_llm(response_content: str) -> MagicMock:
 
 
 def _config(agent_type: AgentType, name: str = "test") -> AgentConfig:
-    return AgentConfig(name=name, agent_type=agent_type, description="", capabilities=[])
+    return AgentConfig(
+        name=name, agent_type=agent_type, description="", capabilities=[]
+    )
 
 
 # ── PlanningAgent ─────────────────────────────────────────────────────────────
+
 
 class TestPlanningAgentWithLlm:
     @pytest.mark.asyncio
     async def test_llm_decompose_used_when_available(self):
         steps = [
-            {"step_id": "step_1", "action": "research", "description": "Do something", "agent_type": "research"},
+            {
+                "step_id": "step_1",
+                "action": "research",
+                "description": "Do something",
+                "agent_type": "research",
+            },
         ]
         llm = _mock_llm(json.dumps(steps))
         agent = PlanningAgent(config=_config(AgentType.PLANNING), llm=llm)
@@ -55,6 +63,7 @@ class TestPlanningAgentWithLlm:
 
 # ── ResearchAgent ─────────────────────────────────────────────────────────────
 
+
 class TestResearchAgentWithLlm:
     @pytest.mark.asyncio
     async def test_llm_summary_included_in_result(self):
@@ -66,6 +75,7 @@ class TestResearchAgentWithLlm:
 
 
 # ── AnalysisAgent ─────────────────────────────────────────────────────────────
+
 
 class TestAnalysisAgentWithLlm:
     @pytest.mark.asyncio
@@ -79,7 +89,9 @@ class TestAnalysisAgentWithLlm:
         }
         llm = _mock_llm(json.dumps(payload))
         agent = AnalysisAgent(config=_config(AgentType.ANALYSIS), llm=llm)
-        result = await agent.process_task({"data": {"x": 1}, "analysis_type": "general"})
+        result = await agent.process_task(
+            {"data": {"x": 1}, "analysis_type": "general"}
+        )
         assert result["confidence"] == 0.9
         assert result["insights"] == ["trend upward"]
 
@@ -87,11 +99,14 @@ class TestAnalysisAgentWithLlm:
     async def test_falls_back_on_bad_json(self):
         llm = _mock_llm("garbage")
         agent = AnalysisAgent(config=_config(AgentType.ANALYSIS), llm=llm)
-        result = await agent.process_task({"data": {"a": 1}, "analysis_type": "statistical"})
+        result = await agent.process_task(
+            {"data": {"a": 1}, "analysis_type": "statistical"}
+        )
         assert result["status"] == "completed"
 
 
 # ── WritingAgent ──────────────────────────────────────────────────────────────
+
 
 class TestWritingAgentWithLlm:
     @pytest.mark.asyncio
@@ -135,6 +150,7 @@ class TestWritingAgentWithLlm:
 
 # ── ReviewAgent ───────────────────────────────────────────────────────────────
 
+
 class TestReviewAgentWithLlm:
     @pytest.mark.asyncio
     async def test_llm_review_parsed(self):
@@ -147,7 +163,9 @@ class TestReviewAgentWithLlm:
         }
         llm = _mock_llm(json.dumps(payload))
         agent = ReviewAgent(config=_config(AgentType.REVIEW), llm=llm)
-        result = await agent.process_task({"content": "Great content here", "criteria": {}})
+        result = await agent.process_task(
+            {"content": "Great content here", "criteria": {}}
+        )
         assert result["is_approved"] is True
         assert result["score"] == 0.95
 
@@ -160,6 +178,7 @@ class TestReviewAgentWithLlm:
 
 
 # ── CodingAgent ───────────────────────────────────────────────────────────────
+
 
 class TestCodingAgentWithLlm:
     @pytest.mark.asyncio
@@ -200,12 +219,15 @@ class TestCodingAgentWithLlm:
 
         agent = CodingAgent(config=_config(AgentType.CODING), llm=mock_llm)
         chunks = []
-        async for c in agent.stream_task({"task": "write a function", "language": "python"}):
+        async for c in agent.stream_task(
+            {"task": "write a function", "language": "python"}
+        ):
             chunks.append(c)
         assert "def solution(): pass" in chunks
 
 
 # ── SummarizationAgent ────────────────────────────────────────────────────────
+
 
 class TestSummarizationAgentWithLlm:
     @pytest.mark.asyncio

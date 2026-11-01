@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -11,15 +11,15 @@ logger = logging.getLogger(__name__)
 class CrewOrchestrator:
     """Runs a multi-agent crew using CrewAI (falls back to sequential execution if unavailable)."""
 
-    def __init__(self, agent_factory: Any, llm: Optional[Any] = None) -> None:
+    def __init__(self, agent_factory: Any, llm: Any | None = None) -> None:
         self._factory = agent_factory
         self._llm = llm
 
     async def run(
         self,
         objective: str,
-        agent_names: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        agent_names: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Execute *objective* using a collaborative crew.
 
         Parameters
@@ -31,7 +31,12 @@ class CrewOrchestrator:
             (research → analysis → writing → review).
         """
         if agent_names is None:
-            agent_names = ["research_agent", "analysis_agent", "writing_agent", "review_agent"]
+            agent_names = [
+                "research_agent",
+                "analysis_agent",
+                "writing_agent",
+                "review_agent",
+            ]
 
         langgraph_result = await self._try_langgraph(objective, agent_names)
         if langgraph_result is not None:
@@ -48,11 +53,12 @@ class CrewOrchestrator:
     # ------------------------------------------------------------------
 
     async def _try_langgraph(
-        self, objective: str, agent_names: List[str]
-    ) -> Optional[Dict[str, Any]]:
+        self, objective: str, agent_names: list[str]
+    ) -> dict[str, Any] | None:
         """Attempt to run the crew via LangGraph StateGraph; return None if unavailable."""
         try:
             from src.crew.langgraph_orchestrator import run_langgraph_crew
+
             return await run_langgraph_crew(objective, agent_names, self._factory)
         except Exception as exc:  # noqa: BLE001
             logger.warning("LangGraph path failed: %s — falling back", exc)
@@ -63,8 +69,8 @@ class CrewOrchestrator:
     # ------------------------------------------------------------------
 
     async def _try_crewai(
-        self, objective: str, agent_names: List[str]
-    ) -> Optional[Dict[str, Any]]:
+        self, objective: str, agent_names: list[str]
+    ) -> dict[str, Any] | None:
         """Attempt to run the crew via CrewAI; return None if unavailable."""
         try:
             from crewai import Agent, Crew, Process, Task  # type: ignore
@@ -74,13 +80,14 @@ class CrewOrchestrator:
 
         agents_map = {n: self._factory.get_agent(n) for n in agent_names}
         crew_agents = []
-        for name, agt in agents_map.items():
+        for agt in agents_map.values():
             if agt is None:
                 continue
             crew_agents.append(
                 Agent(
                     role=agt.config.agent_type.value.title(),
-                    goal=agt.config.description or f"Complete tasks as a {agt.config.agent_type.value} agent",
+                    goal=agt.config.description
+                    or f"Complete tasks as a {agt.config.agent_type.value} agent",
                     backstory=f"An expert {agt.config.agent_type.value} agent in an AGI system.",
                     llm=self._llm,
                     verbose=False,
@@ -115,6 +122,7 @@ class CrewOrchestrator:
                 verbose=False,
             )
             import asyncio
+
             result = await asyncio.to_thread(crew.kickoff)
             return {
                 "status": "completed",
@@ -132,11 +140,11 @@ class CrewOrchestrator:
     # ------------------------------------------------------------------
 
     async def _sequential_fallback(
-        self, objective: str, agent_names: List[str]
-    ) -> Dict[str, Any]:
+        self, objective: str, agent_names: list[str]
+    ) -> dict[str, Any]:
         """Run agents sequentially, passing context forward."""
         context = objective
-        step_results: List[Dict[str, Any]] = []
+        step_results: list[dict[str, Any]] = []
 
         for name in agent_names:
             agent = self._factory.get_agent(name)
@@ -156,7 +164,11 @@ class CrewOrchestrator:
                 logger.error("Agent '%s' failed: %s", name, exc)
                 step_results.append({"agent": name, "error": str(exc)})
 
-        final = step_results[-1]["result"] if step_results and "result" in step_results[-1] else {}
+        final = (
+            step_results[-1]["result"]
+            if step_results and "result" in step_results[-1]
+            else {}
+        )
         return {
             "status": "completed",
             "engine": "sequential",

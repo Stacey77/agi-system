@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +16,10 @@ class ToolMetadata:
 
     name: str
     description: str
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
     return_type: str = "Any"
     category: str = "general"
-    required_permissions: List[str] = field(default_factory=list)
+    required_permissions: list[str] = field(default_factory=list)
 
 
 class BaseTool(ABC):
@@ -39,7 +39,9 @@ class BaseTool(ABC):
         required = self.metadata.parameters.get("required", [])
         missing = [p for p in required if p not in kwargs]
         if missing:
-            logger.warning("Tool '%s' missing parameters: %s", self.metadata.name, missing)
+            logger.warning(
+                "Tool '%s' missing parameters: %s", self.metadata.name, missing
+            )
             return False
         return True
 

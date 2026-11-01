@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi import (
     APIRouter,
@@ -29,21 +29,21 @@ _PROTECTED_AGENTS = {"planning_agent", "execution_agent"}
 
 class TaskRequest(BaseModel):
     task: str
-    parameters: Dict[str, Any] = {}
+    parameters: dict[str, Any] = {}
 
 
 class AgentCreateRequest(BaseModel):
     name: str
     agent_type: str  # must match AgentType enum values
     description: str = ""
-    capabilities: List[str] = []
-    tools: List[str] = []
+    capabilities: list[str] = []
+    tools: list[str] = []
     max_retries: int = 2
     temperature: float = 0.7
 
 
 @router.get("/")
-async def list_agents(request: Request) -> List[Dict[str, Any]]:
+async def list_agents(request: Request) -> list[dict[str, Any]]:
     """List all registered agents with name, type, and status."""
     factory = getattr(request.app.state, "agent_factory", None)
     if factory is None:
@@ -61,7 +61,7 @@ async def list_agents(request: Request) -> List[Dict[str, Any]]:
 
 
 @router.post("/", status_code=201)
-async def register_agent(body: AgentCreateRequest, request: Request) -> Dict[str, Any]:
+async def register_agent(body: AgentCreateRequest, request: Request) -> dict[str, Any]:
     """Register a new agent at runtime."""
     # Validate agent_type against AgentType enum
     try:
@@ -79,7 +79,9 @@ async def register_agent(body: AgentCreateRequest, request: Request) -> Dict[str
 
     # Check for duplicate name
     if factory.get_agent(body.name) is not None:
-        raise HTTPException(status_code=409, detail=f"Agent '{body.name}' is already registered")
+        raise HTTPException(
+            status_code=409, detail=f"Agent '{body.name}' is already registered"
+        )
 
     config = AgentConfig(
         name=body.name,
@@ -103,7 +105,7 @@ async def register_agent(body: AgentCreateRequest, request: Request) -> Dict[str
 @router.post("/{agent_name}/execute")
 async def execute_agent_task(
     agent_name: str, body: TaskRequest, request: Request
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Execute a task using the named agent."""
     factory = getattr(request.app.state, "agent_factory", None)
     if factory is None:
@@ -117,7 +119,7 @@ async def execute_agent_task(
     try:
         result = await agent.process_task(task_dict)
         return {"agent": agent_name, "result": result}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.error("Agent '%s' execution error: %s", agent_name, exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -173,7 +175,10 @@ async def websocket_agent_task(agent_name: str, websocket: WebSocket) -> None:
 
     try:
         data = await websocket.receive_json()
-        task_dict = {"task": sanitize(data.get("task", "")), **data.get("parameters", {})}
+        task_dict = {
+            "task": sanitize(data.get("task", "")),
+            **data.get("parameters", {}),
+        }
         async for chunk in agent.stream_task(task_dict):
             await websocket.send_text(chunk)
         await websocket.send_text("[DONE]")
@@ -183,19 +188,19 @@ async def websocket_agent_task(agent_name: str, websocket: WebSocket) -> None:
         logger.error("WebSocket error for agent '%s': %s", agent_name, exc)
         try:
             await websocket.send_json({"error": str(exc)})
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110
             pass
     finally:
         try:
             await websocket.close()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110
             pass
 
 
 @router.get("/{agent_name}/memory")
 async def agent_memory_recall(
     agent_name: str, query: str, request: Request, k: int = 3
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Recall past tasks similar to *query* from the agent's persistent memory."""
     factory = getattr(request.app.state, "agent_factory", None)
     if factory is None:
@@ -210,7 +215,7 @@ async def agent_memory_recall(
 
 
 @router.get("/{agent_name}/status")
-async def agent_status(agent_name: str, request: Request) -> Dict[str, Any]:
+async def agent_status(agent_name: str, request: Request) -> dict[str, Any]:
     """Get status and memory usage for the named agent."""
     factory = getattr(request.app.state, "agent_factory", None)
     if factory is None:
@@ -224,7 +229,7 @@ async def agent_status(agent_name: str, request: Request) -> Dict[str, Any]:
 
 
 @router.post("/{agent_name}/circuit/reset")
-async def reset_circuit_breaker(agent_name: str, request: Request) -> Dict[str, Any]:
+async def reset_circuit_breaker(agent_name: str, request: Request) -> dict[str, Any]:
     """Reset an agent's circuit breaker — use after fixing the underlying issue."""
     factory = getattr(request.app.state, "agent_factory", None)
     if factory is None:
@@ -245,7 +250,7 @@ async def agent_token_history(
     request: Request,
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return paginated token-usage history for the named agent (newest first).
 
     Each record contains the task_id, model, input/output token counts, and
@@ -277,7 +282,7 @@ async def agent_token_history(
         agent_records = [r for r in tracker._records if r.agent_name == agent_name]
 
     agent_records_newest_first = list(reversed(agent_records))
-    page = agent_records_newest_first[offset: offset + limit]
+    page = agent_records_newest_first[offset : offset + limit]
 
     return {
         "agent_name": agent_name,

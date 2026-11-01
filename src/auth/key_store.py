@@ -5,9 +5,8 @@ import json
 import os
 import secrets
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 
 
 class KeyRole(str, Enum):
@@ -32,8 +31,8 @@ def _hash(raw: str) -> str:
 
 class KeyStore:
     def __init__(self) -> None:
-        self._keys: Dict[str, ApiKey] = {}
-        self._hash_index: Dict[str, str] = {}
+        self._keys: dict[str, ApiKey] = {}
+        self._hash_index: dict[str, str] = {}
         self._load_from_env()
 
     def _load_from_env(self) -> None:
@@ -70,12 +69,12 @@ class KeyStore:
         self._hash_index[h] = key_id
         return api_key
 
-    def create_key(self, name: str, role: KeyRole) -> Tuple[str, ApiKey]:
+    def create_key(self, name: str, role: KeyRole) -> tuple[str, ApiKey]:
         raw_key = f"sk-{secrets.token_hex(32)}"
         api_key = self._store(raw_key, name, role)
         return raw_key, api_key
 
-    def validate_key(self, raw_key: str) -> Optional[ApiKey]:
+    def validate_key(self, raw_key: str) -> ApiKey | None:
         h = _hash(raw_key)
         key_id = self._hash_index.get(h)
         if key_id is None:
@@ -92,5 +91,5 @@ class KeyStore:
         api_key.active = False
         return True
 
-    def list_keys(self) -> List[ApiKey]:
+    def list_keys(self) -> list[ApiKey]:
         return list(self._keys.values())

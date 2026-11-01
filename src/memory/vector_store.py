@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import struct
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -15,16 +15,16 @@ class _OfflineEmbeddingFunction:
 
     _DIM = 64  # fixed embedding dimension
 
-    def name(self) -> str:  # noqa: D401
+    def name(self) -> str:
         return "offline_hash"
 
-    def embed_query(self, input: List[str]) -> List[List[float]]:  # noqa: A001
+    def embed_query(self, input: list[str]) -> list[list[float]]:
         return self(input)
 
-    def __call__(self, input: List[str]) -> List[List[float]]:  # noqa: A001
-        embeddings: List[List[float]] = []
+    def __call__(self, input: list[str]) -> list[list[float]]:
+        embeddings: list[list[float]] = []
         for text in input:
-            floats: List[float] = []
+            floats: list[float] = []
             seed = text.encode()
             chunk = 0
             while len(floats) < self._DIM:
@@ -44,13 +44,13 @@ class VectorStore:
     def __init__(
         self,
         collection_name: str = "agi_memory",
-        persist_directory: Optional[str] = None,
+        persist_directory: str | None = None,
     ) -> None:
         self._collection_name = collection_name
         self._persist_directory = persist_directory
-        self._client: Optional[Any] = None
-        self._collection: Optional[Any] = None
-        self._mock_store: List[Dict[str, Any]] = []
+        self._client: Any | None = None
+        self._collection: Any | None = None
+        self._mock_store: list[dict[str, Any]] = []
         self._use_mock = False
         self._init_client()
 
@@ -71,7 +71,9 @@ class VectorStore:
                 self._collection_name,
                 embedding_function=ef,  # type: ignore[arg-type]
             )
-            logger.info("VectorStore: ChromaDB collection '%s' ready", self._collection_name)
+            logger.info(
+                "VectorStore: ChromaDB collection '%s' ready", self._collection_name
+            )
         except ImportError:
             logger.warning("chromadb not installed; using in-memory mock vector store")
             self._use_mock = True
@@ -82,9 +84,9 @@ class VectorStore:
 
     def add_documents(
         self,
-        documents: List[str],
-        ids: Optional[List[str]] = None,
-        metadatas: Optional[List[Dict[str, Any]]] = None,
+        documents: list[str],
+        ids: list[str] | None = None,
+        metadatas: list[dict[str, Any]] | None = None,
     ) -> None:
         """Add *documents* to the store."""
         if ids is None:
@@ -100,7 +102,9 @@ class VectorStore:
                 )
             return
         # ChromaDB requires every metadata dict to be non-empty.
-        normalized = [m or {"_type": "document"} for m in (metadatas or [{} for _ in documents])]
+        normalized = [
+            m or {"_type": "document"} for m in (metadatas or [{} for _ in documents])
+        ]
         self._collection.add(  # type: ignore[union-attr]
             documents=documents,
             ids=ids,
@@ -108,14 +112,19 @@ class VectorStore:
         )
         logger.debug("VectorStore: added %d documents", len(documents))
 
-    def similarity_search(
-        self, query: str, k: int = 5
-    ) -> List[Dict[str, Any]]:
+    def similarity_search(self, query: str, k: int = 5) -> list[dict[str, Any]]:
         """Return the *k* most similar documents to *query*."""
         if self._use_mock:
             # Simple substring mock similarity
             scored = [
-                (entry, sum(1 for w in query.lower().split() if w in entry["document"].lower()))
+                (
+                    entry,
+                    sum(
+                        1
+                        for w in query.lower().split()
+                        if w in entry["document"].lower()
+                    ),
+                )
                 for entry in self._mock_store
             ]
             scored.sort(key=lambda x: x[1], reverse=True)
@@ -132,7 +141,7 @@ class VectorStore:
             for i in range(len(docs))
         ]
 
-    def delete(self, ids: List[str]) -> None:
+    def delete(self, ids: list[str]) -> None:
         """Delete documents by *ids*."""
         if self._use_mock:
             self._mock_store = [e for e in self._mock_store if e["id"] not in ids]

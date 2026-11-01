@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import AsyncIterator
 from enum import Enum
-from typing import AsyncIterator, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +19,11 @@ class LLMProvider(str, Enum):
 
 def create_llm(
     provider: str = "openai",
-    model: Optional[str] = None,
+    model: str | None = None,
     temperature: float = 0.7,
     max_tokens: int = 2000,
-    api_key: Optional[str] = None,
-) -> Optional[object]:
+    api_key: str | None = None,
+) -> object | None:
     """Instantiate a LangChain chat model for the given provider.
 
     Returns ``None`` (graceful no-op) when the required API key is absent or
@@ -50,7 +50,9 @@ def create_llm(
             logger.info("Initialised OpenAI LLM: %s", resolved_model)
             return llm
         except ImportError:
-            logger.warning("langchain-openai not installed — run: pip install langchain-openai")
+            logger.warning(
+                "langchain-openai not installed — run: pip install langchain-openai"
+            )
             return None
 
     if provider == LLMProvider.ANTHROPIC:
@@ -61,7 +63,9 @@ def create_llm(
         try:
             from langchain_anthropic import ChatAnthropic  # type: ignore
 
-            resolved_model = model or os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+            resolved_model = model or os.getenv(
+                "ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"
+            )
             llm = ChatAnthropic(
                 model=resolved_model,
                 temperature=temperature,
@@ -95,8 +99,8 @@ async def invoke_llm(
     system_prompt: str,
     user_prompt: str,
     agent_name: str = "unknown",
-    task_id: Optional[str] = None,
-    tracker: Optional[object] = None,
+    task_id: str | None = None,
+    tracker: object | None = None,
 ) -> str:
     """Invoke an LLM with a system + user message pair and return the full response.
 
@@ -109,15 +113,21 @@ async def invoke_llm(
 
     # Capture usage metadata if available and tracker provided
     if tracker is not None:
-        usage = getattr(response, "usage_metadata", None) or getattr(response, "response_metadata", {})
+        usage = getattr(response, "usage_metadata", None) or getattr(
+            response, "response_metadata", {}
+        )
         model = getattr(llm, "model_name", getattr(llm, "model", "unknown"))
         input_tokens = (
             getattr(usage, "input_tokens", None)
-            or (usage.get("token_usage", {}) if isinstance(usage, dict) else {}).get("prompt_tokens", 0)
+            or (usage.get("token_usage", {}) if isinstance(usage, dict) else {}).get(
+                "prompt_tokens", 0
+            )
         ) or 0
         output_tokens = (
             getattr(usage, "output_tokens", None)
-            or (usage.get("token_usage", {}) if isinstance(usage, dict) else {}).get("completion_tokens", 0)
+            or (usage.get("token_usage", {}) if isinstance(usage, dict) else {}).get(
+                "completion_tokens", 0
+            )
         ) or 0
         try:
             tracker.record(  # type: ignore[attr-defined]
@@ -127,7 +137,7 @@ async def invoke_llm(
                 output_tokens=int(output_tokens),
                 task_id=task_id,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110
             pass
 
     return str(getattr(response, "content", response))

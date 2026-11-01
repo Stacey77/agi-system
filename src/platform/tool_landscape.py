@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class ToolCategory(str, Enum):
@@ -41,14 +41,14 @@ class PlatformTool:
     category: ToolCategory = ToolCategory.OTHER
     tier: ToolTier = ToolTier.BOTH
     version: str = "latest"
-    homepage_url: Optional[str] = None
-    docs_url: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    homepage_url: str | None = None
+    docs_url: str | None = None
+    tags: list[str] = field(default_factory=list)
     owner_team: str = ""
     is_active: bool = True
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "tool_id": self.tool_id,
             "name": self.name,
@@ -65,7 +65,7 @@ class PlatformTool:
 
 
 # Built-in default tools that ship with the platform
-_DEFAULT_TOOLS: List[Dict[str, Any]] = [
+_DEFAULT_TOOLS: list[dict[str, Any]] = [
     {
         "name": "GitHub Actions",
         "description": "CI/CD automation platform",
@@ -138,7 +138,7 @@ class ToolLandscape:
     """Registry and discovery service for platform tools."""
 
     def __init__(self, load_defaults: bool = True) -> None:
-        self._tools: Dict[str, PlatformTool] = {}
+        self._tools: dict[str, PlatformTool] = {}
         if load_defaults:
             self._seed_defaults()
 
@@ -153,11 +153,11 @@ class ToolLandscape:
         category: ToolCategory = ToolCategory.OTHER,
         tier: ToolTier = ToolTier.BOTH,
         version: str = "latest",
-        homepage_url: Optional[str] = None,
-        docs_url: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        homepage_url: str | None = None,
+        docs_url: str | None = None,
+        tags: list[str] | None = None,
         owner_team: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> PlatformTool:
         tool = PlatformTool(
             name=name,
@@ -174,7 +174,7 @@ class ToolLandscape:
         self._tools[tool.tool_id] = tool
         return tool
 
-    def get_tool(self, tool_id: str) -> Optional[PlatformTool]:
+    def get_tool(self, tool_id: str) -> PlatformTool | None:
         return self._tools.get(tool_id)
 
     def deactivate_tool(self, tool_id: str) -> bool:
@@ -190,11 +190,11 @@ class ToolLandscape:
 
     def list_tools(
         self,
-        category: Optional[ToolCategory] = None,
-        tier: Optional[ToolTier] = None,
-        tag: Optional[str] = None,
+        category: ToolCategory | None = None,
+        tier: ToolTier | None = None,
+        tag: str | None = None,
         active_only: bool = True,
-    ) -> List[PlatformTool]:
+    ) -> list[PlatformTool]:
         tools = list(self._tools.values())
         if active_only:
             tools = [t for t in tools if t.is_active]
@@ -206,7 +206,7 @@ class ToolLandscape:
             tools = [t for t in tools if tag in t.tags]
         return tools
 
-    def search(self, query: str) -> List[PlatformTool]:
+    def search(self, query: str) -> list[PlatformTool]:
         """Simple substring search across name, description, and tags."""
         q = query.lower()
         return [
@@ -220,9 +220,9 @@ class ToolLandscape:
             )
         ]
 
-    def categories_summary(self) -> Dict[str, int]:
+    def categories_summary(self) -> dict[str, int]:
         """Return tool count per category."""
-        summary: Dict[str, int] = {}
+        summary: dict[str, int] = {}
         for tool in self._tools.values():
             if tool.is_active:
                 key = tool.category.value

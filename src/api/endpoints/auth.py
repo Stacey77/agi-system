@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import List, Optional
-
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
@@ -40,13 +38,13 @@ class KeyInfo(BaseModel):
     created_at: float
 
 
-def _resolve_auth(request: Request) -> Optional[dict]:
+def _resolve_auth(request: Request) -> dict | None:
     key_store = request.app.state.key_store
     jwt_manager = request.app.state.jwt_manager
 
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
-        token = auth_header[len("Bearer "):]
+        token = auth_header[len("Bearer ") :]
         payload = jwt_manager.verify_token(token)
         if payload:
             return payload
@@ -55,7 +53,11 @@ def _resolve_auth(request: Request) -> Optional[dict]:
     if x_api_key:
         api_key = key_store.validate_key(x_api_key)
         if api_key:
-            return {"sub": api_key.key_id, "name": api_key.name, "role": api_key.role.value}
+            return {
+                "sub": api_key.key_id,
+                "name": api_key.name,
+                "role": api_key.role.value,
+            }
 
     return None
 
@@ -109,8 +111,8 @@ async def create_key(body: CreateKeyRequest, request: Request) -> CreateKeyRespo
     )
 
 
-@router.get("/keys", response_model=List[KeyInfo])
-async def list_keys(request: Request) -> List[KeyInfo]:
+@router.get("/keys", response_model=list[KeyInfo])
+async def list_keys(request: Request) -> list[KeyInfo]:
     _require_admin(request)
     key_store = request.app.state.key_store
     return [

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -15,12 +15,13 @@ logger = logging.getLogger(__name__)
 
 try:
     from prometheus_client import (
+        CONTENT_TYPE_LATEST,
         Counter,
         Gauge,
         Histogram,
         generate_latest,
-        CONTENT_TYPE_LATEST,
     )
+
     _PROMETHEUS_AVAILABLE = True
 except ImportError:
     _PROMETHEUS_AVAILABLE = False
@@ -122,7 +123,9 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             HTTP_REQUESTS_TOTAL.labels(
                 method=request.method, path=path, status=response.status_code
             ).inc()
-            HTTP_REQUEST_DURATION.labels(method=request.method, path=path).observe(duration)
+            HTTP_REQUEST_DURATION.labels(method=request.method, path=path).observe(
+                duration
+            )
         return response
 
 

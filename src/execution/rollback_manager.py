@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +15,8 @@ class Checkpoint:
     """A saved state snapshot."""
 
     checkpoint_id: str
-    state: Dict[str, Any]
-    completed_steps: List[str] = field(default_factory=list)
+    state: dict[str, Any]
+    completed_steps: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -23,19 +24,19 @@ class RollbackResult:
     """Result of an execute-with-rollback operation."""
 
     success: bool
-    completed_tasks: List[str] = field(default_factory=list)
-    rolled_back_to: Optional[str] = None
-    error: Optional[str] = None
+    completed_tasks: list[str] = field(default_factory=list)
+    rolled_back_to: str | None = None
+    error: str | None = None
 
 
 class RollbackPlan:
     """Manages checkpoints and performs rollbacks."""
 
     def __init__(self) -> None:
-        self._checkpoints: List[Checkpoint] = []
+        self._checkpoints: list[Checkpoint] = []
 
     def add_checkpoint(
-        self, checkpoint_id: str, state: Dict[str, Any], completed_steps: List[str]
+        self, checkpoint_id: str, state: dict[str, Any], completed_steps: list[str]
     ) -> None:
         self._checkpoints.append(
             Checkpoint(
@@ -46,7 +47,7 @@ class RollbackPlan:
         )
         logger.debug("Checkpoint added: %s", checkpoint_id)
 
-    def perform_rollback(self, target_id: Optional[str] = None) -> Optional[Checkpoint]:
+    def perform_rollback(self, target_id: str | None = None) -> Checkpoint | None:
         """Roll back to *target_id* or the most recent checkpoint."""
         if not self._checkpoints:
             return None
@@ -54,13 +55,17 @@ class RollbackPlan:
             cp = self._checkpoints[-1]
         else:
             cp = next(
-                (c for c in reversed(self._checkpoints) if c.checkpoint_id == target_id),
+                (
+                    c
+                    for c in reversed(self._checkpoints)
+                    if c.checkpoint_id == target_id
+                ),
                 self._checkpoints[-1],
             )
         logger.info("Rolling back to checkpoint '%s'", cp.checkpoint_id)
         return cp
 
-    def latest_checkpoint(self) -> Optional[Checkpoint]:
+    def latest_checkpoint(self) -> Checkpoint | None:
         return self._checkpoints[-1] if self._checkpoints else None
 
 
@@ -72,8 +77,8 @@ class RollbackManager:
 
     async def execute_with_rollback(
         self,
-        task_sequence: List[Dict[str, Any]],
-        executor: Optional[Callable[..., Any]] = None,
+        task_sequence: list[dict[str, Any]],
+        executor: Callable[..., Any] | None = None,
     ) -> RollbackResult:
         """Execute *task_sequence*, rolling back on failure.
 
@@ -85,8 +90,8 @@ class RollbackManager:
             Optional async callable that executes a single task dict.
             Defaults to a no-op that marks each task as completed.
         """
-        completed: List[str] = []
-        state: Dict[str, Any] = {}
+        completed: list[str] = []
+        state: dict[str, Any] = {}
 
         for task in task_sequence:
             task_id = task.get("task_id", f"task_{len(completed)}")
