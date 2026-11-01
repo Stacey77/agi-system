@@ -9,10 +9,10 @@ from src.agents.kally_agent import FeedbackSignal, KallyAgent
 from src.platform.developer_portal import DeveloperPortal, PortalTier, ServiceStatus
 from src.platform.tool_landscape import ToolCategory, ToolLandscape, ToolTier
 
-
 # ---------------------------------------------------------------------------
 # ToolLandscape
 # ---------------------------------------------------------------------------
+
 
 class TestToolLandscape:
     def test_loads_defaults(self):
@@ -92,6 +92,7 @@ class TestToolLandscape:
 # DeveloperPortal
 # ---------------------------------------------------------------------------
 
+
 class TestDeveloperPortal:
     def test_loads_defaults(self):
         portal = DeveloperPortal(load_defaults=True)
@@ -153,6 +154,7 @@ class TestDeveloperPortal:
 # KallyAgent
 # ---------------------------------------------------------------------------
 
+
 class TestKallyAgent:
     def _make_agent(self) -> KallyAgent:
         config = AgentConfig(name="kally", agent_type=AgentType.KALLY)
@@ -161,14 +163,16 @@ class TestKallyAgent:
     @pytest.mark.asyncio
     async def test_ingest_signal(self):
         agent = self._make_agent()
-        result = await agent.process_task({
-            "action": "ingest",
-            "source": "api_gateway",
-            "metric": "error_rate",
-            "value": 0.05,
-            "threshold": 0.01,
-            "severity": "warning",
-        })
+        result = await agent.process_task(
+            {
+                "action": "ingest",
+                "source": "api_gateway",
+                "metric": "error_rate",
+                "value": 0.05,
+                "threshold": 0.01,
+                "severity": "warning",
+            }
+        )
         assert result["status"] == "completed"
         assert result["buffer_size"] == 1
 
@@ -184,14 +188,16 @@ class TestKallyAgent:
     async def test_analyse_with_anomaly(self):
         agent = self._make_agent()
         # Ingest a signal that breaches threshold
-        await agent.process_task({
-            "action": "ingest",
-            "source": "memory",
-            "metric": "usage_gb",
-            "value": 15.0,
-            "threshold": 10.0,
-            "severity": "critical",
-        })
+        await agent.process_task(
+            {
+                "action": "ingest",
+                "source": "memory",
+                "metric": "usage_gb",
+                "value": 15.0,
+                "threshold": 10.0,
+                "severity": "critical",
+            }
+        )
         result = await agent.process_task({"action": "analyse"})
         assert result["anomalies_detected"] == 1
         assert result["health_score"] < 1.0
@@ -206,9 +212,14 @@ class TestKallyAgent:
     @pytest.mark.asyncio
     async def test_reset_action(self):
         agent = self._make_agent()
-        await agent.process_task({
-            "action": "ingest", "source": "x", "metric": "y", "value": 1.0,
-        })
+        await agent.process_task(
+            {
+                "action": "ingest",
+                "source": "x",
+                "metric": "y",
+                "value": 1.0,
+            }
+        )
         result = await agent.process_task({"action": "reset"})
         assert result["signals_cleared"] == 1
         # Buffer should be empty now
@@ -225,19 +236,21 @@ class TestKallyAgent:
     async def test_health_score_all_clear(self):
         agent = self._make_agent()
         # Signal within threshold
-        await agent.ingest_signal(FeedbackSignal(
-            source="db", metric="latency_ms", value=50.0, threshold=100.0
-        ))
+        await agent.ingest_signal(
+            FeedbackSignal(
+                source="db", metric="latency_ms", value=50.0, threshold=100.0
+            )
+        )
         assert agent._compute_health_score() == 1.0
 
     @pytest.mark.asyncio
     async def test_health_score_partial_breach(self):
         agent = self._make_agent()
-        await agent.ingest_signal(FeedbackSignal(
-            source="a", metric="m", value=200.0, threshold=100.0
-        ))
-        await agent.ingest_signal(FeedbackSignal(
-            source="b", metric="m", value=50.0, threshold=100.0
-        ))
+        await agent.ingest_signal(
+            FeedbackSignal(source="a", metric="m", value=200.0, threshold=100.0)
+        )
+        await agent.ingest_signal(
+            FeedbackSignal(source="b", metric="m", value=50.0, threshold=100.0)
+        )
         # 1 out of 2 signals breach => health = 0.5
         assert agent._compute_health_score() == 0.5

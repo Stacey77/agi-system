@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ class Message:
 
     role: str  # "user" | "assistant" | "system"
     content: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class ConversationMemory:
@@ -23,7 +23,7 @@ class ConversationMemory:
 
     def __init__(self, window_size: int = 20) -> None:
         self._window_size = window_size
-        self._messages: List[Message] = []
+        self._messages: list[Message] = []
 
     # ------------------------------------------------------------------
     # Public interface
@@ -37,11 +37,11 @@ class ConversationMemory:
             self._messages.pop(0)
         logger.debug("ConversationMemory: added message (role=%s)", role)
 
-    def get_messages(self) -> List[Message]:
+    def get_messages(self) -> list[Message]:
         """Return all current messages."""
         return list(self._messages)
 
-    def get_recent_context(self, n: int = 5) -> List[Message]:
+    def get_recent_context(self, n: int = 5) -> list[Message]:
         """Return the *n* most recent messages."""
         return self._messages[-n:]
 
@@ -50,7 +50,7 @@ class ConversationMemory:
         self._messages.clear()
         logger.debug("ConversationMemory cleared")
 
-    def to_dict_list(self) -> List[Dict[str, Any]]:
+    def to_dict_list(self) -> list[dict[str, Any]]:
         """Serialise messages to a list of dicts."""
         return [{"role": m.role, "content": m.content} for m in self._messages]
 

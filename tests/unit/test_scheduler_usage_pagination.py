@@ -4,36 +4,44 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
 from src.llm.token_tracker import TokenTracker, UsageRecord
 
-
 # ---------------------------------------------------------------------------
 # TokenTracker unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestTokenTracker:
     def test_record_returns_usage_record(self):
         tracker = TokenTracker()
-        r = tracker.record(agent_name="agent_a", model="gpt-4o-mini", input_tokens=100, output_tokens=50)
+        r = tracker.record(
+            agent_name="agent_a",
+            model="gpt-4o-mini",
+            input_tokens=100,
+            output_tokens=50,
+        )
         assert isinstance(r, UsageRecord)
         assert r.total_tokens == 150
         assert r.agent_name == "agent_a"
 
     def test_estimated_cost_known_model(self):
         tracker = TokenTracker()
-        r = tracker.record(agent_name="x", model="gpt-4o-mini", input_tokens=1000, output_tokens=1000)
+        r = tracker.record(
+            agent_name="x", model="gpt-4o-mini", input_tokens=1000, output_tokens=1000
+        )
         # gpt-4o-mini: input=0.00015/1k, output=0.0006/1k → 0.00015 + 0.0006 = 0.00075
         assert abs(r.estimated_cost_usd - 0.00075) < 1e-9
 
     def test_estimated_cost_unknown_model_uses_default(self):
         tracker = TokenTracker()
-        r = tracker.record(agent_name="x", model="unknown-model", input_tokens=1000, output_tokens=1000)
+        r = tracker.record(
+            agent_name="x", model="unknown-model", input_tokens=1000, output_tokens=1000
+        )
         # default: 0.002/1k each → 0.004
         assert abs(r.estimated_cost_usd - 0.004) < 1e-9
 
@@ -80,12 +88,21 @@ class TestTokenTracker:
         tracker = TokenTracker()
         r = tracker.record("agent", "gpt-4o-mini", 100, 50, task_id="t1")
         d = r.to_dict()
-        for key in ("agent_name", "task_id", "model", "input_tokens", "output_tokens",
-                    "total_tokens", "estimated_cost_usd", "timestamp"):
+        for key in (
+            "agent_name",
+            "task_id",
+            "model",
+            "input_tokens",
+            "output_tokens",
+            "total_tokens",
+            "estimated_cost_usd",
+            "timestamp",
+        ):
             assert key in d
 
     def test_thread_safe_concurrent_records(self):
         import threading
+
         tracker = TokenTracker()
         errors = []
 
@@ -93,7 +110,7 @@ class TestTokenTracker:
             try:
                 for _ in range(50):
                     tracker.record("agent", "gpt-4o-mini", 10, 5)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 errors.append(e)
 
         threads = [threading.Thread(target=worker) for _ in range(4)]
@@ -110,9 +127,11 @@ class TestTokenTracker:
 # TaskScheduler unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestTaskScheduler:
     def test_schedule_returns_scheduled_task(self):
         from src.tasks.scheduler import TaskScheduler
+
         scheduler = TaskScheduler()
         sched = scheduler.schedule(objective="test", interval_seconds=60)
         assert sched.schedule_id
@@ -122,6 +141,7 @@ class TestTaskScheduler:
 
     def test_list_schedules(self):
         from src.tasks.scheduler import TaskScheduler
+
         scheduler = TaskScheduler()
         scheduler.schedule(objective="job1", interval_seconds=30)
         scheduler.schedule(objective="job2", interval_seconds=60)
@@ -130,17 +150,20 @@ class TestTaskScheduler:
 
     def test_get_existing(self):
         from src.tasks.scheduler import TaskScheduler
+
         scheduler = TaskScheduler()
         sched = scheduler.schedule("task", 10)
         assert scheduler.get(sched.schedule_id) is sched
 
     def test_get_missing_returns_none(self):
         from src.tasks.scheduler import TaskScheduler
+
         scheduler = TaskScheduler()
         assert scheduler.get("nonexistent") is None
 
     def test_unschedule(self):
         from src.tasks.scheduler import TaskScheduler
+
         scheduler = TaskScheduler()
         sched = scheduler.schedule("task", 10)
         assert scheduler.unschedule(sched.schedule_id) is True
@@ -148,11 +171,13 @@ class TestTaskScheduler:
 
     def test_unschedule_missing_returns_false(self):
         from src.tasks.scheduler import TaskScheduler
+
         scheduler = TaskScheduler()
         assert scheduler.unschedule("nonexistent") is False
 
     def test_pause_and_resume(self):
         from src.tasks.scheduler import TaskScheduler
+
         scheduler = TaskScheduler()
         sched = scheduler.schedule("task", 10)
         assert scheduler.pause(sched.schedule_id) is True
@@ -162,11 +187,13 @@ class TestTaskScheduler:
 
     def test_pause_missing_returns_false(self):
         from src.tasks.scheduler import TaskScheduler
+
         scheduler = TaskScheduler()
         assert scheduler.pause("nonexistent") is False
 
     def test_run_immediately_sets_next_run_in_past(self):
         from src.tasks.scheduler import TaskScheduler
+
         scheduler = TaskScheduler()
         sched = scheduler.schedule("task", 60, run_immediately=True)
         # next_run_at should be at or before the current time (within a small margin)
@@ -174,16 +201,25 @@ class TestTaskScheduler:
 
     def test_to_dict_keys(self):
         from src.tasks.scheduler import TaskScheduler
+
         scheduler = TaskScheduler()
         sched = scheduler.schedule("task", 10)
         d = sched.to_dict()
-        for key in ("schedule_id", "objective", "interval_seconds", "next_run_at",
-                    "enabled", "run_count", "created_at"):
+        for key in (
+            "schedule_id",
+            "objective",
+            "interval_seconds",
+            "next_run_at",
+            "enabled",
+            "run_count",
+            "created_at",
+        ):
             assert key in d
 
     @pytest.mark.asyncio
     async def test_start_stop(self):
         from src.tasks.scheduler import TaskScheduler
+
         scheduler = TaskScheduler()
         await scheduler.start()
         assert scheduler._runner is not None
@@ -192,6 +228,7 @@ class TestTaskScheduler:
     @pytest.mark.asyncio
     async def test_submits_due_tasks(self):
         from src.tasks.scheduler import TaskScheduler
+
         scheduler = TaskScheduler()
 
         submitted = []
@@ -213,8 +250,10 @@ class TestTaskScheduler:
 # Usage endpoint tests
 # ---------------------------------------------------------------------------
 
+
 def _make_api_key_mock(role_str: str = "admin"):
     from src.auth.key_store import ApiKey, KeyRole
+
     mock_key = MagicMock(spec=ApiKey)
     mock_key.role = KeyRole(role_str)
     mock_key.key_id = "k1"
@@ -225,6 +264,7 @@ def _make_api_key_mock(role_str: str = "admin"):
 @pytest.fixture()
 def client_with_tracker():
     from src.api.main import create_app
+
     app = create_app()
     tracker = TokenTracker()
     tracker.record("agent_x", "gpt-4o-mini", 500, 250, task_id="task-abc")
@@ -270,10 +310,11 @@ class TestUsageEndpoints:
 # Task list pagination tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def client_with_tasks():
     from src.api.main import create_app
-    from src.tasks.queue import TaskStatus
+
     app = create_app()
 
     queue = MagicMock()
@@ -290,7 +331,9 @@ def client_with_tasks():
         r.progress = 100
         r.progress_message = ""
         r.to_dict.return_value = {
-            "task_id": tid, "status": r.status, "objective": r.objective,
+            "task_id": tid,
+            "status": r.status,
+            "objective": r.objective,
             "created_at": r.created_at,
         }
         task_list.append(r)

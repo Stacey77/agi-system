@@ -4,20 +4,20 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import tempfile
 import time
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Settings
 # ---------------------------------------------------------------------------
 
+
 class TestSettings:
     def test_defaults(self):
         from src.config import Settings
+
         s = Settings()
         assert s.llm_provider == "openai"
         assert s.rate_limit_requests == 100
@@ -25,11 +25,13 @@ class TestSettings:
 
     def test_cors_origins_list_single(self):
         from src.config import Settings
+
         s = Settings(cors_origins="http://localhost:3000")
         assert s.cors_origins_list() == ["http://localhost:3000"]
 
     def test_cors_origins_list_multiple(self):
         from src.config import Settings
+
         s = Settings(cors_origins="http://a.com,http://b.com")
         assert len(s.cors_origins_list()) == 2
 
@@ -37,28 +39,35 @@ class TestSettings:
         monkeypatch.setenv("LOG_LEVEL", "DEBUG")
         monkeypatch.setenv("RATE_LIMIT_REQUESTS", "50")
         from importlib import reload
+
         import src.config as cfg_mod
+
         reload(cfg_mod)
         from src.config import Settings
+
         s = Settings()
         assert s.log_level == "DEBUG"
         assert s.rate_limit_requests == 50
 
     def test_jwt_secret_generated(self):
         from src.config import Settings
+
         s1 = Settings()
         s2 = Settings()
         # Both are valid hex strings (even if different due to default_factory)
         assert len(s1.jwt_secret) == 64
+        assert len(s2.jwt_secret) == 64
 
 
 # ---------------------------------------------------------------------------
 # Structured logging
 # ---------------------------------------------------------------------------
 
+
 class TestJsonFormatter:
     def test_json_log_output(self):
         from src.logging_config import _JsonFormatter
+
         formatter = _JsonFormatter()
         record = logging.LogRecord(
             name="test.logger",
@@ -78,11 +87,13 @@ class TestJsonFormatter:
 
     def test_json_log_with_exception(self):
         from src.logging_config import _JsonFormatter
+
         formatter = _JsonFormatter()
         try:
             raise ValueError("oops")
         except ValueError:
             import sys
+
             exc_info = sys.exc_info()
         record = logging.LogRecord(
             name="test",
@@ -100,12 +111,14 @@ class TestJsonFormatter:
 
     def test_configure_logging_text(self):
         from src.logging_config import configure_logging
+
         configure_logging(level="WARNING", fmt="text")
         root = logging.getLogger()
         assert root.level == logging.WARNING
 
     def test_configure_logging_json(self):
-        from src.logging_config import configure_logging, _JsonFormatter
+        from src.logging_config import _JsonFormatter, configure_logging
+
         configure_logging(level="INFO", fmt="json")
         root = logging.getLogger()
         assert any(isinstance(h.formatter, _JsonFormatter) for h in root.handlers)
@@ -115,16 +128,19 @@ class TestJsonFormatter:
 # TaskPersistence
 # ---------------------------------------------------------------------------
 
+
 class TestTaskPersistence:
     def _make_persistence(self):
         from src.tasks.persistence import TaskPersistence
+
         tmp = tempfile.mktemp(suffix=".db")
         return TaskPersistence(db_path=tmp), tmp
 
     def test_save_and_load(self):
-        from src.tasks.queue import TaskRecord, TaskStatus
-        from src.tasks.persistence import TaskPersistence
         import tempfile
+
+        from src.tasks.persistence import TaskPersistence
+        from src.tasks.queue import TaskRecord, TaskStatus
 
         tmp = tempfile.mktemp(suffix=".db")
         p = TaskPersistence(db_path=tmp)
@@ -140,9 +156,10 @@ class TestTaskPersistence:
         p2.close()
 
     def test_upsert_updates_status(self):
-        from src.tasks.queue import TaskRecord, TaskStatus
-        from src.tasks.persistence import TaskPersistence
         import tempfile
+
+        from src.tasks.persistence import TaskPersistence
+        from src.tasks.queue import TaskRecord, TaskStatus
 
         tmp = tempfile.mktemp(suffix=".db")
         p = TaskPersistence(db_path=tmp)
@@ -163,8 +180,9 @@ class TestTaskPersistence:
         p2.close()
 
     def test_load_empty_db(self):
-        from src.tasks.persistence import TaskPersistence
         import tempfile
+
+        from src.tasks.persistence import TaskPersistence
 
         tmp = tempfile.mktemp(suffix=".db")
         p = TaskPersistence(db_path=tmp)
@@ -172,9 +190,10 @@ class TestTaskPersistence:
         p.close()
 
     def test_multiple_records(self):
-        from src.tasks.queue import TaskRecord
-        from src.tasks.persistence import TaskPersistence
         import tempfile
+
+        from src.tasks.persistence import TaskPersistence
+        from src.tasks.queue import TaskRecord
 
         tmp = tempfile.mktemp(suffix=".db")
         p = TaskPersistence(db_path=tmp)
@@ -187,8 +206,9 @@ class TestTaskPersistence:
         p2.close()
 
     def test_close_is_idempotent(self):
-        from src.tasks.persistence import TaskPersistence
         import tempfile
+
+        from src.tasks.persistence import TaskPersistence
 
         tmp = tempfile.mktemp(suffix=".db")
         p = TaskPersistence(db_path=tmp)
@@ -197,9 +217,10 @@ class TestTaskPersistence:
 
     @pytest.mark.asyncio
     async def test_queue_persists_through_restart(self):
-        from src.tasks.queue import TaskQueue, TaskStatus
-        from src.tasks.persistence import TaskPersistence
         import tempfile
+
+        from src.tasks.persistence import TaskPersistence
+        from src.tasks.queue import TaskQueue, TaskStatus
 
         tmp = tempfile.mktemp(suffix=".db")
         p1 = TaskPersistence(db_path=tmp)

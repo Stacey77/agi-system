@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.tools.base_tool import BaseTool, ToolMetadata
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class WebSearchTool(BaseTool):
     """Performs web searches and returns structured results."""
 
-    def __init__(self, api_key: Optional[str] = None, provider: str = "mock") -> None:
+    def __init__(self, api_key: str | None = None, provider: str = "mock") -> None:
         self._api_key = api_key
         self._provider = provider
 
@@ -38,7 +38,7 @@ class WebSearchTool(BaseTool):
             category="information_retrieval",
         )
 
-    def execute(self, **kwargs: Any) -> List[Dict[str, Any]]:
+    def execute(self, **kwargs: Any) -> list[dict[str, Any]]:
         """Execute a web search and return a list of result dicts."""
         if not self.validate_parameters(**kwargs):
             return []
@@ -54,7 +54,7 @@ class WebSearchTool(BaseTool):
     # Internal
     # ------------------------------------------------------------------
 
-    def _live_search(self, query: str, max_results: int) -> List[Dict[str, Any]]:
+    def _live_search(self, query: str, max_results: int) -> list[dict[str, Any]]:
         """Perform a live search using the configured provider."""
         try:
             if self._provider == "tavily":
@@ -66,7 +66,7 @@ class WebSearchTool(BaseTool):
             logger.error("Live search failed: %s — falling back to mock", exc)
             return self._mock_search(query, max_results)
 
-    def _search_tavily(self, query: str, max_results: int) -> List[Dict[str, Any]]:
+    def _search_tavily(self, query: str, max_results: int) -> list[dict[str, Any]]:
         """Tavily search integration (requires tavily-python package)."""
         try:
             from tavily import TavilyClient  # type: ignore[import]
@@ -85,14 +85,17 @@ class WebSearchTool(BaseTool):
             logger.warning("tavily-python not installed; falling back to mock")
             return self._mock_search(query, max_results)
 
-    def _search_serper(self, query: str, max_results: int) -> List[Dict[str, Any]]:
+    def _search_serper(self, query: str, max_results: int) -> list[dict[str, Any]]:
         """Serper.dev search integration."""
         try:
             import httpx
 
             resp = httpx.post(
                 "https://google.serper.dev/search",
-                headers={"X-API-KEY": self._api_key or "", "Content-Type": "application/json"},
+                headers={
+                    "X-API-KEY": self._api_key or "",
+                    "Content-Type": "application/json",
+                },
                 json={"q": query, "num": max_results},
                 timeout=10,
             )
@@ -110,7 +113,7 @@ class WebSearchTool(BaseTool):
             logger.error("Serper search failed: %s", exc)
             return self._mock_search(query, max_results)
 
-    def _mock_search(self, query: str, max_results: int) -> List[Dict[str, Any]]:
+    def _mock_search(self, query: str, max_results: int) -> list[dict[str, Any]]:
         return [
             {
                 "title": f"Result {i + 1} for '{query}'",

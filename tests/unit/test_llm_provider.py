@@ -47,9 +47,11 @@ class TestCreateLlm:
         except ImportError:
             pytest.skip("langchain-openai not installed")
         mock_llm = MagicMock()
-        with patch.dict("os.environ", {"OPENAI_API_KEY": "env-key"}):
-            with patch("langchain_openai.ChatOpenAI", return_value=mock_llm):
-                result = create_llm(provider=LLMProvider.OPENAI)
+        with (
+            patch.dict("os.environ", {"OPENAI_API_KEY": "env-key"}),
+            patch("langchain_openai.ChatOpenAI", return_value=mock_llm),
+        ):
+            result = create_llm(provider=LLMProvider.OPENAI)
         assert result is not None
 
 

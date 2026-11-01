@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -16,14 +16,14 @@ router = APIRouter(prefix="/api/v1/crew", tags=["crew"])
 
 class CrewTaskRequest(BaseModel):
     objective: str
-    agents: Optional[List[str]] = None
+    agents: list[str] | None = None
     stream: bool = False
 
 
 class CrewTemplate(BaseModel):
     name: str
     description: str = ""
-    agent_names: List[str]
+    agent_names: list[str]
     max_iterations: int = 3
 
 
@@ -32,7 +32,7 @@ class TemplateRunRequest(BaseModel):
 
 
 @router.post("/run")
-async def run_crew(body: CrewTaskRequest, request: Request) -> Dict[str, Any]:
+async def run_crew(body: CrewTaskRequest, request: Request) -> dict[str, Any]:
     """Run a collaborative multi-agent crew on the given objective."""
     orchestrator = getattr(request.app.state, "crew_orchestrator", None)
     if orchestrator is None:
@@ -40,7 +40,7 @@ async def run_crew(body: CrewTaskRequest, request: Request) -> Dict[str, Any]:
     try:
         result = await orchestrator.run(body.objective, agent_names=body.agents)
         return result
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.error("Crew execution error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -53,10 +53,16 @@ async def stream_crew(body: CrewTaskRequest, request: Request) -> StreamingRespo
         raise HTTPException(status_code=503, detail="Crew orchestrator not initialised")
 
     factory = getattr(request.app.state, "agent_factory", None)
-    agent_names = body.agents or ["research_agent", "analysis_agent", "writing_agent", "review_agent"]
+    agent_names = body.agents or [
+        "research_agent",
+        "analysis_agent",
+        "writing_agent",
+        "review_agent",
+    ]
 
     async def _generate():
         import json
+
         for name in agent_names:
             if factory is None:
                 break
@@ -88,25 +94,33 @@ async def stream_crew(body: CrewTaskRequest, request: Request) -> StreamingRespo
 @router.post("/templates", status_code=201)
 async def create_template(template: CrewTemplate, request: Request) -> CrewTemplate:
     """Create a named, reusable crew template."""
-    templates: Dict[str, CrewTemplate] = getattr(request.app.state, "crew_templates", {})
+    templates: dict[str, CrewTemplate] = getattr(
+        request.app.state, "crew_templates", {}
+    )
     if template.name in templates:
-        raise HTTPException(status_code=409, detail=f"Template '{template.name}' already exists")
+        raise HTTPException(
+            status_code=409, detail=f"Template '{template.name}' already exists"
+        )
     templates[template.name] = template
     request.app.state.crew_templates = templates
     return template
 
 
 @router.get("/templates")
-async def list_templates(request: Request) -> List[CrewTemplate]:
+async def list_templates(request: Request) -> list[CrewTemplate]:
     """List all stored crew templates."""
-    templates: Dict[str, CrewTemplate] = getattr(request.app.state, "crew_templates", {})
+    templates: dict[str, CrewTemplate] = getattr(
+        request.app.state, "crew_templates", {}
+    )
     return list(templates.values())
 
 
 @router.get("/templates/{name}")
 async def get_template(name: str, request: Request) -> CrewTemplate:
     """Retrieve a single crew template by name."""
-    templates: Dict[str, CrewTemplate] = getattr(request.app.state, "crew_templates", {})
+    templates: dict[str, CrewTemplate] = getattr(
+        request.app.state, "crew_templates", {}
+    )
     if name not in templates:
         raise HTTPException(status_code=404, detail=f"Template '{name}' not found")
     return templates[name]
@@ -115,16 +129,22 @@ async def get_template(name: str, request: Request) -> CrewTemplate:
 @router.delete("/templates/{name}", status_code=204)
 async def delete_template(name: str, request: Request) -> None:
     """Delete a crew template by name."""
-    templates: Dict[str, CrewTemplate] = getattr(request.app.state, "crew_templates", {})
+    templates: dict[str, CrewTemplate] = getattr(
+        request.app.state, "crew_templates", {}
+    )
     if name not in templates:
         raise HTTPException(status_code=404, detail=f"Template '{name}' not found")
     del templates[name]
 
 
 @router.post("/templates/{name}/run")
-async def run_template(name: str, body: TemplateRunRequest, request: Request) -> Dict[str, Any]:
+async def run_template(
+    name: str, body: TemplateRunRequest, request: Request
+) -> dict[str, Any]:
     """Run a named crew template with a given objective."""
-    templates: Dict[str, CrewTemplate] = getattr(request.app.state, "crew_templates", {})
+    templates: dict[str, CrewTemplate] = getattr(
+        request.app.state, "crew_templates", {}
+    )
     if name not in templates:
         raise HTTPException(status_code=404, detail=f"Template '{name}' not found")
 
@@ -134,9 +154,11 @@ async def run_template(name: str, body: TemplateRunRequest, request: Request) ->
         raise HTTPException(status_code=503, detail="Crew orchestrator not initialised")
 
     try:
-        result = await orchestrator.run(body.objective, agent_names=template.agent_names)
+        result = await orchestrator.run(
+            body.objective, agent_names=template.agent_names
+        )
         result["template"] = name
         return result
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.error("Template '%s' execution error: %s", name, exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc

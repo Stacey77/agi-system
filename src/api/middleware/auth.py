@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -12,7 +12,14 @@ from starlette.types import ASGIApp
 
 logger = logging.getLogger(__name__)
 
-_EXCLUDED_PATHS = {"/health", "/health/detailed", "/docs", "/openapi.json", "/redoc", "/"}
+_EXCLUDED_PATHS = {
+    "/health",
+    "/health/detailed",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/",
+}
 
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
@@ -22,14 +29,18 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        if request.url.path in _EXCLUDED_PATHS or request.url.path.startswith("/static/"):
+        if request.url.path in _EXCLUDED_PATHS or request.url.path.startswith(
+            "/static/"
+        ):
             return await call_next(request)
 
         key_store = getattr(request.app.state, "key_store", None)
         jwt_manager = getattr(request.app.state, "jwt_manager", None)
 
         if key_store is None or not key_store.list_keys():
-            logger.debug("APIKeyMiddleware: no keys configured — skipping auth (dev mode)")
+            logger.debug(
+                "APIKeyMiddleware: no keys configured — skipping auth (dev mode)"
+            )
             return await call_next(request)
 
         auth_role: str | None = None
@@ -37,7 +48,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
 
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer ") and jwt_manager is not None:
-            token = auth_header[len("Bearer "):]
+            token = auth_header[len("Bearer ") :]
             payload = jwt_manager.verify_token(token)
             if payload:
                 auth_role = payload.get("role")

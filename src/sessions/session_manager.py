@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 
 @dataclass
@@ -11,14 +11,14 @@ class AgentSession:
     session_id: str
     agent_name: str
     created_at: str
-    messages: List[Dict[str, Any]] = field(default_factory=list)
+    messages: list[dict[str, Any]] = field(default_factory=list)
 
 
 class SessionManager:
-    def __init__(self, store: Optional[Any] = None) -> None:
+    def __init__(self, store: Any | None = None) -> None:
         self._store = store
         if store is not None:
-            self._sessions: Dict[str, AgentSession] = store.load_all()
+            self._sessions: dict[str, AgentSession] = store.load_all()
         else:
             self._sessions = {}
 
@@ -27,17 +27,17 @@ class SessionManager:
         session = AgentSession(
             session_id=session_id,
             agent_name=agent_name,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
         )
         self._sessions[session_id] = session
         if self._store:
             self._store.save(session)
         return session
 
-    def get_session(self, session_id: str) -> Optional[AgentSession]:
+    def get_session(self, session_id: str) -> AgentSession | None:
         return self._sessions.get(session_id)
 
-    def list_sessions(self) -> List[AgentSession]:
+    def list_sessions(self) -> list[AgentSession]:
         return list(self._sessions.values())
 
     def delete_session(self, session_id: str) -> bool:

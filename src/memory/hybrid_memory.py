@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.memory.vector_store import VectorStore
 
@@ -19,14 +19,16 @@ class HybridMemory:
 
     def __init__(self) -> None:
         self._shared_store = VectorStore(collection_name="hybrid_shared")
-        self._agent_stores: Dict[str, VectorStore] = {}
-        self._agent_contexts: Dict[str, List[Dict[str, Any]]] = {}
+        self._agent_stores: dict[str, VectorStore] = {}
+        self._agent_contexts: dict[str, list[dict[str, Any]]] = {}
 
     # ------------------------------------------------------------------
     # Context API
     # ------------------------------------------------------------------
 
-    def get_context(self, agent_id: str, query: str, k: int = 5) -> List[Dict[str, Any]]:
+    def get_context(
+        self, agent_id: str, query: str, k: int = 5
+    ) -> list[dict[str, Any]]:
         """Return a merged context for *agent_id* relevant to *query*."""
         shared_results = self._shared_store.similarity_search(query, k=k)
         agent_results = self._get_agent_results(agent_id, query, k=k)
@@ -34,8 +36,8 @@ class HybridMemory:
 
         # Deduplicate by document content
         seen: set = set()
-        merged: List[Dict[str, Any]] = []
-        for item in (agent_context + agent_results + shared_results):
+        merged: list[dict[str, Any]] = []
+        for item in agent_context + agent_results + shared_results:
             doc = item.get("document", str(item))
             if doc not in seen:
                 seen.add(doc)
@@ -45,9 +47,9 @@ class HybridMemory:
 
     def add_to_shared(
         self,
-        documents: List[str],
-        ids: Optional[List[str]] = None,
-        metadatas: Optional[List[Dict[str, Any]]] = None,
+        documents: list[str],
+        ids: list[str] | None = None,
+        metadatas: list[dict[str, Any]] | None = None,
     ) -> None:
         """Add documents to the shared cross-agent store."""
         self._shared_store.add_documents(documents, ids=ids, metadatas=metadatas)
@@ -56,7 +58,7 @@ class HybridMemory:
         self,
         agent_id: str,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Add a context entry specifically for *agent_id*."""
         if agent_id not in self._agent_stores:
@@ -87,7 +89,7 @@ class HybridMemory:
 
     def _get_agent_results(
         self, agent_id: str, query: str, k: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         store = self._agent_stores.get(agent_id)
         if store is None:
             return []

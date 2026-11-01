@@ -37,18 +37,34 @@ _ROLE_OVERRIDE_PATTERNS: Sequence[re.Pattern[str]] = [
 ]
 
 _INSTRUCTION_LEAK_PATTERNS: Sequence[re.Pattern[str]] = [
-    re.compile(r"(print|reveal|show|output|repeat|display)\s+(your\s+)?(system\s+)?(prompt|instructions?|context|training)", re.IGNORECASE),
-    re.compile(r"what\s+(are|were)\s+your\s+(original\s+)?instructions?", re.IGNORECASE),
-    re.compile(r"(leak|exfiltrate)\s+(your\s+)?(prompt|instructions?|context)", re.IGNORECASE),
+    re.compile(
+        r"(print|reveal|show|output|repeat|display)\s+(your\s+)?(system\s+)?(prompt|instructions?|context|training)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"what\s+(are|were)\s+your\s+(original\s+)?instructions?", re.IGNORECASE
+    ),
+    re.compile(
+        r"(leak|exfiltrate)\s+(your\s+)?(prompt|instructions?|context)", re.IGNORECASE
+    ),
 ]
 
 _JAILBREAK_PATTERNS: Sequence[re.Pattern[str]] = [
     re.compile(r"\bDAN\s+mode\b", re.IGNORECASE),
     re.compile(r"\bdeveloper\s+mode\b", re.IGNORECASE),
     re.compile(r"\bjailbreak\b", re.IGNORECASE),
-    re.compile(r"act\s+as\s+(if\s+you\s+are\s+)?a\s+(different|unrestricted|unfiltered)\s+(AI|model|assistant)", re.IGNORECASE),
-    re.compile(r"pretend\s+(you\s+are|to\s+be)\s+(an?\s+)?(AI|model|assistant)\s+(without|with\s+no)\s+(restrictions?|rules?|guidelines?)", re.IGNORECASE),
-    re.compile(r"you\s+are\s+now\s+(an?\s+)?(unrestricted|unfiltered|uncensored)", re.IGNORECASE),
+    re.compile(
+        r"act\s+as\s+(if\s+you\s+are\s+)?a\s+(different|unrestricted|unfiltered)\s+(AI|model|assistant)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"pretend\s+(you\s+are|to\s+be)\s+(an?\s+)?(AI|model|assistant)\s+(without|with\s+no)\s+(restrictions?|rules?|guidelines?)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"you\s+are\s+now\s+(an?\s+)?(unrestricted|unfiltered|uncensored)",
+        re.IGNORECASE,
+    ),
 ]
 
 _ALL_PATTERNS: list[re.Pattern[str]] = [
