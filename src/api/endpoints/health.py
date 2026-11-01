@@ -90,11 +90,26 @@ async def detailed_health(request: Request) -> Dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         components["auth"] = {"status": "unhealthy", "error": str(exc)}
 
+    # Process memory
+    try:
+        import resource
+        rusage = resource.getrusage(resource.RUSAGE_SELF)
+        # ru_maxrss is in KB on Linux, bytes on macOS — normalise to bytes
+        import sys
+        rss_bytes = rusage.ru_maxrss * (1 if sys.platform == "darwin" else 1024)
+        components["process_memory"] = {
+            "status": "healthy",
+            "peak_rss_bytes": rss_bytes,
+            "peak_rss_mb": round(rss_bytes / (1024 * 1024), 2),
+        }
+    except Exception as exc:  # noqa: BLE001
+        components["process_memory"] = {"status": "unavailable", "error": str(exc)}
+
     statuses = [
         v["status"] if isinstance(v, dict) else v
         for v in components.values()
     ]
-    all_ok = all(s in ("healthy", "mock_mode", "not_configured") for s in statuses)
+    all_ok = all(s in ("healthy", "mock_mode", "not_configured", "unavailable") for s in statuses)
 
     return {
         "status": "healthy" if all_ok else "degraded",

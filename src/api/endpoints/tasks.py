@@ -7,7 +7,7 @@ import json
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -33,6 +33,28 @@ async def submit_task(body: TaskSubmission, request: Request) -> Dict[str, Any]:
 
     record = await queue.submit(sanitize(body.objective), body.parameters)
     return {"task_id": record.task_id, "status": record.status, "objective": record.objective}
+
+
+@router.get("/dead-letter")
+async def list_dead_letter(
+    request: Request,
+    limit: int = 50,
+    offset: int = Query(default=0, ge=0),
+) -> Dict[str, Any]:
+    """Return failed tasks (dead-letter queue) for inspection and retry."""
+    queue = getattr(request.app.state, "task_queue", None)
+    if queue is None:
+        raise HTTPException(status_code=503, detail="Task queue not initialised")
+    limit = max(1, min(limit, 500))
+    failed = [r for r in queue.list_all() if r.status == TaskStatus.FAILED]
+    failed.sort(key=lambda r: r.completed_at or r.created_at, reverse=True)
+    page = failed[offset : offset + limit]
+    return {
+        "tasks": [r.to_dict() for r in page],
+        "total": len(failed),
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/{task_id}")

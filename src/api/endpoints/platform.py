@@ -123,6 +123,47 @@ async def register_tool(body: RegisterToolRequest, request: Request) -> Dict[str
     return {"tool": tool.to_dict()}
 
 
+class UpdateToolRequest(BaseModel):
+    description: Optional[str] = None
+    version: Optional[str] = None
+    homepage_url: Optional[str] = None
+    docs_url: Optional[str] = None
+    tags: Optional[List[str]] = None
+    owner_team: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+@router.get("/tools/{tool_id}")
+async def get_tool(tool_id: str, request: Request) -> Dict[str, Any]:
+    """Get a single tool by tool_id."""
+    landscape = _get_tool_landscape(request)
+    tool = landscape.get_tool(tool_id)
+    if tool is None:
+        raise HTTPException(status_code=404, detail=f"Tool '{tool_id}' not found")
+    return {"tool": tool.to_dict()}
+
+
+@router.patch("/tools/{tool_id}")
+async def update_tool(tool_id: str, body: UpdateToolRequest, request: Request) -> Dict[str, Any]:
+    """Partially update a tool's metadata."""
+    landscape = _get_tool_landscape(request)
+    fields = {k: v for k, v in body.model_dump().items() if v is not None}
+    tool = landscape.update_tool(tool_id, **fields)
+    if tool is None:
+        raise HTTPException(status_code=404, detail=f"Tool '{tool_id}' not found")
+    return {"tool": tool.to_dict()}
+
+
+@router.delete("/tools/{tool_id}")
+async def delete_tool(tool_id: str, request: Request) -> Dict[str, str]:
+    """Permanently remove a tool from the landscape."""
+    landscape = _get_tool_landscape(request)
+    removed = landscape.remove_tool(tool_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"Tool '{tool_id}' not found")
+    return {"message": f"Tool '{tool_id}' removed"}
+
+
 # ------------------------------------------------------------------
 # Developer portal
 # ------------------------------------------------------------------
