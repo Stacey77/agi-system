@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from src.auth.key_store import KeyRole
 
@@ -19,7 +20,9 @@ def _api_key_mock(role: str = "admin"):
 @pytest.fixture(scope="module")
 def client():
     from fastapi.testclient import TestClient
+
     from src.api.main import create_app
+
     app = create_app()
     with TestClient(app, raise_server_exceptions=True) as c:
         app.state.key_store = MagicMock()
@@ -36,10 +39,12 @@ H = {"X-API-Key": "sk-test"}
 # WorkerPool unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestWorkerPool:
     @pytest.fixture()
     def pool(self):
         from src.workforce.worker_pool import WorkerPool
+
         return WorkerPool()
 
     def test_add_worker(self, pool):
@@ -110,7 +115,9 @@ class TestWorkerPool:
         assert "special_skill" in w.skills
 
     def test_find_available_none_when_all_busy(self, pool):
-        fresh_pool = __import__("src.workforce.worker_pool", fromlist=["WorkerPool"]).WorkerPool()
+        fresh_pool = __import__(
+            "src.workforce.worker_pool", fromlist=["WorkerPool"]
+        ).WorkerPool()
         w = fresh_pool.add_worker("OnlyWorker", "coding", [])
         fresh_pool.assign_task(w.worker_id, "t1")
         assert fresh_pool.find_available() is None
@@ -134,11 +141,13 @@ class TestWorkerPool:
 # TaskDispatcher unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestTaskDispatcher:
     @pytest.fixture()
     def dispatcher(self):
-        from src.workforce.worker_pool import WorkerPool
         from src.workforce.task_dispatcher import TaskDispatcher
+        from src.workforce.worker_pool import WorkerPool
+
         pool = WorkerPool()
         pool.add_worker("DispatchWorker", "planning", ["planning"])
         return TaskDispatcher(pool)
@@ -152,8 +161,9 @@ class TestTaskDispatcher:
 
     @pytest.mark.asyncio
     async def test_dispatch_no_available_worker(self):
-        from src.workforce.worker_pool import WorkerPool
         from src.workforce.task_dispatcher import TaskDispatcher
+        from src.workforce.worker_pool import WorkerPool
+
         pool = WorkerPool()
         d = TaskDispatcher(pool)
         result = await d.dispatch("do something")
@@ -168,8 +178,9 @@ class TestTaskDispatcher:
 
     @pytest.mark.asyncio
     async def test_dispatch_batch(self):
-        from src.workforce.worker_pool import WorkerPool
         from src.workforce.task_dispatcher import TaskDispatcher
+        from src.workforce.worker_pool import WorkerPool
+
         pool = WorkerPool()
         for i in range(3):
             pool.add_worker(f"BW{i}", "coding", [])
@@ -183,6 +194,7 @@ class TestTaskDispatcher:
 # Workforce API endpoint tests
 # ---------------------------------------------------------------------------
 
+
 class TestWorkforceAPI:
     def test_list_workers(self, client):
         resp = client.get("/api/v1/workforce/workers", headers=H)
@@ -190,15 +202,21 @@ class TestWorkforceAPI:
         assert "workers" in resp.json()
 
     def test_hire_worker(self, client):
-        resp = client.post("/api/v1/workforce/hire", headers=H,
-                           json={"name": "TestWorker", "agent_type": "coding", "skills": ["python"]})
+        resp = client.post(
+            "/api/v1/workforce/hire",
+            headers=H,
+            json={"name": "TestWorker", "agent_type": "coding", "skills": ["python"]},
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert "worker_id" in data
 
     def test_fire_worker(self, client):
-        hire = client.post("/api/v1/workforce/hire", headers=H,
-                           json={"name": "FireWorker", "agent_type": "coding", "skills": []})
+        hire = client.post(
+            "/api/v1/workforce/hire",
+            headers=H,
+            json={"name": "FireWorker", "agent_type": "coding", "skills": []},
+        )
         wid = hire.json()["worker_id"]
         resp = client.delete(f"/api/v1/workforce/workers/{wid}", headers=H)
         assert resp.status_code == 200
@@ -213,8 +231,14 @@ class TestWorkforceAPI:
 
     def test_assign_objective(self, client):
         # Hire a worker first
-        client.post("/api/v1/workforce/hire", headers=H,
-                    json={"name": "DispWorker", "agent_type": "planning", "skills": []})
-        resp = client.post("/api/v1/workforce/assign", headers=H,
-                           json={"objective": "Do something important"})
+        client.post(
+            "/api/v1/workforce/hire",
+            headers=H,
+            json={"name": "DispWorker", "agent_type": "planning", "skills": []},
+        )
+        resp = client.post(
+            "/api/v1/workforce/assign",
+            headers=H,
+            json={"objective": "Do something important"},
+        )
         assert resp.status_code == 200

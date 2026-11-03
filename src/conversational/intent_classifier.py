@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, ClassVar
 
 
 class IntentClassifier:
     """Classifies user messages into intents and suggests the best agent."""
 
-    INTENTS = [
+    INTENTS: ClassVar[list[str]] = [
         "question",
         "command",
         "task_request",
@@ -22,7 +22,7 @@ class IntentClassifier:
         "general",
     ]
 
-    _INTENT_TO_AGENT: Dict[str, str] = {
+    _INTENT_TO_AGENT: ClassVar[dict[str, str]] = {
         "task_request": "planning_agent",
         "question": "research_agent",
         "command": "execution_agent",
@@ -34,31 +34,141 @@ class IntentClassifier:
         "general": "kally_agent",
     }
 
-    _GREETING_WORDS = {"hello", "hi", "hey", "howdy", "greetings", "good morning", "good afternoon", "good evening"}
-    _FAREWELL_WORDS = {"bye", "goodbye", "see you", "farewell", "later", "take care", "ciao", "adios"}
-    _QUESTION_WORDS = {"what", "who", "when", "where", "why", "how", "which", "is", "are", "was", "were", "do", "does", "did", "can", "could", "would", "should"}
-    _TASK_WORDS = {"task", "do", "create", "build", "make", "generate", "write", "draft", "run", "execute", "analyse", "analyze", "summarize", "summarise", "research", "find", "search", "schedule", "deploy", "implement", "develop", "design"}
-    _COMMAND_WORDS = {"start", "stop", "restart", "kill", "launch", "open", "close", "delete", "remove", "install", "uninstall", "enable", "disable", "set", "configure"}
-    _FEEDBACK_WORDS = {"good", "bad", "great", "terrible", "awesome", "poor", "improve", "better", "worse", "feedback", "rating", "score", "review"}
-    _COMPLAINT_WORDS = {"error", "broken", "doesn't work", "not working", "bug", "issue", "problem", "wrong", "fail", "failed", "crash"}
-    _CLARIFICATION_WORDS = {"clarify", "explain", "what do you mean", "unclear", "confusing", "elaborate", "more detail"}
+    _GREETING_WORDS: ClassVar[set[str]] = {
+        "hello",
+        "hi",
+        "hey",
+        "howdy",
+        "greetings",
+        "good morning",
+        "good afternoon",
+        "good evening",
+    }
+    _FAREWELL_WORDS: ClassVar[set[str]] = {
+        "bye",
+        "goodbye",
+        "see you",
+        "farewell",
+        "later",
+        "take care",
+        "ciao",
+        "adios",
+    }
+    _QUESTION_WORDS: ClassVar[set[str]] = {
+        "what",
+        "who",
+        "when",
+        "where",
+        "why",
+        "how",
+        "which",
+        "is",
+        "are",
+        "was",
+        "were",
+        "do",
+        "does",
+        "did",
+        "can",
+        "could",
+        "would",
+        "should",
+    }
+    _TASK_WORDS: ClassVar[set[str]] = {
+        "task",
+        "do",
+        "create",
+        "build",
+        "make",
+        "generate",
+        "write",
+        "draft",
+        "run",
+        "execute",
+        "analyse",
+        "analyze",
+        "summarize",
+        "summarise",
+        "research",
+        "find",
+        "search",
+        "schedule",
+        "deploy",
+        "implement",
+        "develop",
+        "design",
+    }
+    _COMMAND_WORDS: ClassVar[set[str]] = {
+        "start",
+        "stop",
+        "restart",
+        "kill",
+        "launch",
+        "open",
+        "close",
+        "delete",
+        "remove",
+        "install",
+        "uninstall",
+        "enable",
+        "disable",
+        "set",
+        "configure",
+    }
+    _FEEDBACK_WORDS: ClassVar[set[str]] = {
+        "good",
+        "bad",
+        "great",
+        "terrible",
+        "awesome",
+        "poor",
+        "improve",
+        "better",
+        "worse",
+        "feedback",
+        "rating",
+        "score",
+        "review",
+    }
+    _COMPLAINT_WORDS: ClassVar[set[str]] = {
+        "error",
+        "broken",
+        "doesn't work",
+        "not working",
+        "bug",
+        "issue",
+        "problem",
+        "wrong",
+        "fail",
+        "failed",
+        "crash",
+    }
+    _CLARIFICATION_WORDS: ClassVar[set[str]] = {
+        "clarify",
+        "explain",
+        "what do you mean",
+        "unclear",
+        "confusing",
+        "elaborate",
+        "more detail",
+    }
 
-    def __init__(self, llm: Optional[Any] = None) -> None:
+    def __init__(self, llm: Any | None = None) -> None:
         self._llm = llm
 
     async def classify(
-        self, text: str, context: Optional[List[Dict[str, Any]]] = None
-    ) -> Dict[str, Any]:
+        self, text: str, context: list[dict[str, Any]] | None = None
+    ) -> dict[str, Any]:
         if self._llm is not None:
             try:
                 return await self._llm_classify(text, context)
-            except Exception:
-                pass
+            except (RuntimeError, ValueError, TypeError, IndexError, AttributeError):
+                return self._heuristic_classify(text)
         return self._heuristic_classify(text)
 
     async def _llm_classify(
-        self, text: str, context: Optional[List[Dict[str, Any]]]
-    ) -> Dict[str, Any]:
+        self, text: str, context: list[dict[str, Any]] | None
+    ) -> dict[str, Any]:
         prompt = (
             "Classify the following user message into one of these intents: "
             + ", ".join(self.INTENTS)
@@ -79,7 +189,7 @@ class IntentClassifier:
             ),
         }
 
-    def _heuristic_classify(self, text: str) -> Dict[str, Any]:
+    def _heuristic_classify(self, text: str) -> dict[str, Any]:
         lower = text.lower().strip()
         tokens = set(re.findall(r"\w+", lower))
 
@@ -118,7 +228,7 @@ class IntentClassifier:
 
         return self._result("general", 0.5, lower)
 
-    def _result(self, intent: str, confidence: float, text: str) -> Dict[str, Any]:
+    def _result(self, intent: str, confidence: float, text: str) -> dict[str, Any]:
         entities = self._extract_entities(text)
         return {
             "intent": intent,
@@ -127,9 +237,9 @@ class IntentClassifier:
             "suggested_agent": self._INTENT_TO_AGENT.get(intent, "kally_agent"),
         }
 
-    def _extract_entities(self, text: str) -> List[str]:
+    def _extract_entities(self, text: str) -> list[str]:
         # Very lightweight: extract capitalised multi-word phrases and quoted strings
-        entities: List[str] = []
+        entities: list[str] = []
         quoted = re.findall(r'"([^"]+)"', text)
         entities.extend(quoted)
         caps = re.findall(r"\b[A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+)*\b", text)

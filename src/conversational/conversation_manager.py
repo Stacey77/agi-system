@@ -6,13 +6,15 @@ import asyncio
 import json
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     import aiosqlite  # type: ignore
+
     _AIOSQLITE = True
 except ImportError:
     import sqlite3
+
     _AIOSQLITE = False
 
 
@@ -56,6 +58,7 @@ class ConversationManager:
                     await db.execute(stmt)
                 await db.commit()
         else:
+
             def _sync() -> None:
                 conn = sqlite3.connect(self._db_path)
                 try:
@@ -64,13 +67,14 @@ class ConversationManager:
                     conn.commit()
                 finally:
                     conn.close()
+
             await asyncio.to_thread(_sync)
 
     # ── sessions ──────────────────────────────────────────────────────────────
 
     async def create_session(
-        self, agent_name: str, metadata: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, agent_name: str, metadata: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         await self._ensure_init()
         now = time.time()
         session_id = str(uuid.uuid4())
@@ -78,11 +82,10 @@ class ConversationManager:
         row = (session_id, agent_name, now, now, meta_str)
         if _AIOSQLITE:
             async with aiosqlite.connect(self._db_path) as db:
-                await db.execute(
-                    "INSERT INTO sessions VALUES (?,?,?,?,?)", row
-                )
+                await db.execute("INSERT INTO sessions VALUES (?,?,?,?,?)", row)
                 await db.commit()
         else:
+
             def _sync() -> None:
                 conn = sqlite3.connect(self._db_path)
                 try:
@@ -90,6 +93,7 @@ class ConversationManager:
                     conn.commit()
                 finally:
                     conn.close()
+
             await asyncio.to_thread(_sync)
         return {
             "session_id": session_id,
@@ -100,7 +104,7 @@ class ConversationManager:
             "message_count": 0,
         }
 
-    async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_session(self, session_id: str) -> dict[str, Any] | None:
         await self._ensure_init()
         if _AIOSQLITE:
             async with aiosqlite.connect(self._db_path) as db:
@@ -114,7 +118,8 @@ class ConversationManager:
                     row = await cur.fetchone()
                     return _row_to_session(row) if row else None
         else:
-            def _sync() -> Optional[Dict[str, Any]]:
+
+            def _sync() -> dict[str, Any] | None:
                 conn = sqlite3.connect(self._db_path)
                 conn.row_factory = sqlite3.Row
                 try:
@@ -128,23 +133,23 @@ class ConversationManager:
                     return _row_to_session(row) if row else None
                 finally:
                     conn.close()
+
             return await asyncio.to_thread(_sync)
 
     async def list_sessions(
         self,
-        agent_name: Optional[str] = None,
+        agent_name: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         await self._ensure_init()
-        where = "WHERE s.agent_name=?" if agent_name else ""
-        params: tuple = (agent_name, limit, offset) if agent_name else (limit, offset)
         sql = (
-            f"SELECT s.*, COUNT(m.id) as message_count "
-            f"FROM sessions s LEFT JOIN messages m ON s.session_id=m.session_id "
-            f"{where} GROUP BY s.session_id "
-            f"ORDER BY s.updated_at DESC LIMIT ? OFFSET ?"
+            "SELECT s.*, COUNT(m.id) as message_count "
+            "FROM sessions s LEFT JOIN messages m ON s.session_id=m.session_id "
+            "WHERE (? OR s.agent_name=?) GROUP BY s.session_id "
+            "ORDER BY s.updated_at DESC LIMIT ? OFFSET ?"
         )
+        params = (not agent_name, agent_name, limit, offset)
         if _AIOSQLITE:
             async with aiosqlite.connect(self._db_path) as db:
                 db.row_factory = aiosqlite.Row
@@ -152,13 +157,17 @@ class ConversationManager:
                     rows = await cur.fetchall()
                     return [_row_to_session(r) for r in rows]
         else:
-            def _sync() -> List[Dict[str, Any]]:
+
+            def _sync() -> list[dict[str, Any]]:
                 conn = sqlite3.connect(self._db_path)
                 conn.row_factory = sqlite3.Row
                 try:
-                    return [_row_to_session(r) for r in conn.execute(sql, params).fetchall()]
+                    return [
+                        _row_to_session(r) for r in conn.execute(sql, params).fetchall()
+                    ]
                 finally:
                     conn.close()
+
             return await asyncio.to_thread(_sync)
 
     async def delete_session(self, session_id: str) -> bool:
@@ -174,17 +183,21 @@ class ConversationManager:
                 await db.commit()
                 return cur.rowcount > 0
         else:
+
             def _sync() -> bool:
                 conn = sqlite3.connect(self._db_path)
                 try:
                     n = conn.execute(
                         "DELETE FROM sessions WHERE session_id=?", (session_id,)
                     ).rowcount
-                    conn.execute("DELETE FROM messages WHERE session_id=?", (session_id,))
+                    conn.execute(
+                        "DELETE FROM messages WHERE session_id=?", (session_id,)
+                    )
                     conn.commit()
                     return n > 0
                 finally:
                     conn.close()
+
             return await asyncio.to_thread(_sync)
 
     # ── messages ──────────────────────────────────────────────────────────────
@@ -195,7 +208,7 @@ class ConversationManager:
         role: str,
         content: str,
         tokens: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         await self._ensure_init()
         now = time.time()
         row = (session_id, role, content, now, tokens)
@@ -212,6 +225,7 @@ class ConversationManager:
                 await db.commit()
                 msg_id = cur.lastrowid
         else:
+
             def _sync() -> int:
                 conn = sqlite3.connect(self._db_path)
                 try:
@@ -227,6 +241,7 @@ class ConversationManager:
                     return mid
                 finally:
                     conn.close()
+
             msg_id = await asyncio.to_thread(_sync)
         return {
             "id": msg_id,
@@ -242,7 +257,7 @@ class ConversationManager:
         session_id: str,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         await self._ensure_init()
         sql = (
             "SELECT * FROM messages WHERE session_id=? "
@@ -255,20 +270,22 @@ class ConversationManager:
                 async with db.execute(sql, params) as cur:
                     return [dict(r) for r in await cur.fetchall()]
         else:
-            def _sync() -> List[Dict[str, Any]]:
+
+            def _sync() -> list[dict[str, Any]]:
                 conn = sqlite3.connect(self._db_path)
                 conn.row_factory = sqlite3.Row
                 try:
                     return [dict(r) for r in conn.execute(sql, params).fetchall()]
                 finally:
                     conn.close()
+
             return await asyncio.to_thread(_sync)
 
     async def get_context_window(
         self, session_id: str, max_tokens: int = 4000
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         msgs = await self.get_messages(session_id, limit=500)
-        result: List[Dict[str, Any]] = []
+        result: list[dict[str, Any]] = []
         budget = max_tokens
         for msg in reversed(msgs):
             approx = len(msg.get("content", "")) // 4 + 1
@@ -288,6 +305,7 @@ class ConversationManager:
                 await db.commit()
                 return cur.rowcount
         else:
+
             def _sync() -> int:
                 conn = sqlite3.connect(self._db_path)
                 try:
@@ -298,6 +316,7 @@ class ConversationManager:
                     return n
                 finally:
                     conn.close()
+
             return await asyncio.to_thread(_sync)
 
     async def close(self) -> None:
@@ -307,7 +326,7 @@ class ConversationManager:
         return f"ConversationManager(db={self._db_path!r})"
 
 
-def _row_to_session(row: Any) -> Dict[str, Any]:
+def _row_to_session(row: Any) -> dict[str, Any]:
     d = dict(row)
     try:
         d["metadata"] = json.loads(d.get("metadata") or "{}")

@@ -5,7 +5,6 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 
 @dataclass
@@ -13,14 +12,14 @@ class Worker:
     worker_id: str
     name: str
     agent_type: str
-    skills: List[str]
+    skills: list[str]
     status: str = "idle"
-    current_task_id: Optional[str] = None
+    current_task_id: str | None = None
     tasks_completed: int = 0
     tasks_failed: int = 0
     created_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "worker_id": self.worker_id,
             "name": self.name,
@@ -41,9 +40,9 @@ class WorkerPool:
     """Thread-safe in-memory pool of workers."""
 
     def __init__(self) -> None:
-        self._workers: Dict[str, Worker] = {}
+        self._workers: dict[str, Worker] = {}
 
-    def add_worker(self, name: str, agent_type: str, skills: List[str]) -> Worker:
+    def add_worker(self, name: str, agent_type: str, skills: list[str]) -> Worker:
         worker = Worker(
             worker_id=str(uuid.uuid4()),
             name=name,
@@ -59,14 +58,14 @@ class WorkerPool:
             return True
         return False
 
-    def get_worker(self, worker_id: str) -> Optional[Worker]:
+    def get_worker(self, worker_id: str) -> Worker | None:
         return self._workers.get(worker_id)
 
     def list_workers(
         self,
-        status: Optional[str] = None,
-        skill: Optional[str] = None,
-    ) -> List[Worker]:
+        status: str | None = None,
+        skill: str | None = None,
+    ) -> list[Worker]:
         workers = list(self._workers.values())
         if status:
             workers = [w for w in workers if w.status == status]
@@ -93,7 +92,7 @@ class WorkerPool:
         else:
             w.tasks_failed += 1
 
-    def find_available(self, required_skills: Optional[List[str]] = None) -> Optional[Worker]:
+    def find_available(self, required_skills: list[str] | None = None) -> Worker | None:
         for w in self._workers.values():
             if w.status != "idle":
                 continue
@@ -104,7 +103,7 @@ class WorkerPool:
                 return w
         return None
 
-    def stats(self) -> Dict:
+    def stats(self) -> dict:
         workers = list(self._workers.values())
         idle = sum(1 for w in workers if w.status == "idle")
         busy = sum(1 for w in workers if w.status == "busy")

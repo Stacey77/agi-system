@@ -5,14 +5,13 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-
-_PLAN_LIMITS: Dict[str, Dict[str, Any]] = {
-    "free":       {"agents": 3,   "requests_per_minute": 20,  "storage_mb": 512},
-    "starter":    {"agents": 10,  "requests_per_minute": 100, "storage_mb": 2048},
-    "pro":        {"agents": 50,  "requests_per_minute": 500, "storage_mb": 10240},
-    "enterprise": {"agents": -1,  "requests_per_minute": -1,  "storage_mb": -1},
+_PLAN_LIMITS: dict[str, dict[str, Any]] = {
+    "free": {"agents": 3, "requests_per_minute": 20, "storage_mb": 512},
+    "starter": {"agents": 10, "requests_per_minute": 100, "storage_mb": 2048},
+    "pro": {"agents": 50, "requests_per_minute": 500, "storage_mb": 10240},
+    "enterprise": {"agents": -1, "requests_per_minute": -1, "storage_mb": -1},
 }
 
 
@@ -22,16 +21,16 @@ class Tenant:
     name: str
     plan: str = "free"
     owner_id: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     active: bool = True
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
 
     @property
-    def limits(self) -> Dict[str, Any]:
+    def limits(self) -> dict[str, Any]:
         return _PLAN_LIMITS.get(self.plan, _PLAN_LIMITS["free"])
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "tenant_id": self.tenant_id,
             "name": self.name,
@@ -49,14 +48,14 @@ class TenantManager:
     """In-memory tenant registry."""
 
     def __init__(self) -> None:
-        self._tenants: Dict[str, Tenant] = {}
+        self._tenants: dict[str, Tenant] = {}
 
     def create_tenant(
         self,
         name: str,
         plan: str = "free",
         owner_id: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Tenant:
         if plan not in _PLAN_LIMITS:
             raise ValueError(f"Unknown plan {plan!r}; valid: {list(_PLAN_LIMITS)}")
@@ -70,10 +69,10 @@ class TenantManager:
         self._tenants[tenant.tenant_id] = tenant
         return tenant
 
-    def get_tenant(self, tenant_id: str) -> Optional[Tenant]:
+    def get_tenant(self, tenant_id: str) -> Tenant | None:
         return self._tenants.get(tenant_id)
 
-    def list_tenants(self, active_only: bool = False) -> List[Tenant]:
+    def list_tenants(self, active_only: bool = False) -> list[Tenant]:
         tenants = list(self._tenants.values())
         if active_only:
             tenants = [t for t in tenants if t.active]
@@ -82,11 +81,11 @@ class TenantManager:
     def update_tenant(
         self,
         tenant_id: str,
-        name: Optional[str] = None,
-        plan: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        active: Optional[bool] = None,
-    ) -> Optional[Tenant]:
+        name: str | None = None,
+        plan: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        active: bool | None = None,
+    ) -> Tenant | None:
         tenant = self._tenants.get(tenant_id)
         if tenant is None:
             return None
@@ -109,7 +108,7 @@ class TenantManager:
         del self._tenants[tenant_id]
         return True
 
-    def available_plans(self) -> Dict[str, Any]:
+    def available_plans(self) -> dict[str, Any]:
         return dict(_PLAN_LIMITS)
 
     def __repr__(self) -> str:

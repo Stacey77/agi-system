@@ -23,6 +23,7 @@ def _api_key_mock(role: str = "admin"):
 # NotionClient unit tests (no HTTP)
 # ---------------------------------------------------------------------------
 
+
 class TestNotionClientUnit:
     def test_is_configured_with_key(self):
         client = NotionClient(api_key="secret-token")
@@ -43,7 +44,9 @@ class TestNotionClientUnit:
     async def test_get_page_calls_correct_path(self):
         client = NotionClient(api_key="ntn_test")
         mock_response = {"id": "page-abc", "object": "page"}
-        with patch.object(client, "_get", new=AsyncMock(return_value=mock_response)) as mock_get:
+        with patch.object(
+            client, "_get", new=AsyncMock(return_value=mock_response)
+        ) as mock_get:
             result = await client.get_page("page-abc")
             mock_get.assert_called_once_with("/pages/page-abc")
             assert result["id"] == "page-abc"
@@ -52,7 +55,9 @@ class TestNotionClientUnit:
     async def test_query_database_passes_filter(self):
         client = NotionClient(api_key="ntn_test")
         mock_response = {"results": [], "has_more": False}
-        with patch.object(client, "_post", new=AsyncMock(return_value=mock_response)) as mock_post:
+        with patch.object(
+            client, "_post", new=AsyncMock(return_value=mock_response)
+        ) as mock_post:
             await client.query_database("db-123", filter_obj={"property": "Status"})
             call_body = mock_post.call_args[0][1]
             assert call_body["filter"] == {"property": "Status"}
@@ -71,7 +76,9 @@ class TestNotionClientUnit:
     async def test_create_page_includes_content_block(self):
         client = NotionClient(api_key="ntn_test")
         mock_response = {"id": "new-page"}
-        with patch.object(client, "_post", new=AsyncMock(return_value=mock_response)) as mock_post:
+        with patch.object(
+            client, "_post", new=AsyncMock(return_value=mock_response)
+        ) as mock_post:
             await client.create_page("db-parent", "My Title", content="Hello world")
             body = mock_post.call_args[0][1]
             assert "children" in body
@@ -81,7 +88,9 @@ class TestNotionClientUnit:
     async def test_search_with_filter_type(self):
         client = NotionClient(api_key="ntn_test")
         mock_response = {"results": []}
-        with patch.object(client, "_post", new=AsyncMock(return_value=mock_response)) as mock_post:
+        with patch.object(
+            client, "_post", new=AsyncMock(return_value=mock_response)
+        ) as mock_post:
             await client.search("docs", filter_type="database")
             body = mock_post.call_args[0][1]
             assert body["filter"]["value"] == "database"
@@ -89,7 +98,9 @@ class TestNotionClientUnit:
     @pytest.mark.asyncio
     async def test_archive_page_sends_archived_true(self):
         client = NotionClient(api_key="ntn_test")
-        with patch.object(client, "_patch", new=AsyncMock(return_value={})) as mock_patch:
+        with patch.object(
+            client, "_patch", new=AsyncMock(return_value={})
+        ) as mock_patch:
             await client.archive_page("page-999")
             mock_patch.assert_called_once_with("/pages/page-999", {"archived": True})
 
@@ -98,9 +109,11 @@ class TestNotionClientUnit:
 # Notion API endpoints
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def notion_client_app():
     from src.api.main import create_app
+
     app = create_app()
     mock_notion = MagicMock(spec=NotionClient)
     mock_notion.is_configured.return_value = True
@@ -135,7 +148,9 @@ class TestNotionStatusEndpoint:
 class TestNotionPageEndpoints:
     def test_get_page(self, notion_client_app):
         c, mock_notion = notion_client_app
-        mock_notion.get_page = AsyncMock(return_value={"id": "page-1", "object": "page"})
+        mock_notion.get_page = AsyncMock(
+            return_value={"id": "page-1", "object": "page"}
+        )
         resp = c.get("/api/v1/notion/pages/page-1", headers=H)
         assert resp.status_code == 200
         assert resp.json()["id"] == "page-1"
@@ -153,41 +168,56 @@ class TestNotionPageEndpoints:
 
     def test_create_page(self, notion_client_app):
         c, mock_notion = notion_client_app
-        mock_notion.create_page = AsyncMock(return_value={"id": "new-page", "object": "page"})
-        resp = c.post("/api/v1/notion/pages", headers=H, json={
-            "parent_id": "db-parent",
-            "title": "New Doc",
-            "content": "hello",
-        })
+        mock_notion.create_page = AsyncMock(
+            return_value={"id": "new-page", "object": "page"}
+        )
+        resp = c.post(
+            "/api/v1/notion/pages",
+            headers=H,
+            json={
+                "parent_id": "db-parent",
+                "title": "New Doc",
+                "content": "hello",
+            },
+        )
         assert resp.status_code == 200
         assert resp.json()["id"] == "new-page"
 
     def test_update_page(self, notion_client_app):
         c, mock_notion = notion_client_app
         mock_notion.update_page = AsyncMock(return_value={"id": "page-1"})
-        resp = c.patch("/api/v1/notion/pages/page-1", headers=H,
-                       json={"properties": {"Status": {"select": {"name": "Done"}}}})
+        resp = c.patch(
+            "/api/v1/notion/pages/page-1",
+            headers=H,
+            json={"properties": {"Status": {"select": {"name": "Done"}}}},
+        )
         assert resp.status_code == 200
 
     def test_archive_page(self, notion_client_app):
         c, mock_notion = notion_client_app
-        mock_notion.archive_page = AsyncMock(return_value={"id": "page-1", "archived": True})
+        mock_notion.archive_page = AsyncMock(
+            return_value={"id": "page-1", "archived": True}
+        )
         resp = c.delete("/api/v1/notion/pages/page-1", headers=H)
         assert resp.status_code == 200
 
     def test_append_blocks(self, notion_client_app):
         c, mock_notion = notion_client_app
         mock_notion.append_blocks = AsyncMock(return_value={"results": []})
-        resp = c.post("/api/v1/notion/pages/page-1/blocks", headers=H, json={
-            "blocks": [{"type": "paragraph", "paragraph": {"rich_text": []}}]
-        })
+        resp = c.post(
+            "/api/v1/notion/pages/page-1/blocks",
+            headers=H,
+            json={"blocks": [{"type": "paragraph", "paragraph": {"rich_text": []}}]},
+        )
         assert resp.status_code == 200
 
 
 class TestNotionDatabaseEndpoints:
     def test_get_database(self, notion_client_app):
         c, mock_notion = notion_client_app
-        mock_notion.get_database = AsyncMock(return_value={"id": "db-1", "object": "database"})
+        mock_notion.get_database = AsyncMock(
+            return_value={"id": "db-1", "object": "database"}
+        )
         resp = c.get("/api/v1/notion/databases/db-1", headers=H)
         assert resp.status_code == 200
         assert resp.json()["object"] == "database"
@@ -197,8 +227,9 @@ class TestNotionDatabaseEndpoints:
         mock_notion.query_database = AsyncMock(
             return_value={"results": [{"id": "row-1"}], "has_more": False}
         )
-        resp = c.post("/api/v1/notion/databases/db-1/query", headers=H,
-                      json={"page_size": 10})
+        resp = c.post(
+            "/api/v1/notion/databases/db-1/query", headers=H, json={"page_size": 10}
+        )
         assert resp.status_code == 200
         assert len(resp.json()["results"]) == 1
 
@@ -220,16 +251,22 @@ class TestNotionSearchEndpoint:
         mock_notion.search = AsyncMock(
             return_value={"results": [{"id": "p1", "object": "page"}]}
         )
-        resp = c.post("/api/v1/notion/search", headers=H,
-                      json={"query": "AGI", "filter_type": "page"})
+        resp = c.post(
+            "/api/v1/notion/search",
+            headers=H,
+            json={"query": "AGI", "filter_type": "page"},
+        )
         assert resp.status_code == 200
         assert len(resp.json()["results"]) == 1
 
     def test_search_database_filter(self, notion_client_app):
         c, mock_notion = notion_client_app
         mock_notion.search = AsyncMock(return_value={"results": []})
-        resp = c.post("/api/v1/notion/search", headers=H,
-                      json={"query": "tasks", "filter_type": "database"})
+        resp = c.post(
+            "/api/v1/notion/search",
+            headers=H,
+            json={"query": "tasks", "filter_type": "database"},
+        )
         assert resp.status_code == 200
         mock_notion.search.assert_called_once_with(
             query="tasks", filter_type="database", page_size=20

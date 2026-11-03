@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import Any, Deque, Dict, List, Optional
+from typing import Any
 
 
 class ContextTracker:
@@ -12,9 +12,9 @@ class ContextTracker:
     def __init__(self, max_messages: int = 20, max_tokens: int = 8000) -> None:
         self._max_messages = max_messages
         self._max_tokens = max_tokens
-        self._sessions: Dict[str, Deque[Dict[str, str]]] = {}
+        self._sessions: dict[str, deque[dict[str, str]]] = {}
 
-    def _get_or_create(self, session_id: str) -> Deque[Dict[str, str]]:
+    def _get_or_create(self, session_id: str) -> deque[dict[str, str]]:
         if session_id not in self._sessions:
             self._sessions[session_id] = deque(maxlen=self._max_messages)
         return self._sessions[session_id]
@@ -23,7 +23,7 @@ class ContextTracker:
         dq = self._get_or_create(session_id)
         dq.append({"role": role, "content": content})
 
-    def get_context(self, session_id: str) -> List[Dict[str, str]]:
+    def get_context(self, session_id: str) -> list[dict[str, str]]:
         return list(self._sessions.get(session_id, deque()))
 
     def clear(self, session_id: str) -> None:
@@ -36,7 +36,7 @@ class ContextTracker:
         )
 
     async def summarize_if_needed(
-        self, session_id: str, llm: Optional[Any] = None
+        self, session_id: str, llm: Any | None = None
     ) -> bool:
         dq = self._sessions.get(session_id)
         if dq is None:
@@ -63,11 +63,16 @@ class ContextTracker:
         try:
             resp = await llm.agenerate([[{"role": "user", "content": summary_prompt}]])
             summary_text = resp.generations[0][0].text.strip()
-        except Exception:
+        except (RuntimeError, ValueError, TypeError, IndexError, AttributeError):
             summary_text = "[Earlier conversation summarised]"
 
-        new_dq: Deque[Dict[str, str]] = deque(maxlen=self._max_messages)
-        new_dq.append({"role": "system", "content": f"Summary of earlier conversation: {summary_text}"})
+        new_dq: deque[dict[str, str]] = deque(maxlen=self._max_messages)
+        new_dq.append(
+            {
+                "role": "system",
+                "content": f"Summary of earlier conversation: {summary_text}",
+            }
+        )
         new_dq.extend(to_keep)
         self._sessions[session_id] = new_dq
         return True

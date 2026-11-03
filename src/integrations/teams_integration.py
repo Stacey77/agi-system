@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     import httpx
+
     _HTTPX = True
 except ImportError:
     _HTTPX = False
@@ -18,10 +19,10 @@ class TeamsIntegration:
     def __init__(self, webhook_url: str = "") -> None:
         self._webhook = webhook_url
 
-    async def send_message(self, text: str, title: Optional[str] = None) -> bool:
+    async def send_message(self, text: str, title: str | None = None) -> bool:
         if not _HTTPX or not self._webhook:
             return False
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "@type": "MessageCard",
             "@context": "https://schema.org/extensions",
             "text": text,
@@ -37,7 +38,7 @@ class TeamsIntegration:
             )
         return r.status_code in (200, 202)
 
-    async def send_adaptive_card(self, card: Dict[str, Any]) -> bool:
+    async def send_adaptive_card(self, card: dict[str, Any]) -> bool:
         if not _HTTPX or not self._webhook:
             return False
         payload = {
@@ -59,18 +60,28 @@ class TeamsIntegration:
         return r.status_code in (200, 202)
 
     async def send_fact_set(
-        self, title: str, facts: List[Dict[str, str]], text: str = ""
+        self, title: str, facts: list[dict[str, str]], text: str = ""
     ) -> bool:
-        card: Dict[str, Any] = {
+        card: dict[str, Any] = {
             "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
             "type": "AdaptiveCard",
             "version": "1.4",
-            "body": [{"type": "TextBlock", "text": title, "weight": "Bolder", "size": "Medium"}],
+            "body": [
+                {
+                    "type": "TextBlock",
+                    "text": title,
+                    "weight": "Bolder",
+                    "size": "Medium",
+                }
+            ],
         }
         if text:
             card["body"].append({"type": "TextBlock", "text": text, "wrap": True})
         card["body"].append(
-            {"type": "FactSet", "facts": [{"title": f["title"], "value": f["value"]} for f in facts]}
+            {
+                "type": "FactSet",
+                "facts": [{"title": f["title"], "value": f["value"]} for f in facts],
+            }
         )
         return await self.send_adaptive_card(card)
 

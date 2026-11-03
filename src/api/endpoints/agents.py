@@ -5,7 +5,14 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -18,8 +25,14 @@ router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
 
 # Built-in agents that cannot be removed at runtime
 _PROTECTED_AGENTS = {
-    "planning_agent", "execution_agent", "research_agent", "analysis_agent",
-    "writing_agent", "review_agent", "coding_agent", "summarization_agent",
+    "planning_agent",
+    "execution_agent",
+    "research_agent",
+    "analysis_agent",
+    "writing_agent",
+    "review_agent",
+    "coding_agent",
+    "summarization_agent",
 }
 
 

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from src.auth.key_store import KeyRole
 
@@ -19,7 +20,9 @@ def _api_key_mock(role: str = "admin"):
 @pytest.fixture(scope="module")
 def client():
     from fastapi.testclient import TestClient
+
     from src.api.main import create_app
+
     app = create_app()
     with TestClient(app, raise_server_exceptions=True) as c:
         app.state.key_store = MagicMock()
@@ -36,10 +39,12 @@ H = {"X-API-Key": "sk-test"}
 # AuditLog unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestAuditLog:
     @pytest.fixture()
     def audit(self, tmp_path):
         from src.enterprise.audit_log import AuditLog
+
         return AuditLog(db_path=str(tmp_path / "audit_test.db"))
 
     @pytest.mark.asyncio
@@ -50,7 +55,9 @@ class TestAuditLog:
 
     @pytest.mark.asyncio
     async def test_get_event(self, audit):
-        eid = await audit.log(actor="alice", action="delete", resource_type="task", resource_id="t1")
+        eid = await audit.log(
+            actor="alice", action="delete", resource_type="task", resource_id="t1"
+        )
         event = await audit.get_event(eid)
         assert event is not None
         assert event["event_id"] == eid
@@ -80,7 +87,9 @@ class TestAuditLog:
     @pytest.mark.asyncio
     async def test_query_pagination(self, audit):
         for _ in range(5):
-            await audit.log(actor="paginate_user", action="view", resource_type="dashboard")
+            await audit.log(
+                actor="paginate_user", action="view", resource_type="dashboard"
+            )
         page1 = await audit.query(actor="paginate_user", limit=2, offset=0)
         page2 = await audit.query(actor="paginate_user", limit=2, offset=2)
         assert len(page1["events"]) == 2
@@ -90,7 +99,7 @@ class TestAuditLog:
     @pytest.mark.asyncio
     async def test_purge_before(self, audit):
         import time
-        past = time.time() - 1000
+
         await audit.log(actor="old_actor", action="old_action", resource_type="r")
         n = await audit.purge_before(time.time() + 1)
         assert n >= 1
@@ -98,8 +107,10 @@ class TestAuditLog:
     @pytest.mark.asyncio
     async def test_details_serialized(self, audit):
         eid = await audit.log(
-            actor="sys", action="deploy", resource_type="service",
-            details={"version": "1.0", "region": "us-east-1"}
+            actor="sys",
+            action="deploy",
+            resource_type="service",
+            details={"version": "1.0", "region": "us-east-1"},
         )
         event = await audit.get_event(eid)
         assert event["details"]["version"] == "1.0"
@@ -109,10 +120,12 @@ class TestAuditLog:
 # RBACManager unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestRBACManager:
     @pytest.fixture()
     def rbac(self):
         from src.enterprise.rbac import RBACManager
+
         return RBACManager()
 
     def test_default_roles_seeded(self, rbac):
@@ -136,7 +149,9 @@ class TestRBACManager:
         assert not role.has_permission("agents:write")
 
     def test_create_role(self, rbac):
-        role = rbac.create_role("custom_role", permissions=["tasks:read"], description="Custom")
+        role = rbac.create_role(
+            "custom_role", permissions=["tasks:read"], description="Custom"
+        )
         assert rbac.get_role("custom_role") is role
         assert "tasks:read" in role.permissions
 
@@ -186,10 +201,12 @@ class TestRBACManager:
 # TenantManager unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestTenantManager:
     @pytest.fixture()
     def tm(self):
         from src.enterprise.tenant_manager import TenantManager
+
         return TenantManager()
 
     def test_create_tenant(self, tm):
@@ -266,6 +283,7 @@ class TestTenantManager:
 # Enterprise API endpoint tests
 # ---------------------------------------------------------------------------
 
+
 class TestEnterpriseAPI:
     def test_list_audit_events(self, client):
         resp = client.get("/api/v1/enterprise/audit/events", headers=H)
@@ -281,8 +299,11 @@ class TestEnterpriseAPI:
         assert "admin" in names
 
     def test_create_role(self, client):
-        resp = client.post("/api/v1/enterprise/rbac/roles", headers=H,
-                           json={"name": "api_test_role", "permissions": ["tasks:read"]})
+        resp = client.post(
+            "/api/v1/enterprise/rbac/roles",
+            headers=H,
+            json={"name": "api_test_role", "permissions": ["tasks:read"]},
+        )
         assert resp.status_code == 200
 
     def test_list_tenants(self, client):
@@ -291,14 +312,20 @@ class TestEnterpriseAPI:
         assert "tenants" in resp.json()
 
     def test_create_tenant(self, client):
-        resp = client.post("/api/v1/enterprise/tenants", headers=H,
-                           json={"name": "API Test Tenant", "plan": "starter"})
+        resp = client.post(
+            "/api/v1/enterprise/tenants",
+            headers=H,
+            json={"name": "API Test Tenant", "plan": "starter"},
+        )
         assert resp.status_code == 200
         assert "tenant_id" in resp.json()
 
     def test_get_tenant(self, client):
-        create = client.post("/api/v1/enterprise/tenants", headers=H,
-                             json={"name": "GetTenant", "plan": "free"})
+        create = client.post(
+            "/api/v1/enterprise/tenants",
+            headers=H,
+            json={"name": "GetTenant", "plan": "free"},
+        )
         tid = create.json()["tenant_id"]
         resp = client.get(f"/api/v1/enterprise/tenants/{tid}", headers=H)
         assert resp.status_code == 200
@@ -309,8 +336,11 @@ class TestEnterpriseAPI:
         assert resp.status_code == 404
 
     def test_delete_tenant(self, client):
-        create = client.post("/api/v1/enterprise/tenants", headers=H,
-                             json={"name": "DeleteMe", "plan": "free"})
+        create = client.post(
+            "/api/v1/enterprise/tenants",
+            headers=H,
+            json={"name": "DeleteMe", "plan": "free"},
+        )
         tid = create.json()["tenant_id"]
         resp = client.delete(f"/api/v1/enterprise/tenants/{tid}", headers=H)
         assert resp.status_code == 200

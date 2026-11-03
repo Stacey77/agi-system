@@ -6,13 +6,15 @@ import asyncio
 import json
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     import aiosqlite  # type: ignore
+
     _AIOSQLITE = True
 except ImportError:
     import sqlite3
+
     _AIOSQLITE = False
 
 
@@ -54,6 +56,7 @@ class AuditLog:
                     await db.execute(stmt)
                 await db.commit()
         else:
+
             def _sync() -> None:
                 conn = sqlite3.connect(self._db_path)
                 try:
@@ -62,6 +65,7 @@ class AuditLog:
                     conn.commit()
                 finally:
                     conn.close()
+
             await asyncio.to_thread(_sync)
 
     async def log(
@@ -70,7 +74,7 @@ class AuditLog:
         action: str,
         resource_type: str,
         resource_id: str = "",
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
         ip_address: str = "",
         status: str = "success",
     ) -> str:
@@ -78,7 +82,17 @@ class AuditLog:
         event_id = str(uuid.uuid4())
         now = time.time()
         details_str = json.dumps(details or {})
-        row = (event_id, now, actor, action, resource_type, resource_id, details_str, ip_address, status)
+        row = (
+            event_id,
+            now,
+            actor,
+            action,
+            resource_type,
+            resource_id,
+            details_str,
+            ip_address,
+            status,
+        )
         sql = (
             "INSERT INTO events (event_id,timestamp,actor,action,resource_type,"
             "resource_id,details,ip_address,status) VALUES (?,?,?,?,?,?,?,?,?)"
@@ -88,6 +102,7 @@ class AuditLog:
                 await db.execute(sql, row)
                 await db.commit()
         else:
+
             def _sync() -> None:
                 conn = sqlite3.connect(self._db_path)
                 try:
@@ -95,36 +110,44 @@ class AuditLog:
                     conn.commit()
                 finally:
                     conn.close()
+
             await asyncio.to_thread(_sync)
         return event_id
 
     async def query(
         self,
-        actor: Optional[str] = None,
-        action: Optional[str] = None,
-        resource_type: Optional[str] = None,
-        start_time: Optional[float] = None,
-        end_time: Optional[float] = None,
+        actor: str | None = None,
+        action: str | None = None,
+        resource_type: str | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         await self._ensure_init()
-        conditions: List[str] = []
-        params: List[Any] = []
-        if actor:
-            conditions.append("actor=?"); params.append(actor)
-        if action:
-            conditions.append("action=?"); params.append(action)
-        if resource_type:
-            conditions.append("resource_type=?"); params.append(resource_type)
-        if start_time is not None:
-            conditions.append("timestamp>=?"); params.append(start_time)
-        if end_time is not None:
-            conditions.append("timestamp<=?"); params.append(end_time)
-
-        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-        count_sql = f"SELECT COUNT(*) FROM events {where}"
-        data_sql = f"SELECT * FROM events {where} ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+        count_sql = (
+            "SELECT COUNT(*) FROM events "
+            "WHERE (? OR actor=?) AND (? OR action=?) AND (? OR resource_type=?) "
+            "AND (? OR timestamp>=?) AND (? OR timestamp<=?)"
+        )
+        data_sql = (
+            "SELECT * FROM events "
+            "WHERE (? OR actor=?) AND (? OR action=?) AND (? OR resource_type=?) "
+            "AND (? OR timestamp>=?) AND (? OR timestamp<=?) "
+            "ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+        )
+        params = [
+            not actor,
+            actor,
+            not action,
+            action,
+            not resource_type,
+            resource_type,
+            start_time is None,
+            start_time,
+            end_time is None,
+            end_time,
+        ]
 
         if _AIOSQLITE:
             async with aiosqlite.connect(self._db_path) as db:
@@ -134,6 +157,7 @@ class AuditLog:
                 async with db.execute(data_sql, params + [limit, offset]) as cur:
                     events = [_row_to_event(r) for r in await cur.fetchall()]
         else:
+
             def _sync() -> tuple:
                 conn = sqlite3.connect(self._db_path)
                 conn.row_factory = sqlite3.Row
@@ -143,45 +167,58 @@ class AuditLog:
                     return t, [_row_to_event(r) for r in rows]
                 finally:
                     conn.close()
+
             total, events = await asyncio.to_thread(_sync)
 
         return {"events": events, "total": total, "limit": limit, "offset": offset}
 
-    async def get_event(self, event_id: str) -> Optional[Dict[str, Any]]:
+    async def get_event(self, event_id: str) -> dict[str, Any] | None:
         await self._ensure_init()
         if _AIOSQLITE:
             async with aiosqlite.connect(self._db_path) as db:
                 db.row_factory = aiosqlite.Row
-                async with db.execute("SELECT * FROM events WHERE event_id=?", (event_id,)) as cur:
+                async with db.execute(
+                    "SELECT * FROM events WHERE event_id=?", (event_id,)
+                ) as cur:
                     row = await cur.fetchone()
                     return _row_to_event(row) if row else None
         else:
-            def _sync() -> Optional[Dict[str, Any]]:
+
+            def _sync() -> dict[str, Any] | None:
                 conn = sqlite3.connect(self._db_path)
                 conn.row_factory = sqlite3.Row
                 try:
-                    row = conn.execute("SELECT * FROM events WHERE event_id=?", (event_id,)).fetchone()
+                    row = conn.execute(
+                        "SELECT * FROM events WHERE event_id=?", (event_id,)
+                    ).fetchone()
                     return _row_to_event(row) if row else None
                 finally:
                     conn.close()
+
             return await asyncio.to_thread(_sync)
 
     async def purge_before(self, timestamp: float) -> int:
         await self._ensure_init()
         if _AIOSQLITE:
             async with aiosqlite.connect(self._db_path) as db:
-                cur = await db.execute("DELETE FROM events WHERE timestamp<?", (timestamp,))
+                cur = await db.execute(
+                    "DELETE FROM events WHERE timestamp<?", (timestamp,)
+                )
                 await db.commit()
                 return cur.rowcount
         else:
+
             def _sync() -> int:
                 conn = sqlite3.connect(self._db_path)
                 try:
-                    n = conn.execute("DELETE FROM events WHERE timestamp<?", (timestamp,)).rowcount
+                    n = conn.execute(
+                        "DELETE FROM events WHERE timestamp<?", (timestamp,)
+                    ).rowcount
                     conn.commit()
                     return n
                 finally:
                     conn.close()
+
             return await asyncio.to_thread(_sync)
 
     async def close(self) -> None:
@@ -191,7 +228,7 @@ class AuditLog:
         return f"AuditLog(db={self._db_path!r})"
 
 
-def _row_to_event(row: Any) -> Dict[str, Any]:
+def _row_to_event(row: Any) -> dict[str, Any]:
     d = dict(row)
     try:
         d["details"] = json.loads(d.get("details") or "{}")

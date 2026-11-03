@@ -128,17 +128,17 @@ async def register_tool(body: RegisterToolRequest, request: Request) -> dict[str
 
 
 class UpdateToolRequest(BaseModel):
-    description: Optional[str] = None
-    version: Optional[str] = None
-    homepage_url: Optional[str] = None
-    docs_url: Optional[str] = None
-    tags: Optional[List[str]] = None
-    owner_team: Optional[str] = None
-    is_active: Optional[bool] = None
+    description: str | None = None
+    version: str | None = None
+    homepage_url: str | None = None
+    docs_url: str | None = None
+    tags: list[str] | None = None
+    owner_team: str | None = None
+    is_active: bool | None = None
 
 
 @router.get("/tools/{tool_id}")
-async def get_tool(tool_id: str, request: Request) -> Dict[str, Any]:
+async def get_tool(tool_id: str, request: Request) -> dict[str, Any]:
     """Get a single tool by tool_id."""
     landscape = _get_tool_landscape(request)
     tool = landscape.get_tool(tool_id)
@@ -148,7 +148,9 @@ async def get_tool(tool_id: str, request: Request) -> Dict[str, Any]:
 
 
 @router.patch("/tools/{tool_id}")
-async def update_tool(tool_id: str, body: UpdateToolRequest, request: Request) -> Dict[str, Any]:
+async def update_tool(
+    tool_id: str, body: UpdateToolRequest, request: Request
+) -> dict[str, Any]:
     """Partially update a tool's metadata."""
     landscape = _get_tool_landscape(request)
     fields = {k: v for k, v in body.model_dump().items() if v is not None}
@@ -159,7 +161,7 @@ async def update_tool(tool_id: str, body: UpdateToolRequest, request: Request) -
 
 
 @router.delete("/tools/{tool_id}")
-async def delete_tool(tool_id: str, request: Request) -> Dict[str, str]:
+async def delete_tool(tool_id: str, request: Request) -> dict[str, str]:
     """Permanently remove a tool from the landscape."""
     landscape = _get_tool_landscape(request)
     removed = landscape.remove_tool(tool_id)

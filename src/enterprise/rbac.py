@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
 
 
 @dataclass
@@ -15,14 +14,14 @@ class Permission:
 @dataclass
 class Role:
     name: str
-    permissions: Set[str] = field(default_factory=set)
+    permissions: set[str] = field(default_factory=set)
     description: str = ""
 
     def has_permission(self, permission: str) -> bool:
         return permission in self.permissions or "*" in self.permissions
 
 
-_DEFAULT_PERMISSIONS: List[Permission] = [
+_DEFAULT_PERMISSIONS: list[Permission] = [
     Permission("agents:read", "List and inspect agents"),
     Permission("agents:write", "Create and update agents"),
     Permission("agents:delete", "Remove agents"),
@@ -45,7 +44,7 @@ _DEFAULT_PERMISSIONS: List[Permission] = [
     Permission("integrations:write", "Configure integrations"),
 ]
 
-_DEFAULT_ROLES: List[Dict] = [
+_DEFAULT_ROLES: list[dict] = [
     {
         "name": "super_admin",
         "description": "Full platform access",
@@ -55,26 +54,39 @@ _DEFAULT_ROLES: List[Dict] = [
         "name": "admin",
         "description": "Administrative access excluding super-admin ops",
         "permissions": {
-            "agents:read", "agents:write", "agents:delete",
-            "tasks:read", "tasks:write", "tasks:delete",
-            "memory:read", "memory:write",
-            "sessions:read", "sessions:write",
-            "workforce:read", "workforce:write",
+            "agents:read",
+            "agents:write",
+            "agents:delete",
+            "tasks:read",
+            "tasks:write",
+            "tasks:delete",
+            "memory:read",
+            "memory:write",
+            "sessions:read",
+            "sessions:write",
+            "workforce:read",
+            "workforce:write",
             "audit:read",
             "tenants:read",
             "rbac:read",
-            "integrations:read", "integrations:write",
+            "integrations:read",
+            "integrations:write",
         },
     },
     {
         "name": "operator",
         "description": "Day-to-day operational access",
         "permissions": {
-            "agents:read", "agents:write",
-            "tasks:read", "tasks:write",
-            "memory:read", "memory:write",
-            "sessions:read", "sessions:write",
-            "workforce:read", "workforce:write",
+            "agents:read",
+            "agents:write",
+            "tasks:read",
+            "tasks:write",
+            "memory:read",
+            "memory:write",
+            "sessions:read",
+            "sessions:write",
+            "workforce:read",
+            "workforce:write",
             "audit:read",
             "integrations:read",
         },
@@ -99,9 +111,9 @@ class RBACManager:
     """In-memory RBAC manager seeded with default roles and permissions."""
 
     def __init__(self) -> None:
-        self._permissions: Dict[str, Permission] = {}
-        self._roles: Dict[str, Role] = {}
-        self._user_roles: Dict[str, Set[str]] = {}
+        self._permissions: dict[str, Permission] = {}
+        self._roles: dict[str, Role] = {}
+        self._user_roles: dict[str, set[str]] = {}
         self._seed()
 
     def _seed(self) -> None:
@@ -117,7 +129,7 @@ class RBACManager:
 
     # --- Permissions ---
 
-    def list_permissions(self) -> List[Permission]:
+    def list_permissions(self) -> list[Permission]:
         return list(self._permissions.values())
 
     def add_permission(self, name: str, description: str = "") -> Permission:
@@ -135,16 +147,18 @@ class RBACManager:
 
     # --- Roles ---
 
-    def list_roles(self) -> List[Role]:
+    def list_roles(self) -> list[Role]:
         return list(self._roles.values())
 
-    def get_role(self, name: str) -> Optional[Role]:
+    def get_role(self, name: str) -> Role | None:
         return self._roles.get(name)
 
     def create_role(
-        self, name: str, permissions: Optional[List[str]] = None, description: str = ""
+        self, name: str, permissions: list[str] | None = None, description: str = ""
     ) -> Role:
-        role = Role(name=name, description=description, permissions=set(permissions or []))
+        role = Role(
+            name=name, description=description, permissions=set(permissions or [])
+        )
         self._roles[name] = role
         return role
 
@@ -184,7 +198,7 @@ class RBACManager:
         self._user_roles[user_id].discard(role_name)
         return True
 
-    def get_user_roles(self, user_id: str) -> List[str]:
+    def get_user_roles(self, user_id: str) -> list[str]:
         return list(self._user_roles.get(user_id, set()))
 
     def check_permission(self, user_id: str, permission: str) -> bool:
@@ -194,8 +208,8 @@ class RBACManager:
                 return True
         return False
 
-    def get_user_permissions(self, user_id: str) -> Set[str]:
-        perms: Set[str] = set()
+    def get_user_permissions(self, user_id: str) -> set[str]:
+        perms: set[str] = set()
         for role_name in self._user_roles.get(user_id, set()):
             role = self._roles.get(role_name)
             if role:

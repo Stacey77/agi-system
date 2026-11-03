@@ -11,7 +11,9 @@ from starlette.responses import Response
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MAX_BYTES = int(os.getenv("MAX_REQUEST_BODY_BYTES", str(10 * 1024 * 1024)))  # 10 MB
+_DEFAULT_MAX_BYTES = int(
+    os.getenv("MAX_REQUEST_BODY_BYTES", str(10 * 1024 * 1024))
+)  # 10 MB
 
 
 class BodyLimitMiddleware(BaseHTTPMiddleware):

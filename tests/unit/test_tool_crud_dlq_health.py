@@ -22,6 +22,7 @@ def _api_key_mock(role: str = "admin"):
 @pytest.fixture(scope="module")
 def client():
     from src.api.main import create_app
+
     app = create_app()
     with TestClient(app, raise_server_exceptions=True) as c:
         app.state.key_store = MagicMock()
@@ -38,9 +39,11 @@ H = {"X-API-Key": "sk-test"}
 # ToolLandscape unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestToolLandscapeUnit:
     def test_remove_tool(self):
         from src.platform.tool_landscape import ToolLandscape
+
         ls = ToolLandscape(load_defaults=False)
         tool = ls.register_tool(name="mytool", description="test")
         tid = tool.tool_id
@@ -49,11 +52,13 @@ class TestToolLandscapeUnit:
 
     def test_remove_missing_returns_false(self):
         from src.platform.tool_landscape import ToolLandscape
+
         ls = ToolLandscape(load_defaults=False)
         assert ls.remove_tool("nonexistent") is False
 
     def test_update_tool(self):
         from src.platform.tool_landscape import ToolLandscape
+
         ls = ToolLandscape(load_defaults=False)
         tool = ls.register_tool(name="updatable", description="original")
         updated = ls.update_tool(tool.tool_id, description="updated", version="2.0")
@@ -63,6 +68,7 @@ class TestToolLandscapeUnit:
 
     def test_update_missing_returns_none(self):
         from src.platform.tool_landscape import ToolLandscape
+
         ls = ToolLandscape(load_defaults=False)
         assert ls.update_tool("nonexistent", description="x") is None
 
@@ -71,14 +77,19 @@ class TestToolLandscapeUnit:
 # Platform tool CRUD endpoints
 # ---------------------------------------------------------------------------
 
+
 class TestPlatformToolCRUD:
     @pytest.fixture(autouse=True)
     def _register_test_tool(self, client):
-        resp = client.post("/api/v1/platform/tools", headers=H, json={
-            "name": "crud_tool",
-            "description": "A test tool",
-            "category": "ci_cd",
-        })
+        resp = client.post(
+            "/api/v1/platform/tools",
+            headers=H,
+            json={
+                "name": "crud_tool",
+                "description": "A test tool",
+                "category": "ci_cd",
+            },
+        )
         assert resp.status_code == 200
         self._tool_id = resp.json()["tool"]["tool_id"]
 
@@ -92,22 +103,29 @@ class TestPlatformToolCRUD:
         assert resp.status_code == 404
 
     def test_patch_tool(self, client):
-        resp = client.patch(f"/api/v1/platform/tools/{self._tool_id}", headers=H,
-                            json={"description": "patched", "version": "3.0"})
+        resp = client.patch(
+            f"/api/v1/platform/tools/{self._tool_id}",
+            headers=H,
+            json={"description": "patched", "version": "3.0"},
+        )
         assert resp.status_code == 200
         data = resp.json()["tool"]
         assert data["description"] == "patched"
         assert data["version"] == "3.0"
 
     def test_patch_missing_tool_404(self, client):
-        resp = client.patch("/api/v1/platform/tools/nonexistent", headers=H,
-                            json={"description": "x"})
+        resp = client.patch(
+            "/api/v1/platform/tools/nonexistent", headers=H, json={"description": "x"}
+        )
         assert resp.status_code == 404
 
     def test_delete_tool(self, client):
         # Register a disposable tool
-        r = client.post("/api/v1/platform/tools", headers=H,
-                        json={"name": "disposable_tool", "description": "bye"})
+        r = client.post(
+            "/api/v1/platform/tools",
+            headers=H,
+            json={"name": "disposable_tool", "description": "bye"},
+        )
         tid = r.json()["tool"]["tool_id"]
         resp = client.delete(f"/api/v1/platform/tools/{tid}", headers=H)
         assert resp.status_code == 200
@@ -123,11 +141,13 @@ class TestPlatformToolCRUD:
 # Dead-letter queue endpoint
 # ---------------------------------------------------------------------------
 
+
 class TestDeadLetterQueue:
     @pytest.fixture()
     def dlq_client(self):
         from src.api.main import create_app
         from src.tasks.queue import TaskRecord, TaskStatus
+
         app = create_app()
 
         queue = MagicMock()
@@ -142,8 +162,11 @@ class TestDeadLetterQueue:
             r.result = {"error": "simulated failure"}
             r.error = "simulated failure"
             r.to_dict.return_value = {
-                "task_id": r.task_id, "status": "failed", "error": r.error,
-                "objective": r.objective, "created_at": r.created_at,
+                "task_id": r.task_id,
+                "status": "failed",
+                "error": r.error,
+                "objective": r.objective,
+                "created_at": r.created_at,
             }
             records.append(r)
         # Add one non-failed task
@@ -188,23 +211,21 @@ class TestDeadLetterQueue:
 # Body limit middleware
 # ---------------------------------------------------------------------------
 
+
 class TestBodyLimitMiddleware:
     def test_small_body_passes(self, client):
-        resp = client.post("/api/v1/tasks/", headers=H,
-                           json={"objective": "small"})
+        resp = client.post("/api/v1/tasks/", headers=H, json={"objective": "small"})
         assert resp.status_code != 413
 
     def test_oversized_content_length_rejected(self):
-        from src.api.main import create_app
-        from src.api.middleware.body_limit import BodyLimitMiddleware
-        app = create_app()
         # Override to 10 bytes max so we can trigger it easily
         # We test the middleware directly
-        from src.api.middleware.body_limit import BodyLimitMiddleware
-        from starlette.testclient import TestClient as StarletteClient
         from starlette.applications import Starlette
-        from starlette.routing import Route
         from starlette.responses import PlainTextResponse
+        from starlette.routing import Route
+        from starlette.testclient import TestClient as StarletteClient
+
+        from src.api.middleware.body_limit import BodyLimitMiddleware
 
         async def dummy(req):
             return PlainTextResponse("ok")
@@ -212,14 +233,14 @@ class TestBodyLimitMiddleware:
         mini_app = Starlette(routes=[Route("/", dummy, methods=["POST"])])
         mini_app.add_middleware(BodyLimitMiddleware, max_bytes=10)
         with StarletteClient(mini_app) as tc:
-            resp = tc.post("/", content=b"x" * 11,
-                           headers={"content-length": "11"})
+            resp = tc.post("/", content=b"x" * 11, headers={"content-length": "11"})
             assert resp.status_code == 413
 
 
 # ---------------------------------------------------------------------------
 # Health detailed — process_memory component
 # ---------------------------------------------------------------------------
+
 
 class TestHealthMemoryMetric:
     def test_detailed_health_has_memory(self, client):

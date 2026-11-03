@@ -44,7 +44,7 @@ async def list_dead_letter(
     request: Request,
     limit: int = 50,
     offset: int = Query(default=0, ge=0),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return failed tasks (dead-letter queue) for inspection and retry."""
     queue = getattr(request.app.state, "task_queue", None)
     if queue is None:

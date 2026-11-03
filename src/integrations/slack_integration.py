@@ -6,10 +6,11 @@ import hashlib
 import hmac
 import json
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     import httpx
+
     _HTTPX = True
 except ImportError:
     _HTTPX = False
@@ -34,26 +35,29 @@ class SlackIntegration:
         self,
         channel: str,
         text: str,
-        blocks: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
+        blocks: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         if not _HTTPX:
             return {"ok": False, "error": "httpx not installed"}
-        payload: Dict[str, Any] = {"channel": channel, "text": text}
+        payload: dict[str, Any] = {"channel": channel, "text": text}
         if blocks:
             payload["blocks"] = blocks
         async with httpx.AsyncClient() as client:
             r = await client.post(
                 "https://slack.com/api/chat.postMessage",
-                headers={"Authorization": f"Bearer {self._token}", "Content-Type": "application/json"},
+                headers={
+                    "Authorization": f"Bearer {self._token}",
+                    "Content-Type": "application/json",
+                },
                 content=json.dumps(payload),
                 timeout=10,
             )
         return r.json()
 
-    async def send_webhook(self, text: str, blocks: Optional[List[Dict]] = None) -> bool:
+    async def send_webhook(self, text: str, blocks: list[dict] | None = None) -> bool:
         if not _HTTPX or not self._webhook:
             return False
-        payload: Dict[str, Any] = {"text": text}
+        payload: dict[str, Any] = {"text": text}
         if blocks:
             payload["blocks"] = blocks
         async with httpx.AsyncClient() as client:
@@ -65,7 +69,7 @@ class SlackIntegration:
             )
         return r.status_code == 200
 
-    async def list_channels(self) -> List[Dict[str, Any]]:
+    async def list_channels(self) -> list[dict[str, Any]]:
         if not _HTTPX:
             return []
         async with httpx.AsyncClient() as client:
@@ -85,9 +89,10 @@ class SlackIntegration:
         if abs(time.time() - float(timestamp)) > 300:
             return False
         base = f"v0:{timestamp}:{body.decode()}"
-        expected = "v0=" + hmac.new(
-            self._secret.encode(), base.encode(), hashlib.sha256
-        ).hexdigest()
+        expected = (
+            "v0="
+            + hmac.new(self._secret.encode(), base.encode(), hashlib.sha256).hexdigest()
+        )
         return hmac.compare_digest(expected, signature)
 
     def __repr__(self) -> str:

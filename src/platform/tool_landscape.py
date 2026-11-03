@@ -191,14 +191,21 @@ class ToolLandscape:
         del self._tools[tool_id]
         return True
 
-    def update_tool(self, tool_id: str, **fields) -> Optional["PlatformTool"]:
+    def update_tool(self, tool_id: str, **fields) -> PlatformTool | None:
         """Patch one or more fields on an existing tool; returns updated tool or None."""
         tool = self._tools.get(tool_id)
         if tool is None:
             return None
         allowed = {
-            "description", "version", "homepage_url", "docs_url",
-            "tags", "owner_team", "is_active", "category", "tier",
+            "description",
+            "version",
+            "homepage_url",
+            "docs_url",
+            "tags",
+            "owner_team",
+            "is_active",
+            "category",
+            "tier",
         }
         for key, value in fields.items():
             if key in allowed:

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     import httpx
+
     _HTTPX = True
 except ImportError:
     _HTTPX = False
@@ -20,7 +21,7 @@ class GitHubIntegration:
     def __init__(self, token: str = "") -> None:
         self._token = token
 
-    def _headers(self) -> Dict[str, str]:
+    def _headers(self) -> dict[str, str]:
         h = {
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
@@ -29,7 +30,7 @@ class GitHubIntegration:
             h["Authorization"] = f"Bearer {self._token}"
         return h
 
-    async def list_repos(self, owner: str, per_page: int = 30) -> List[Dict[str, Any]]:
+    async def list_repos(self, owner: str, per_page: int = 30) -> list[dict[str, Any]]:
         if not _HTTPX:
             return []
         async with httpx.AsyncClient() as client:
@@ -41,16 +42,18 @@ class GitHubIntegration:
             )
         return r.json()
 
-    async def get_repo(self, owner: str, repo: str) -> Dict[str, Any]:
+    async def get_repo(self, owner: str, repo: str) -> dict[str, Any]:
         if not _HTTPX:
             return {}
         async with httpx.AsyncClient() as client:
-            r = await client.get(f"{_BASE}/repos/{owner}/{repo}", headers=self._headers(), timeout=15)
+            r = await client.get(
+                f"{_BASE}/repos/{owner}/{repo}", headers=self._headers(), timeout=15
+            )
         return r.json()
 
     async def list_issues(
         self, owner: str, repo: str, state: str = "open", per_page: int = 30
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         if not _HTTPX:
             return []
         async with httpx.AsyncClient() as client:
@@ -68,11 +71,11 @@ class GitHubIntegration:
         repo: str,
         title: str,
         body: str = "",
-        labels: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        labels: list[str] | None = None,
+    ) -> dict[str, Any]:
         if not _HTTPX:
             return {}
-        payload: Dict[str, Any] = {"title": title, "body": body}
+        payload: dict[str, Any] = {"title": title, "body": body}
         if labels:
             payload["labels"] = labels
         async with httpx.AsyncClient() as client:
@@ -86,7 +89,7 @@ class GitHubIntegration:
 
     async def list_pull_requests(
         self, owner: str, repo: str, state: str = "open", per_page: int = 30
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         if not _HTTPX:
             return []
         async with httpx.AsyncClient() as client:
@@ -100,7 +103,7 @@ class GitHubIntegration:
 
     async def create_comment(
         self, owner: str, repo: str, issue_number: int, body: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         if not _HTTPX:
             return {}
         async with httpx.AsyncClient() as client:
@@ -114,7 +117,7 @@ class GitHubIntegration:
 
     async def get_workflow_runs(
         self, owner: str, repo: str, per_page: int = 10
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         if not _HTTPX:
             return {}
         async with httpx.AsyncClient() as client:

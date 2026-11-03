@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from src.auth.key_store import KeyRole
 
@@ -19,7 +20,9 @@ def _api_key_mock(role: str = "admin"):
 @pytest.fixture(scope="module")
 def client():
     from fastapi.testclient import TestClient
+
     from src.api.main import create_app
+
     app = create_app()
     with TestClient(app, raise_server_exceptions=True) as c:
         app.state.key_store = MagicMock()
@@ -36,10 +39,12 @@ H = {"X-API-Key": "sk-test"}
 # ConversationManager unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestConversationManager:
     @pytest.fixture()
     def manager(self, tmp_path):
         from src.conversational.conversation_manager import ConversationManager
+
         return ConversationManager(db_path=str(tmp_path / "conv_test.db"))
 
     @pytest.mark.asyncio
@@ -132,10 +137,12 @@ class TestConversationManager:
 # IntentClassifier unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestIntentClassifier:
     @pytest.fixture()
     def clf(self):
         from src.conversational.intent_classifier import IntentClassifier
+
         return IntentClassifier()
 
     @pytest.mark.asyncio
@@ -186,6 +193,7 @@ class TestIntentClassifier:
     @pytest.mark.asyncio
     async def test_fallback_on_llm_error(self):
         from src.conversational.intent_classifier import IntentClassifier
+
         bad_llm = MagicMock()
         bad_llm.agenerate = MagicMock(side_effect=RuntimeError("LLM down"))
         clf = IntentClassifier(llm=bad_llm)
@@ -197,10 +205,12 @@ class TestIntentClassifier:
 # ContextTracker unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestContextTracker:
     @pytest.fixture()
     def tracker(self):
         from src.conversational.context_tracker import ContextTracker
+
         return ContextTracker(max_messages=5, max_tokens=200)
 
     def test_add_and_get_context(self, tracker):
@@ -232,7 +242,7 @@ class TestContextTracker:
     async def test_summarize_no_llm_truncates(self, tracker):
         for i in range(5):
             tracker.add_message("s4", "user", "x" * 50)
-        result = await tracker.summarize_if_needed("s4", llm=None)
+        await tracker.summarize_if_needed("s4", llm=None)
         ctx = tracker.get_context("s4")
         assert len(ctx) <= 5
 
@@ -247,10 +257,14 @@ class TestContextTracker:
 # Conversational API endpoint tests
 # ---------------------------------------------------------------------------
 
+
 class TestConversationalAPI:
     def test_create_session(self, client):
-        resp = client.post("/api/v1/conversational/sessions", headers=H,
-                           json={"agent_name": "test_agent"})
+        resp = client.post(
+            "/api/v1/conversational/sessions",
+            headers=H,
+            json={"agent_name": "test_agent"},
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert "session_id" in data
@@ -261,8 +275,9 @@ class TestConversationalAPI:
         assert "sessions" in resp.json()
 
     def test_get_session(self, client):
-        create = client.post("/api/v1/conversational/sessions", headers=H,
-                             json={"agent_name": "agent1"})
+        create = client.post(
+            "/api/v1/conversational/sessions", headers=H, json={"agent_name": "agent1"}
+        )
         sid = create.json()["session_id"]
         resp = client.get(f"/api/v1/conversational/sessions/{sid}", headers=H)
         assert resp.status_code == 200
@@ -273,13 +288,19 @@ class TestConversationalAPI:
         assert resp.status_code == 404
 
     def test_delete_session(self, client):
-        create = client.post("/api/v1/conversational/sessions", headers=H,
-                             json={"agent_name": "del_agent"})
+        create = client.post(
+            "/api/v1/conversational/sessions",
+            headers=H,
+            json={"agent_name": "del_agent"},
+        )
         sid = create.json()["session_id"]
         resp = client.delete(f"/api/v1/conversational/sessions/{sid}", headers=H)
         assert resp.status_code == 200
 
     def test_classify_intent(self, client):
-        resp = client.post("/api/v1/conversational/classify", headers=H,
-                           json={"text": "What is the weather today?"})
+        resp = client.post(
+            "/api/v1/conversational/classify",
+            headers=H,
+            json={"text": "What is the weather today?"},
+        )
         assert resp.status_code in (200, 503)

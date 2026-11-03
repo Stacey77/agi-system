@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from src.workforce.worker_pool import WorkerPool
 from src.workforce.task_dispatcher import TaskDispatcher
+from src.workforce.worker_pool import WorkerPool
 
 
 class WorkforceManager:
@@ -13,8 +13,8 @@ class WorkforceManager:
 
     def __init__(
         self,
-        agent_factory: Optional[Any] = None,
-        task_queue: Optional[Any] = None,
+        agent_factory: Any | None = None,
+        task_queue: Any | None = None,
     ) -> None:
         self._factory = agent_factory
         self._queue = task_queue
@@ -24,23 +24,25 @@ class WorkforceManager:
     async def initialize_from_factory(self) -> None:
         if self._factory is None:
             return
-        try:
-            agents = self._factory.list_agents()
-        except Exception:
+        list_agents = getattr(self._factory, "list_agents", None)
+        if list_agents is None:
             return
+        agents = list_agents()
         for agent in agents:
             cfg = getattr(agent, "config", None)
             if cfg is None:
                 continue
             name = getattr(cfg, "name", None) or getattr(agent, "name", "unknown")
             agent_type = getattr(cfg, "agent_type", None)
-            agent_type_val = agent_type.value if hasattr(agent_type, "value") else str(agent_type)
+            agent_type_val = (
+                agent_type.value if hasattr(agent_type, "value") else str(agent_type)
+            )
             caps = list(getattr(cfg, "capabilities", []) or [])
             self._pool.add_worker(name=name, agent_type=agent_type_val, skills=caps)
 
     async def hire(
-        self, name: str, agent_type: str, skills: List[str]
-    ) -> Dict[str, Any]:
+        self, name: str, agent_type: str, skills: list[str]
+    ) -> dict[str, Any]:
         worker = self._pool.add_worker(name=name, agent_type=agent_type, skills=skills)
         return worker.to_dict()
 
@@ -50,21 +52,25 @@ class WorkforceManager:
     async def assign_objective(
         self,
         objective: str,
-        required_skills: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
-        return await self._dispatcher.dispatch(objective, required_skills=required_skills)
+        required_skills: list[str] | None = None,
+    ) -> dict[str, Any]:
+        return await self._dispatcher.dispatch(
+            objective, required_skills=required_skills
+        )
 
     async def assign_batch(
-        self, objectives: List[str], required_skills: Optional[List[str]] = None
-    ) -> List[Dict[str, Any]]:
-        return await self._dispatcher.dispatch_batch(objectives, required_skills=required_skills)
+        self, objectives: list[str], required_skills: list[str] | None = None
+    ) -> list[dict[str, Any]]:
+        return await self._dispatcher.dispatch_batch(
+            objectives, required_skills=required_skills
+        )
 
-    def workforce_status(self) -> Dict[str, Any]:
+    def workforce_status(self) -> dict[str, Any]:
         stats = self._pool.stats()
         workers = [w.to_dict() for w in self._pool.list_workers()]
         return {**stats, "workers": workers}
 
-    async def scale_up(self, agent_type: str, count: int = 1) -> List[Dict[str, Any]]:
+    async def scale_up(self, agent_type: str, count: int = 1) -> list[dict[str, Any]]:
         results = []
         for i in range(count):
             worker = self._pool.add_worker(

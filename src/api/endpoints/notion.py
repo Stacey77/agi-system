@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -46,22 +46,22 @@ class CreatePageRequest(BaseModel):
 
 
 class UpdatePageRequest(BaseModel):
-    properties: Dict[str, Any]
+    properties: dict[str, Any]
 
 
 class AppendBlocksRequest(BaseModel):
-    blocks: List[Dict[str, Any]]
+    blocks: list[dict[str, Any]]
 
 
 class QueryDatabaseRequest(BaseModel):
-    filter: Optional[Dict[str, Any]] = None
-    sorts: Optional[List[Dict[str, Any]]] = None
+    filter: dict[str, Any] | None = None
+    sorts: list[dict[str, Any]] | None = None
     page_size: int = 50
 
 
 class NotionSearchRequest(BaseModel):
     query: str
-    filter_type: Optional[str] = None
+    filter_type: str | None = None
     page_size: int = 20
 
 
@@ -71,12 +71,14 @@ class NotionSearchRequest(BaseModel):
 
 
 @router.get("/status")
-async def notion_status(request: Request) -> Dict[str, Any]:
+async def notion_status(request: Request) -> dict[str, Any]:
     """Check whether the Notion integration is configured."""
     api_key_set = bool(os.getenv("NOTION_API_KEY"))
     return {
         "configured": api_key_set,
-        "message": "Notion integration active" if api_key_set else "Set NOTION_API_KEY to enable",
+        "message": "Notion integration active"
+        if api_key_set
+        else "Set NOTION_API_KEY to enable",
     }
 
 
@@ -86,7 +88,7 @@ async def notion_status(request: Request) -> Dict[str, Any]:
 
 
 @router.get("/pages/{page_id}")
-async def get_page(page_id: str, request: Request) -> Dict[str, Any]:
+async def get_page(page_id: str, request: Request) -> dict[str, Any]:
     """Fetch a Notion page by ID."""
     notion = _client(request)
     try:
@@ -96,7 +98,7 @@ async def get_page(page_id: str, request: Request) -> Dict[str, Any]:
 
 
 @router.get("/pages/{page_id}/content")
-async def get_page_content(page_id: str, request: Request) -> Dict[str, Any]:
+async def get_page_content(page_id: str, request: Request) -> dict[str, Any]:
     """Return all block children of a Notion page."""
     notion = _client(request)
     try:
@@ -107,7 +109,7 @@ async def get_page_content(page_id: str, request: Request) -> Dict[str, Any]:
 
 
 @router.post("/pages")
-async def create_page(body: CreatePageRequest, request: Request) -> Dict[str, Any]:
+async def create_page(body: CreatePageRequest, request: Request) -> dict[str, Any]:
     """Create a new Notion page under a database or page parent."""
     notion = _client(request)
     try:
@@ -124,7 +126,7 @@ async def create_page(body: CreatePageRequest, request: Request) -> Dict[str, An
 @router.patch("/pages/{page_id}")
 async def update_page(
     page_id: str, body: UpdatePageRequest, request: Request
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Update properties on an existing Notion page."""
     notion = _client(request)
     try:
@@ -134,7 +136,7 @@ async def update_page(
 
 
 @router.delete("/pages/{page_id}")
-async def archive_page(page_id: str, request: Request) -> Dict[str, Any]:
+async def archive_page(page_id: str, request: Request) -> dict[str, Any]:
     """Archive (soft-delete) a Notion page."""
     notion = _client(request)
     try:
@@ -146,7 +148,7 @@ async def archive_page(page_id: str, request: Request) -> Dict[str, Any]:
 @router.post("/pages/{page_id}/blocks")
 async def append_blocks(
     page_id: str, body: AppendBlocksRequest, request: Request
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Append block children to a Notion page."""
     notion = _client(request)
     try:
@@ -161,7 +163,7 @@ async def append_blocks(
 
 
 @router.get("/databases/{database_id}")
-async def get_database(database_id: str, request: Request) -> Dict[str, Any]:
+async def get_database(database_id: str, request: Request) -> dict[str, Any]:
     """Fetch a Notion database schema."""
     notion = _client(request)
     try:
@@ -173,7 +175,7 @@ async def get_database(database_id: str, request: Request) -> Dict[str, Any]:
 @router.post("/databases/{database_id}/query")
 async def query_database(
     database_id: str, body: QueryDatabaseRequest, request: Request
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Query a Notion database with optional filter and sort."""
     notion = _client(request)
     try:
@@ -188,9 +190,7 @@ async def query_database(
 
 
 @router.get("/databases/{database_id}/rows")
-async def list_database_rows(
-    database_id: str, request: Request
-) -> Dict[str, Any]:
+async def list_database_rows(database_id: str, request: Request) -> dict[str, Any]:
     """Return all rows from a Notion database (handles pagination automatically)."""
     notion = _client(request)
     try:
@@ -206,7 +206,7 @@ async def list_database_rows(
 
 
 @router.post("/search")
-async def search_notion(body: NotionSearchRequest, request: Request) -> Dict[str, Any]:
+async def search_notion(body: NotionSearchRequest, request: Request) -> dict[str, Any]:
     """Search across all Notion pages and databases the integration can access."""
     notion = _client(request)
     try:
