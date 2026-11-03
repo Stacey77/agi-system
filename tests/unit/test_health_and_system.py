@@ -41,6 +41,18 @@ class TestHealthEndpoints:
         r = client.get("/health/detailed")
         assert r.json()["status"] in ("healthy", "degraded")
 
+    def test_detailed_health_does_not_expose_exception_details(self, client):
+        class FailingQueue:
+            def list_all(self):
+                raise RuntimeError("/private/internal/path")
+
+        client.app.state.task_queue = FailingQueue()
+        response = client.get("/health/detailed")
+
+        assert response.status_code == 200
+        assert response.json()["components"]["task_queue"]["error"] == "check failed"
+        assert "/private/internal/path" not in response.text
+
 
 class TestRequestIDMiddleware:
     @pytest.fixture(scope="class")
