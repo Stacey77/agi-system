@@ -34,8 +34,12 @@ async def detailed_health(request: Request) -> Dict[str, Any]:
             components["task_queue"] = {"status": "healthy", "total_tasks": total}
         else:
             components["task_queue"] = {"status": "not_initialised"}
-    except Exception as exc:  # noqa: BLE001
-        components["task_queue"] = {"status": "unhealthy", "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        logger.exception("Health check failed for task queue")
+        components["task_queue"] = {
+            "status": "unhealthy",
+            "error": "component check failed",
+        }
 
     # Redis (if configured)
     try:
@@ -45,8 +49,12 @@ async def detailed_health(request: Request) -> Dict[str, Any]:
             components["redis"] = {"status": "healthy"}
         else:
             components["redis"] = {"status": "not_configured"}
-    except Exception as exc:  # noqa: BLE001
-        components["redis"] = {"status": "unhealthy", "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        logger.exception("Health check failed for Redis")
+        components["redis"] = {
+            "status": "unhealthy",
+            "error": "component check failed",
+        }
 
     # LLM
     try:
@@ -55,8 +63,12 @@ async def detailed_health(request: Request) -> Dict[str, Any]:
             components["llm"] = {"status": "healthy", "provider": type(llm).__name__}
         else:
             components["llm"] = {"status": "mock_mode"}
-    except Exception as exc:  # noqa: BLE001
-        components["llm"] = {"status": "unhealthy", "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        logger.exception("Health check failed for LLM")
+        components["llm"] = {
+            "status": "unhealthy",
+            "error": "component check failed",
+        }
 
     # Agent factory
     try:
@@ -66,8 +78,12 @@ async def detailed_health(request: Request) -> Dict[str, Any]:
             components["agent_factory"] = {"status": "healthy", "agents": agent_names}
         else:
             components["agent_factory"] = {"status": "not_initialised"}
-    except Exception as exc:  # noqa: BLE001
-        components["agent_factory"] = {"status": "unhealthy", "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        logger.exception("Health check failed for agent factory")
+        components["agent_factory"] = {
+            "status": "unhealthy",
+            "error": "component check failed",
+        }
 
     # Task persistence (SQLite)
     try:
@@ -76,8 +92,12 @@ async def detailed_health(request: Request) -> Dict[str, Any]:
             components["task_db"] = {"status": "healthy", "path": persistence._db_path}
         else:
             components["task_db"] = {"status": "not_configured"}
-    except Exception as exc:  # noqa: BLE001
-        components["task_db"] = {"status": "unhealthy", "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        logger.exception("Health check failed for task persistence")
+        components["task_db"] = {
+            "status": "unhealthy",
+            "error": "component check failed",
+        }
 
     # Key store
     try:
@@ -87,8 +107,12 @@ async def detailed_health(request: Request) -> Dict[str, Any]:
             components["auth"] = {"status": "healthy", "active_keys": active}
         else:
             components["auth"] = {"status": "not_initialised"}
-    except Exception as exc:  # noqa: BLE001
-        components["auth"] = {"status": "unhealthy", "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        logger.exception("Health check failed for key store")
+        components["auth"] = {
+            "status": "unhealthy",
+            "error": "component check failed",
+        }
 
     statuses = [v["status"] if isinstance(v, dict) else v for v in components.values()]
     all_ok = all(s in ("healthy", "mock_mode", "not_configured") for s in statuses)
