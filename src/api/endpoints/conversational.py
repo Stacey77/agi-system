@@ -11,7 +11,8 @@ router = APIRouter(prefix="/api/v1/conversational", tags=["conversational"])
 
 
 class SessionCreateRequest(BaseModel):
-    user_id: str
+    user_id: Optional[str] = None
+    agent_name: str = "default"
     metadata: Optional[Dict[str, Any]] = None
 
 
@@ -40,18 +41,18 @@ def _clf(request: Request):
 @router.post("/sessions", summary="Create a new conversation session")
 async def create_session(body: SessionCreateRequest, request: Request) -> Dict[str, Any]:
     mgr = _mgr(request)
-    session = await mgr.create_session(user_id=body.user_id, metadata=body.metadata)
+    session = await mgr.create_session(agent_name=body.agent_name, metadata=body.metadata)
     return session
 
 
 @router.get("/sessions", summary="List conversation sessions")
 async def list_sessions(
-    user_id: Optional[str] = None,
+    agent_name: Optional[str] = None,
     limit: int = 50,
     request: Request = None,  # type: ignore[assignment]
 ) -> Dict[str, Any]:
     mgr = _mgr(request)
-    sessions = await mgr.list_sessions(user_id=user_id, limit=limit)
+    sessions = await mgr.list_sessions(agent_name=agent_name, limit=limit)
     return {"sessions": sessions, "total": len(sessions)}
 
 
@@ -80,7 +81,6 @@ async def add_message(session_id: str, body: MessageRequest, request: Request) -
         session_id=session_id,
         role=body.role,
         content=body.content,
-        metadata=body.metadata,
     )
     if msg is None:
         raise HTTPException(status_code=404, detail="Session not found")
