@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from src.platform.developer_portal import DeveloperPortal, PortalTier, ServiceStatus
+from src.platform.developer_portal import DeveloperPortal, PortalTier
 from src.platform.tool_landscape import ToolCategory, ToolLandscape, ToolTier
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api/v1/platform", tags=["platform"])
 # ------------------------------------------------------------------
 # Shared state helpers
 # ------------------------------------------------------------------
+
 
 def _get_tool_landscape(request: Request) -> ToolLandscape:
     landscape = getattr(request.app.state, "tool_landscape", None)
@@ -44,6 +45,7 @@ def _get_kally_agent(request: Request) -> Any:
 # ------------------------------------------------------------------
 # Platform tooling landscape
 # ------------------------------------------------------------------
+
 
 class RegisterToolRequest(BaseModel):
     name: str
@@ -72,7 +74,9 @@ async def list_tools(
         try:
             cat_filter = ToolCategory(category)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Unknown category '{category}'")
+            raise HTTPException(
+                status_code=400, detail=f"Unknown category '{category}'"
+            )
     if tier:
         try:
             tier_filter = ToolTier(tier)
@@ -127,6 +131,7 @@ async def register_tool(body: RegisterToolRequest, request: Request) -> Dict[str
 # Developer portal
 # ------------------------------------------------------------------
 
+
 class RegisterServiceRequest(BaseModel):
     name: str
     description: str = ""
@@ -172,7 +177,9 @@ async def portal_health(request: Request) -> Dict[str, Any]:
 
 
 @router.post("/portal/services")
-async def register_service(body: RegisterServiceRequest, request: Request) -> Dict[str, Any]:
+async def register_service(
+    body: RegisterServiceRequest, request: Request
+) -> Dict[str, Any]:
     """Register a new service in the developer portal."""
     portal = _get_developer_portal(request)
     try:
@@ -195,6 +202,7 @@ async def register_service(body: RegisterServiceRequest, request: Request) -> Di
 # ------------------------------------------------------------------
 # Kally AI
 # ------------------------------------------------------------------
+
 
 class KallySignalRequest(BaseModel):
     source: str

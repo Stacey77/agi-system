@@ -73,7 +73,9 @@ class TaskQueue:
         self._stop_event: asyncio.Event = asyncio.Event()
         if persistence is not None:
             self._records = persistence.load_all()
-            logger.info("TaskQueue restored %d records from persistence", len(self._records))
+            logger.info(
+                "TaskQueue restored %d records from persistence", len(self._records)
+            )
 
     async def start(self, handler: Callable[[TaskRecord], Coroutine]) -> None:
         """Start background worker with *handler* called for each task."""
@@ -84,7 +86,9 @@ class TaskQueue:
             await self._init_redis(redis_url)
         self._worker_task = asyncio.create_task(self._worker())
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())
-        logger.info("TaskQueue started (backend=%s)", "redis" if self._redis else "asyncio")
+        logger.info(
+            "TaskQueue started (backend=%s)", "redis" if self._redis else "asyncio"
+        )
 
     async def stop(self) -> None:
         self._stop_event.set()
@@ -105,7 +109,9 @@ class TaskQueue:
             except Exception:  # noqa: BLE001
                 pass
 
-    async def submit(self, objective: str, parameters: Dict[str, Any] = {}) -> TaskRecord:
+    async def submit(
+        self, objective: str, parameters: Dict[str, Any] = {}
+    ) -> TaskRecord:
         task_id = str(uuid.uuid4())
         record = TaskRecord(task_id=task_id, objective=objective)
         record.__dict__.update({"parameters": parameters})
@@ -125,12 +131,17 @@ class TaskQueue:
 
     def cancel(self, task_id: str) -> bool:
         record = self._records.get(task_id)
-        if record is None or record.status not in (TaskStatus.QUEUED, TaskStatus.RUNNING):
+        if record is None or record.status not in (
+            TaskStatus.QUEUED,
+            TaskStatus.RUNNING,
+        ):
             return False
         record.status = TaskStatus.CANCELLED
         return True
 
-    async def update_progress(self, task_id: str, progress: int, message: str = "") -> None:
+    async def update_progress(
+        self, task_id: str, progress: int, message: str = ""
+    ) -> None:
         """Push a progress update (0-100) from within a task handler."""
         record = self._records.get(task_id)
         if record is None or record.status != TaskStatus.RUNNING:
@@ -160,6 +171,7 @@ class TaskQueue:
     async def _init_redis(self, url: str) -> None:
         try:
             import redis.asyncio as aioredis  # type: ignore[import]
+
             self._redis = aioredis.from_url(url, decode_responses=True)
             await self._redis.ping()
             logger.info("TaskQueue connected to Redis at %s", url)
@@ -255,11 +267,14 @@ class TaskQueue:
                 return
             cutoff = time.time() - self._retention_seconds
             to_delete = [
-                tid for tid, r in list(self._records.items())
+                tid
+                for tid, r in list(self._records.items())
                 if r.status in _TERMINAL and (r.completed_at or 0) < cutoff
             ]
             for tid in to_delete:
                 del self._records[tid]
                 self._subscribers.pop(tid, None)
             if to_delete:
-                logger.info("TaskQueue cleanup: removed %d expired records", len(to_delete))
+                logger.info(
+                    "TaskQueue cleanup: removed %d expired records", len(to_delete)
+                )

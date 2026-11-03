@@ -41,9 +41,7 @@ class RecoveryPlan:
 class ErrorHandler:
     """Classifies errors and generates recovery plans."""
 
-    def analyze_error(
-        self, error: Exception, task: Dict[str, Any]
-    ) -> ErrorAnalysis:
+    def analyze_error(self, error: Exception, task: Dict[str, Any]) -> ErrorAnalysis:
         """Analyse *error* in the context of *task*."""
         error_msg = str(error).lower()
         error_type = self._classify(error_msg)
@@ -89,9 +87,7 @@ class ErrorHandler:
                 return etype
         return "unknown"
 
-    def _assess_severity(
-        self, error_type: str, task: Dict[str, Any]
-    ) -> str:
+    def _assess_severity(self, error_type: str, task: Dict[str, Any]) -> str:
         if error_type == "permission":
             return "high"
         if error_type == "network":

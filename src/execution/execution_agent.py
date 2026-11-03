@@ -9,7 +9,11 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from src.execution.execution_engine import ExecutionEngine, ExecutionResult, ExecutionStatus
+from src.execution.execution_engine import (
+    ExecutionEngine,
+    ExecutionResult,
+    ExecutionStatus,
+)
 from src.execution.task_validation import TaskValidationSystem, ValidationResult
 
 logger = logging.getLogger(__name__)
@@ -39,9 +43,7 @@ class ExecutionAgent:
     def __init__(self, execution_engine: Optional[ExecutionEngine] = None) -> None:
         self._engine = execution_engine or ExecutionEngine()
         self._validator = TaskValidationSystem()
-        logger.info(
-            "ExecutionAgent initialised (priority=%.1f)", self.PRIORITY_SCORE
-        )
+        logger.info("ExecutionAgent initialised (priority=%.1f)", self.PRIORITY_SCORE)
 
     # ------------------------------------------------------------------
     # Public interface

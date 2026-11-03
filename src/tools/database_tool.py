@@ -51,7 +51,11 @@ class DatabaseTool(BaseTool):
         try:
             conn = self._get_connection()
             rows = self._run_query(conn, query, params, fetch)
-            return {"query": query, "rows": rows, "row_count": len(rows) if isinstance(rows, list) else 0}
+            return {
+                "query": query,
+                "rows": rows,
+                "row_count": len(rows) if isinstance(rows, list) else 0,
+            }
         except Exception as exc:  # noqa: BLE001
             logger.error("Database query failed: %s", exc)
             return {"error": str(exc), "rows": []}

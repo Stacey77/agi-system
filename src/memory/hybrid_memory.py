@@ -26,7 +26,9 @@ class HybridMemory:
     # Context API
     # ------------------------------------------------------------------
 
-    def get_context(self, agent_id: str, query: str, k: int = 5) -> List[Dict[str, Any]]:
+    def get_context(
+        self, agent_id: str, query: str, k: int = 5
+    ) -> List[Dict[str, Any]]:
         """Return a merged context for *agent_id* relevant to *query*."""
         shared_results = self._shared_store.similarity_search(query, k=k)
         agent_results = self._get_agent_results(agent_id, query, k=k)
@@ -35,7 +37,7 @@ class HybridMemory:
         # Deduplicate by document content
         seen: set = set()
         merged: List[Dict[str, Any]] = []
-        for item in (agent_context + agent_results + shared_results):
+        for item in agent_context + agent_results + shared_results:
             doc = item.get("document", str(item))
             if doc not in seen:
                 seen.add(doc)

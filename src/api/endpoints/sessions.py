@@ -31,7 +31,9 @@ def _get_factory(request: Request):
 
 
 @router.post("/", status_code=201)
-async def create_session(body: CreateSessionRequest, request: Request) -> Dict[str, Any]:
+async def create_session(
+    body: CreateSessionRequest, request: Request
+) -> Dict[str, Any]:
     manager = _get_manager(request)
     session = manager.create_session(agent_name=body.agent_name)
     return {
@@ -107,7 +109,9 @@ async def send_message(
     try:
         result = await agent.process_task({"task": task_input})
     except Exception as exc:  # noqa: BLE001
-        logger.error("Agent '%s' error in session '%s': %s", session.agent_name, session_id, exc)
+        logger.error(
+            "Agent '%s' error in session '%s': %s", session.agent_name, session_id, exc
+        )
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     output = result.get("result") or result.get("output") or str(result)
@@ -139,10 +143,12 @@ async def get_messages(
         messages = [m for m in messages if m.get("role") == role]
     if search is not None:
         search_lower = search.lower()
-        messages = [m for m in messages if search_lower in str(m.get("content", "")).lower()]
+        messages = [
+            m for m in messages if search_lower in str(m.get("content", "")).lower()
+        ]
 
     total_filtered = len(messages)
-    messages = messages[offset: offset + limit]
+    messages = messages[offset : offset + limit]
 
     return {
         "messages": messages,

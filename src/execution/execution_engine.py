@@ -70,9 +70,7 @@ class ExecutionEngine:
 
         results: Dict[str, ExecutionResult] = {}
         for batch in ordered:
-            batch_coros = [
-                self._execute_single_task(task, results) for task in batch
-            ]
+            batch_coros = [self._execute_single_task(task, results) for task in batch]
             batch_results = await asyncio.gather(*batch_coros, return_exceptions=True)
             for task, br in zip(batch, batch_results):
                 tid = task.get("task_id", "unknown")

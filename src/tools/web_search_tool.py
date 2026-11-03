@@ -92,7 +92,10 @@ class WebSearchTool(BaseTool):
 
             resp = httpx.post(
                 "https://google.serper.dev/search",
-                headers={"X-API-KEY": self._api_key or "", "Content-Type": "application/json"},
+                headers={
+                    "X-API-KEY": self._api_key or "",
+                    "Content-Type": "application/json",
+                },
                 json={"q": query, "num": max_results},
                 timeout=10,
             )

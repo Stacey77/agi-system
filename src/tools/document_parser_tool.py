@@ -23,7 +23,10 @@ class DocumentParserTool(BaseTool):
                 "required": ["file_path"],
                 "optional": ["output_format"],
                 "properties": {
-                    "file_path": {"type": "string", "description": "Path to the document"},
+                    "file_path": {
+                        "type": "string",
+                        "description": "Path to the document",
+                    },
                     "output_format": {
                         "type": "string",
                         "enum": ["text", "structured"],
@@ -69,11 +72,22 @@ class DocumentParserTool(BaseTool):
 
             reader = pypdf.PdfReader(str(path))
             pages = [page.extract_text() or "" for page in reader.pages]
-            content: Union[str, List[str]] = pages if fmt == "structured" else "\n".join(pages)
-            return {"file": str(path), "type": "pdf", "pages": len(pages), "content": content}
+            content: Union[str, List[str]] = (
+                pages if fmt == "structured" else "\n".join(pages)
+            )
+            return {
+                "file": str(path),
+                "type": "pdf",
+                "pages": len(pages),
+                "content": content,
+            }
         except ImportError:
             logger.warning("pypdf not installed; returning mock PDF content")
-            return {"file": str(path), "type": "pdf", "content": "[PDF content placeholder]"}
+            return {
+                "file": str(path),
+                "type": "pdf",
+                "content": "[PDF content placeholder]",
+            }
 
     def _parse_word(self, path: Path, fmt: str) -> Dict[str, Any]:
         try:
@@ -81,11 +95,22 @@ class DocumentParserTool(BaseTool):
 
             doc = docx.Document(str(path))
             paragraphs = [p.text for p in doc.paragraphs]
-            content: Union[str, List[str]] = paragraphs if fmt == "structured" else "\n".join(paragraphs)
-            return {"file": str(path), "type": "docx", "paragraphs": len(paragraphs), "content": content}
+            content: Union[str, List[str]] = (
+                paragraphs if fmt == "structured" else "\n".join(paragraphs)
+            )
+            return {
+                "file": str(path),
+                "type": "docx",
+                "paragraphs": len(paragraphs),
+                "content": content,
+            }
         except ImportError:
             logger.warning("python-docx not installed; returning mock Word content")
-            return {"file": str(path), "type": "docx", "content": "[Word content placeholder]"}
+            return {
+                "file": str(path),
+                "type": "docx",
+                "content": "[Word content placeholder]",
+            }
 
     def _parse_excel(self, path: Path, fmt: str) -> Dict[str, Any]:
         try:
@@ -106,7 +131,11 @@ class DocumentParserTool(BaseTool):
             return {"file": str(path), "type": "xlsx", "content": "\n".join(rows)}
         except ImportError:
             logger.warning("openpyxl not installed; returning mock Excel content")
-            return {"file": str(path), "type": "xlsx", "content": "[Excel content placeholder]"}
+            return {
+                "file": str(path),
+                "type": "xlsx",
+                "content": "[Excel content placeholder]",
+            }
 
     def _parse_text(self, path: Path) -> Dict[str, Any]:
         content = path.read_text(encoding="utf-8", errors="replace")

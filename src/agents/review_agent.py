@@ -46,7 +46,9 @@ class ReviewAgent(BaseAgent):
         """Process a review task."""
         content = task.get("content")
         criteria = task.get("criteria", {})
-        logger.info("ReviewAgent reviewing content with criteria: %s", list(criteria.keys()))
+        logger.info(
+            "ReviewAgent reviewing content with criteria: %s", list(criteria.keys())
+        )
 
         review = await self.review_output(content, criteria)
 
@@ -143,7 +145,9 @@ class ReviewAgent(BaseAgent):
                 reflection_notes=parsed.get("reflection_notes", []),
             )
         except (json.JSONDecodeError, ValueError, TypeError):
-            logger.warning("LLM review returned non-JSON; falling back to rule-based review")
+            logger.warning(
+                "LLM review returned non-JSON; falling back to rule-based review"
+            )
             return None
 
     # ------------------------------------------------------------------

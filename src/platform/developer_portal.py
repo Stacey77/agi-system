@@ -212,7 +212,8 @@ class DeveloperPortal:
         return {
             "total_services": len(self._services),
             "status_counts": counts,
-            "fully_operational": counts[ServiceStatus.OPERATIONAL.value] == len(self._services),
+            "fully_operational": counts[ServiceStatus.OPERATIONAL.value]
+            == len(self._services),
         }
 
     def total_count(self) -> int:

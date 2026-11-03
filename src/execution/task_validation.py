@@ -8,9 +8,7 @@ from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
-_DANGEROUS_ACTIONS = frozenset(
-    {"delete_all", "drop_database", "rm_rf", "format_disk"}
-)
+_DANGEROUS_ACTIONS = frozenset({"delete_all", "drop_database", "rm_rf", "format_disk"})
 
 
 @dataclass
@@ -64,7 +62,11 @@ class TaskValidationSystem:
         errors: List[str],
         warnings: List[str],
     ) -> None:
-        if not task.get("task_id") and not task.get("action") and not task.get("objective"):
+        if (
+            not task.get("task_id")
+            and not task.get("action")
+            and not task.get("objective")
+        ):
             warnings.append("Task has no identifiable action or objective")
 
     def _check_permissions(
@@ -95,4 +97,6 @@ class TaskValidationSystem:
     ) -> None:
         deps = task.get("dependencies", [])
         if isinstance(deps, list) and len(deps) > 10:
-            warnings.append(f"Task has {len(deps)} dependencies — may impact performance")
+            warnings.append(
+                f"Task has {len(deps)} dependencies — may impact performance"
+            )

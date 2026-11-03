@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, field_validator
@@ -56,7 +56,9 @@ async def get_schedule(schedule_id: str, request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=503, detail="Task scheduler not initialised")
     sched = scheduler.get(schedule_id)
     if sched is None:
-        raise HTTPException(status_code=404, detail=f"Schedule '{schedule_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Schedule '{schedule_id}' not found"
+        )
     return sched.to_dict()
 
 
@@ -67,7 +69,9 @@ async def delete_schedule(schedule_id: str, request: Request) -> Dict[str, str]:
     if scheduler is None:
         raise HTTPException(status_code=503, detail="Task scheduler not initialised")
     if not scheduler.unschedule(schedule_id):
-        raise HTTPException(status_code=404, detail=f"Schedule '{schedule_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Schedule '{schedule_id}' not found"
+        )
     return {"message": f"Schedule '{schedule_id}' removed"}
 
 
@@ -78,7 +82,9 @@ async def pause_schedule(schedule_id: str, request: Request) -> Dict[str, Any]:
     if scheduler is None:
         raise HTTPException(status_code=503, detail="Task scheduler not initialised")
     if not scheduler.pause(schedule_id):
-        raise HTTPException(status_code=404, detail=f"Schedule '{schedule_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Schedule '{schedule_id}' not found"
+        )
     return scheduler.get(schedule_id).to_dict()
 
 
@@ -89,5 +95,7 @@ async def resume_schedule(schedule_id: str, request: Request) -> Dict[str, Any]:
     if scheduler is None:
         raise HTTPException(status_code=503, detail="Task scheduler not initialised")
     if not scheduler.resume(schedule_id):
-        raise HTTPException(status_code=404, detail=f"Schedule '{schedule_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Schedule '{schedule_id}' not found"
+        )
     return scheduler.get(schedule_id).to_dict()

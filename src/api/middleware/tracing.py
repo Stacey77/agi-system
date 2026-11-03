@@ -14,6 +14,7 @@ try:
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from opentelemetry.sdk.resources import Resource
+
     _OTEL_AVAILABLE = True
 except ImportError:
     _OTEL_AVAILABLE = False
@@ -34,11 +35,18 @@ def setup_tracing(service_name: str = "agi-system") -> None:
 
     if endpoint:
         try:
-            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter  # type: ignore
-            provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+                OTLPSpanExporter,
+            )  # type: ignore
+
+            provider.add_span_processor(
+                BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
+            )
             logger.info("OTLP tracing enabled → %s", endpoint)
         except ImportError:
-            logger.warning("opentelemetry-exporter-otlp not installed — traces will not be exported")
+            logger.warning(
+                "opentelemetry-exporter-otlp not installed — traces will not be exported"
+            )
 
     trace.set_tracer_provider(provider)
     _tracer = trace.get_tracer(service_name)

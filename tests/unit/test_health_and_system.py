@@ -10,6 +10,7 @@ class TestHealthEndpoints:
     def client(self):
         from fastapi.testclient import TestClient
         from src.api.main import create_app
+
         with TestClient(create_app()) as c:
             yield c
 
@@ -45,6 +46,7 @@ class TestRequestIDMiddleware:
     def client(self):
         from fastapi.testclient import TestClient
         from src.api.main import create_app
+
         with TestClient(create_app()) as c:
             yield c
 
@@ -54,6 +56,7 @@ class TestRequestIDMiddleware:
 
     def test_request_id_is_uuid(self, client):
         import uuid
+
         r = client.get("/health")
         rid = r.headers.get("x-request-id", "")
         uuid.UUID(rid)  # raises if not valid UUID
@@ -73,6 +76,7 @@ class TestSystemInfo:
     def client(self):
         from fastapi.testclient import TestClient
         from src.api.main import create_app
+
         with TestClient(create_app()) as c:
             yield c
 

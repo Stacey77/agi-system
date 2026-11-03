@@ -17,6 +17,7 @@ from src.agents.writing_agent import WritingAgent
 # AgentMemory
 # ---------------------------------------------------------------------------
 
+
 class TestAgentMemory:
     def test_add_and_get(self):
         mem = AgentMemory(max_size=3)
@@ -43,6 +44,7 @@ class TestAgentMemory:
 # ---------------------------------------------------------------------------
 # create_agent factory function
 # ---------------------------------------------------------------------------
+
 
 class TestCreateAgent:
     def test_creates_planning_agent(self):
@@ -83,6 +85,7 @@ class TestCreateAgent:
 # AgentFactory class
 # ---------------------------------------------------------------------------
 
+
 class TestAgentFactory:
     def test_create_and_retrieve(self):
         factory = AgentFactory()
@@ -100,6 +103,7 @@ class TestAgentFactory:
 # ---------------------------------------------------------------------------
 # PlanningAgent
 # ---------------------------------------------------------------------------
+
 
 class TestPlanningAgent:
     @pytest.mark.asyncio
@@ -132,6 +136,7 @@ class TestPlanningAgent:
 # ResearchAgent
 # ---------------------------------------------------------------------------
 
+
 class TestResearchAgent:
     @pytest.mark.asyncio
     async def test_conduct_research(self):
@@ -155,6 +160,7 @@ class TestResearchAgent:
 # AnalysisAgent
 # ---------------------------------------------------------------------------
 
+
 class TestAnalysisAgent:
     @pytest.mark.asyncio
     async def test_statistical_analysis(self):
@@ -176,13 +182,16 @@ class TestAnalysisAgent:
     async def test_sentiment_analysis(self):
         config = AgentConfig(name="ana", agent_type=AgentType.ANALYSIS)
         agent = AnalysisAgent(config)
-        result = await agent.analyze_data({"text": "This is great and excellent"}, "sentiment")
+        result = await agent.analyze_data(
+            {"text": "This is great and excellent"}, "sentiment"
+        )
         assert len(result.insights) > 0
 
 
 # ---------------------------------------------------------------------------
 # WritingAgent
 # ---------------------------------------------------------------------------
+
 
 class TestWritingAgent:
     @pytest.mark.asyncio
@@ -198,7 +207,9 @@ class TestWritingAgent:
     async def test_process_task(self):
         config = AgentConfig(name="wri", agent_type=AgentType.WRITING)
         agent = WritingAgent(config)
-        result = await agent.process_task({"topic": "Machine Learning", "requirements": {}})
+        result = await agent.process_task(
+            {"topic": "Machine Learning", "requirements": {}}
+        )
         assert result["status"] == "completed"
         assert "content" in result
 
@@ -206,6 +217,7 @@ class TestWritingAgent:
 # ---------------------------------------------------------------------------
 # ReviewAgent
 # ---------------------------------------------------------------------------
+
 
 class TestReviewAgent:
     @pytest.mark.asyncio

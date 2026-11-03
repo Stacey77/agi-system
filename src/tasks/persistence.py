@@ -6,8 +6,7 @@ import json
 import logging
 import sqlite3
 import threading
-import time
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from src.tasks.queue import TaskRecord, TaskStatus
 
@@ -45,7 +44,9 @@ class TaskPersistence:
             self._conn.commit()
             logger.info("TaskPersistence initialised at %s", self._db_path)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("TaskPersistence init failed (%s) — running without persistence", exc)
+            logger.warning(
+                "TaskPersistence init failed (%s) — running without persistence", exc
+            )
             self._conn = None
 
     def save(self, record: TaskRecord) -> None:
@@ -72,7 +73,9 @@ class TaskPersistence:
                         record.task_id,
                         record.objective,
                         record.status,
-                        json.dumps(record.result) if record.result is not None else None,
+                        json.dumps(record.result)
+                        if record.result is not None
+                        else None,
                         record.error,
                         record.created_at,
                         record.started_at,
@@ -96,8 +99,17 @@ class TaskPersistence:
                     "created_at, started_at, completed_at, progress FROM tasks"
                 )
                 for row in cur.fetchall():
-                    (task_id, objective, status, result_json, error,
-                     created_at, started_at, completed_at, progress) = row
+                    (
+                        task_id,
+                        objective,
+                        status,
+                        result_json,
+                        error,
+                        created_at,
+                        started_at,
+                        completed_at,
+                        progress,
+                    ) = row
                     r = TaskRecord(
                         task_id=task_id,
                         objective=objective,

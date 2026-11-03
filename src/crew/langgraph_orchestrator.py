@@ -43,6 +43,7 @@ async def run_langgraph_crew(
 
     # Build one node per agent
     for name in agent_names:
+
         async def _make_node(state: AgentState, _name: str = name) -> AgentState:
             agent = factory.get_agent(_name)
             if agent is None:
@@ -77,17 +78,23 @@ async def run_langgraph_crew(
                         await asyncio.sleep(0.5 * (attempt + 1))
                         logger.warning(
                             "LangGraph: agent '%s' attempt %d failed: %s — retrying",
-                            _name, attempt + 1, exc,
+                            _name,
+                            attempt + 1,
+                            exc,
                         )
 
-            logger.error("LangGraph: agent '%s' failed after %d retries: %s", _name, max_retries, last_exc)
+            logger.error(
+                "LangGraph: agent '%s' failed after %d retries: %s",
+                _name,
+                max_retries,
+                last_exc,
+            )
             return AgentState(
                 objective=state["objective"],
                 context=state["context"],
                 agent_names=state["agent_names"],
-                step_results=list(state["step_results"]) + [
-                    {"agent": _name, "error": str(last_exc)}
-                ],
+                step_results=list(state["step_results"])
+                + [{"agent": _name, "error": str(last_exc)}],
                 current_idx=state["current_idx"] + 1,
                 error=str(last_exc),
             )

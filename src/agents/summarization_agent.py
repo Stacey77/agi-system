@@ -92,7 +92,9 @@ class SummarizationAgent(BaseAgent):
                 key_points = parsed.get("key_points", [])
                 summary_length = len(summary.split())
                 compression = (
-                    round(1 - summary_length / original_length, 2) if original_length > 0 else 0.0
+                    round(1 - summary_length / original_length, 2)
+                    if original_length > 0
+                    else 0.0
                 )
                 return SummaryResult(
                     original_length=original_length,
@@ -126,7 +128,9 @@ class SummarizationAgent(BaseAgent):
         key_points = [f"* {s}." for s in sentences[:5]]
         summary_length = len(summary.split())
         compression = (
-            round(1 - summary_length / original_length, 2) if original_length > 0 else 0.0
+            round(1 - summary_length / original_length, 2)
+            if original_length > 0
+            else 0.0
         )
         return SummaryResult(
             original_length=original_length,

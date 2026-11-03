@@ -106,7 +106,9 @@ class CDEManager:
     # ------------------------------------------------------------------
 
     def running_count(self) -> int:
-        return sum(1 for e in self._environments.values() if e.status == CDEStatus.RUNNING)
+        return sum(
+            1 for e in self._environments.values() if e.status == CDEStatus.RUNNING
+        )
 
     def total_count(self) -> int:
         return len(self._environments)

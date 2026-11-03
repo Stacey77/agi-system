@@ -132,9 +132,7 @@ class IDEAgent(BaseAgent):
     # Internals
     # ------------------------------------------------------------------
 
-    def _resolve_session(
-        self, session_id: Optional[str], language: str
-    ) -> IDESession:
+    def _resolve_session(self, session_id: Optional[str], language: str) -> IDESession:
         if session_id:
             session = self.session_manager.get_session(session_id)
             if session and session.state != SessionState.CLOSED:
@@ -198,16 +196,14 @@ class IDEAgent(BaseAgent):
             f"# Refactoring suggestions for {language}:\n"
             "# 1. Extract repeated logic into helper functions\n"
             "# 2. Use descriptive variable names\n"
-            "# 3. Add type annotations where applicable\n"
-            + code
+            "# 3. Add type annotations where applicable\n" + code
         )
 
     def _build_fix_hints(self, code: str, language: str) -> str:
         return (
             f"# Bug-fix pass for {language}:\n"
             "# - Checked for null/undefined references\n"
-            "# - Added boundary checks\n"
-            + code
+            "# - Added boundary checks\n" + code
         )
 
     def _build_review_feedback(self, code: str, language: str) -> str:

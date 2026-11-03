@@ -79,7 +79,9 @@ async def register_agent(body: AgentCreateRequest, request: Request) -> Dict[str
 
     # Check for duplicate name
     if factory.get_agent(body.name) is not None:
-        raise HTTPException(status_code=409, detail=f"Agent '{body.name}' is already registered")
+        raise HTTPException(
+            status_code=409, detail=f"Agent '{body.name}' is already registered"
+        )
 
     config = AgentConfig(
         name=body.name,
@@ -173,7 +175,10 @@ async def websocket_agent_task(agent_name: str, websocket: WebSocket) -> None:
 
     try:
         data = await websocket.receive_json()
-        task_dict = {"task": sanitize(data.get("task", "")), **data.get("parameters", {})}
+        task_dict = {
+            "task": sanitize(data.get("task", "")),
+            **data.get("parameters", {}),
+        }
         async for chunk in agent.stream_task(task_dict):
             await websocket.send_text(chunk)
         await websocket.send_text("[DONE]")
@@ -277,7 +282,7 @@ async def agent_token_history(
         agent_records = [r for r in tracker._records if r.agent_name == agent_name]
 
     agent_records_newest_first = list(reversed(agent_records))
-    page = agent_records_newest_first[offset: offset + limit]
+    page = agent_records_newest_first[offset : offset + limit]
 
     return {
         "agent_name": agent_name,

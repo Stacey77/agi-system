@@ -46,7 +46,7 @@ def _resolve_auth(request: Request) -> Optional[dict]:
 
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
-        token = auth_header[len("Bearer "):]
+        token = auth_header[len("Bearer ") :]
         payload = jwt_manager.verify_token(token)
         if payload:
             return payload
@@ -55,7 +55,11 @@ def _resolve_auth(request: Request) -> Optional[dict]:
     if x_api_key:
         api_key = key_store.validate_key(x_api_key)
         if api_key:
-            return {"sub": api_key.key_id, "name": api_key.name, "role": api_key.role.value}
+            return {
+                "sub": api_key.key_id,
+                "name": api_key.name,
+                "role": api_key.role.value,
+            }
 
     return None
 

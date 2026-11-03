@@ -17,6 +17,7 @@ from src.execution.task_validation import TaskValidationSystem
 # TaskValidationSystem
 # ---------------------------------------------------------------------------
 
+
 class TestTaskValidation:
     def test_valid_task(self):
         system = TaskValidationSystem()
@@ -32,7 +33,9 @@ class TestTaskValidation:
 
     def test_high_memory_generates_warning(self):
         system = TaskValidationSystem()
-        result = system.validate_task({"task_id": "t3", "action": "run", "memory_required_mb": 9000})
+        result = system.validate_task(
+            {"task_id": "t3", "action": "run", "memory_required_mb": 9000}
+        )
         assert result.is_valid  # warning, not error
         assert len(result.warnings) > 0
 
@@ -40,6 +43,7 @@ class TestTaskValidation:
 # ---------------------------------------------------------------------------
 # ResultValidationSystem
 # ---------------------------------------------------------------------------
+
 
 class TestResultValidation:
     def test_valid_result(self):
@@ -64,6 +68,7 @@ class TestResultValidation:
 # ---------------------------------------------------------------------------
 # ErrorHandler
 # ---------------------------------------------------------------------------
+
 
 class TestErrorHandler:
     def test_network_error_classification(self):
@@ -91,6 +96,7 @@ class TestErrorHandler:
 # ---------------------------------------------------------------------------
 # ExecutionEngine
 # ---------------------------------------------------------------------------
+
 
 class TestExecutionEngine:
     @pytest.mark.asyncio
@@ -142,6 +148,7 @@ class TestExecutionEngine:
 # ExecutionAgent
 # ---------------------------------------------------------------------------
 
+
 class TestExecutionAgent:
     @pytest.mark.asyncio
     async def test_validate_plan(self):
@@ -168,6 +175,7 @@ class TestExecutionAgent:
 # ---------------------------------------------------------------------------
 # RollbackManager
 # ---------------------------------------------------------------------------
+
 
 class TestRollbackManager:
     @pytest.mark.asyncio
@@ -198,6 +206,7 @@ class TestRollbackManager:
 # ---------------------------------------------------------------------------
 # ProgressiveExecutor
 # ---------------------------------------------------------------------------
+
 
 class TestProgressiveExecutor:
     @pytest.mark.asyncio

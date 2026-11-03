@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from src.api.security.sanitizer import sanitize
-from src.tasks.queue import TaskRecord, TaskStatus
+from src.tasks.queue import TaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,11 @@ async def submit_task(body: TaskSubmission, request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=503, detail="Task queue not initialised")
 
     record = await queue.submit(sanitize(body.objective), body.parameters)
-    return {"task_id": record.task_id, "status": record.status, "objective": record.objective}
+    return {
+        "task_id": record.task_id,
+        "status": record.status,
+        "objective": record.objective,
+    }
 
 
 @router.get("/{task_id}")
@@ -70,6 +74,7 @@ async def list_tasks(
     # Push current counts to Prometheus gauges
     try:
         from src.api.middleware.metrics import update_task_queue_metrics
+
         update_task_queue_metrics(by_status)
     except Exception:  # noqa: BLE001
         pass
@@ -108,7 +113,9 @@ async def cancel_task(task_id: str, request: Request) -> Dict[str, str]:
         record = queue.get(task_id)
         if record is None:
             raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
-        return {"message": f"Task '{task_id}' cannot be cancelled (status={record.status})"}
+        return {
+            "message": f"Task '{task_id}' cannot be cancelled (status={record.status})"
+        }
     return {"message": f"Task '{task_id}' cancelled"}
 
 
@@ -154,7 +161,11 @@ async def stream_task_progress(task_id: str, request: Request) -> StreamingRespo
         raise HTTPException(status_code=404, detail=f"Task '{task_id}' not found")
 
     async def _generate():
-        if record.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
+        if record.status in (
+            TaskStatus.COMPLETED,
+            TaskStatus.FAILED,
+            TaskStatus.CANCELLED,
+        ):
             yield f"data: {json.dumps(record.to_dict())}\n\n"
             yield "data: [DONE]\n\n"
             return
@@ -167,11 +178,13 @@ async def stream_task_progress(task_id: str, request: Request) -> StreamingRespo
                     event = await asyncio.wait_for(sub_q.get(), timeout=30.0)
                     yield f"data: {json.dumps(event)}\n\n"
                     if event.get("status") in (
-                        TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED
+                        TaskStatus.COMPLETED,
+                        TaskStatus.FAILED,
+                        TaskStatus.CANCELLED,
                     ):
                         break
                 except asyncio.TimeoutError:
-                    yield "data: {\"heartbeat\": true}\n\n"
+                    yield 'data: {"heartbeat": true}\n\n'
         finally:
             queue.unsubscribe(task_id, sub_q)
         yield "data: [DONE]\n\n"

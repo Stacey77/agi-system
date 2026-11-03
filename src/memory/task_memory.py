@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 class TaskMemory:
     """Stores and recalls task/result pairs using semantic similarity search."""
 
-    def __init__(self, agent_name: str, persist_directory: Optional[str] = None) -> None:
+    def __init__(
+        self, agent_name: str, persist_directory: Optional[str] = None
+    ) -> None:
         self._store = VectorStore(
             collection_name=f"tasks_{agent_name}",
             persist_directory=persist_directory,
@@ -31,7 +33,9 @@ class TaskMemory:
         self._store.add_documents(
             documents=[document],
             ids=[memory_id],
-            metadatas=[{"agent": task.get("agent", ""), "status": result.get("status", "")}],
+            metadatas=[
+                {"agent": task.get("agent", ""), "status": result.get("status", "")}
+            ],
         )
         return memory_id
 
@@ -44,14 +48,18 @@ class TaskMemory:
                 doc = hit.get("document", "")
                 task_part, _, result_part = doc.partition("\nResult: ")
                 task_json = task_part.removeprefix("Task: ")
-                results.append({
-                    "id": hit.get("id"),
-                    "task": json.loads(task_json) if task_json else {},
-                    "result": json.loads(result_part) if result_part else {},
-                    "metadata": hit.get("metadata", {}),
-                })
+                results.append(
+                    {
+                        "id": hit.get("id"),
+                        "task": json.loads(task_json) if task_json else {},
+                        "result": json.loads(result_part) if result_part else {},
+                        "metadata": hit.get("metadata", {}),
+                    }
+                )
             except (json.JSONDecodeError, ValueError):
-                results.append({"id": hit.get("id"), "document": hit.get("document", "")})
+                results.append(
+                    {"id": hit.get("id"), "document": hit.get("document", "")}
+                )
         return results
 
     def __len__(self) -> int:

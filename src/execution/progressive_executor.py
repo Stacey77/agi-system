@@ -116,7 +116,7 @@ class ProgressiveExecutor:
 
         for phase in phases:
             if self._stopped:
-                skipped.extend(p["phase_id"] for p in phases[len(completed):])
+                skipped.extend(p["phase_id"] for p in phases[len(completed) :])
                 break
 
             while self._paused and not self._stopped:

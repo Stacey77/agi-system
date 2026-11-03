@@ -51,6 +51,7 @@ class WritingAgent(BaseAgent):
         """Stream document content token-by-token when an LLM is available."""
         if self.llm is None:
             import json
+
             result = await self.process_task(task)
             yield json.dumps(result)
             return
@@ -96,11 +97,12 @@ class WritingAgent(BaseAgent):
         audience = requirements.get("audience", "general")
         doc_format = requirements.get("format", "article")
 
-        outline = (
-            await self._llm_create_outline(topic, doc_format, audience)
-            or self._create_outline(topic, doc_format)
+        outline = await self._llm_create_outline(
+            topic, doc_format, audience
+        ) or self._create_outline(topic, doc_format)
+        sections = await self._llm_draft_sections(
+            outline, topic, tone, audience, doc_format
         )
-        sections = await self._llm_draft_sections(outline, topic, tone, audience, doc_format)
         content = self._assemble_content(sections)
         content = self._edit_content(content, requirements)
 

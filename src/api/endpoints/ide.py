@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -37,6 +37,7 @@ def _get_ide_agent(request: Request) -> Any:
 # ------------------------------------------------------------------
 # Session management
 # ------------------------------------------------------------------
+
 
 @router.post("/sessions")
 async def create_session(body: IDESessionRequest, request: Request) -> Dict[str, Any]:
@@ -86,8 +87,11 @@ async def close_session(session_id: str, request: Request) -> Dict[str, str]:
 # Code actions
 # ------------------------------------------------------------------
 
+
 @router.post("/actions")
-async def execute_code_action(body: CodeActionRequest, request: Request) -> Dict[str, Any]:
+async def execute_code_action(
+    body: CodeActionRequest, request: Request
+) -> Dict[str, Any]:
     """Execute an AI code action (complete / explain / refactor / fix / generate / review)."""
     ide_agent = _get_ide_agent(request)
     task: Dict[str, Any] = {

@@ -32,9 +32,7 @@ class QualityAssessment:
 class ResultValidationSystem:
     """Validates and scores execution results."""
 
-    def validate_result(
-        self, task: Dict[str, Any], result: Any
-    ) -> QualityAssessment:
+    def validate_result(self, task: Dict[str, Any], result: Any) -> QualityAssessment:
         """Assess the quality of *result* relative to *task*."""
         completeness = self._score_completeness(task, result)
         accuracy = self._score_accuracy(task, result)

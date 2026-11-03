@@ -75,6 +75,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Optional OpenTelemetry tracing
     from src.api.middleware.tracing import setup_tracing
+
     setup_tracing(service_name=cfg.otel_service_name)
 
     # Initialise LLM
@@ -94,6 +95,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Initialise crew orchestrator
     from src.crew.orchestrator import CrewOrchestrator
+
     app.state.crew_orchestrator = CrewOrchestrator(agent_factory=factory, llm=llm)
 
     # Named crew templates store
@@ -104,7 +106,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         name="ide_agent",
         agent_type=AgentType.IDE,
         description="AI-powered coding assistant for the vibecoding IDE",
-        capabilities=["code_completion", "code_explanation", "refactoring", "bug_fixing"],
+        capabilities=[
+            "code_completion",
+            "code_explanation",
+            "refactoring",
+            "bug_fixing",
+        ],
     )
     app.state.ide_agent = IDEAgent(config=ide_config, execution_agent=execution_agent)
 
@@ -128,24 +135,32 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Session manager with optional SQLite persistence
     from src.sessions.session_store import SessionStore
-    session_store = SessionStore(db_path=cfg.task_db_path.replace("tasks.db", "sessions.db"))
+
+    session_store = SessionStore(
+        db_path=cfg.task_db_path.replace("tasks.db", "sessions.db")
+    )
     app.state.session_manager = SessionManager(store=session_store)
     app.state.session_store = session_store
 
     # Token usage tracker
     from src.llm.token_tracker import TokenTracker
+
     app.state.token_tracker = TokenTracker()
 
     # Memory layer
     from src.memory.memory_manager import MemoryManager
     from src.memory.hybrid_memory import HybridMemory
+
     app.state.memory_manager = MemoryManager()
     app.state.hybrid_memory = HybridMemory()
 
     # Eval results store
     app.state.eval_results = {}
     from src.eval.eval_store import EvalStore
-    app.state.eval_store = EvalStore(db_path=cfg.task_db_path.replace("tasks.db", "evals.db"))
+
+    app.state.eval_store = EvalStore(
+        db_path=cfg.task_db_path.replace("tasks.db", "evals.db")
+    )
 
     # Kally AI closed-loop agent
     kally_config = AgentConfig(
@@ -154,11 +169,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         description="Kally AI — closed-loop feedback and continuous improvement",
         capabilities=["signal_ingestion", "anomaly_detection", "auto_correction"],
     )
-    app.state.kally_agent = KallyAgent(config=kally_config, execution_agent=execution_agent)
+    app.state.kally_agent = KallyAgent(
+        config=kally_config, execution_agent=execution_agent
+    )
 
     # Auth: key store and JWT manager
     from src.auth.key_store import KeyStore
     from src.auth.jwt_manager import JWTManager
+
     key_store = KeyStore()
     app.state.key_store = key_store
 
@@ -214,8 +232,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     async def _default_task_handler(record) -> None:
         planning = factory.get_agent("planning_agent")
         if planning is not None:
-            await task_queue.update_progress(record.task_id, 10, "Decomposing objective…")
-            result = await planning.process_task({"objective": record.objective, "task_id": record.task_id})
+            await task_queue.update_progress(
+                record.task_id, 10, "Decomposing objective…"
+            )
+            result = await planning.process_task(
+                {"objective": record.objective, "task_id": record.task_id}
+            )
             await task_queue.update_progress(record.task_id, 90, "Finalising result…")
             record.result = result
         else:
@@ -228,6 +250,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Task scheduler
     from src.tasks.scheduler import TaskScheduler
+
     task_scheduler = TaskScheduler()
     task_scheduler.attach_queue(task_queue)
     await task_scheduler.start()
@@ -302,19 +325,55 @@ def _register_default_agents(
 
 
 _OPENAPI_TAGS = [
-    {"name": "health", "description": "Liveness and readiness probes for load balancers and k8s"},
-    {"name": "agents", "description": "Register, query, and execute individual AI agents"},
-    {"name": "tasks", "description": "Async task queue — submit, track, cancel, retry, and stream progress via SSE"},
-    {"name": "crew", "description": "Multi-agent crew orchestration via CrewAI / LangGraph"},
-    {"name": "sessions", "description": "Multi-turn conversation sessions with per-agent message history"},
-    {"name": "auth", "description": "JWT token issuance and API key management (admin-only CRUD)"},
-    {"name": "system", "description": "Non-sensitive runtime info for dashboards and monitoring"},
-    {"name": "webhooks", "description": "Register HTTP callbacks for task/crew/session lifecycle events"},
-    {"name": "eval", "description": "Agent benchmark evaluation — run standard tasks and score results"},
-    {"name": "ide", "description": "AI-powered vibecoding IDE — completions, explanations, refactoring"},
-    {"name": "cde", "description": "Cloud Development Environment lifecycle management"},
+    {
+        "name": "health",
+        "description": "Liveness and readiness probes for load balancers and k8s",
+    },
+    {
+        "name": "agents",
+        "description": "Register, query, and execute individual AI agents",
+    },
+    {
+        "name": "tasks",
+        "description": "Async task queue — submit, track, cancel, retry, and stream progress via SSE",
+    },
+    {
+        "name": "crew",
+        "description": "Multi-agent crew orchestration via CrewAI / LangGraph",
+    },
+    {
+        "name": "sessions",
+        "description": "Multi-turn conversation sessions with per-agent message history",
+    },
+    {
+        "name": "auth",
+        "description": "JWT token issuance and API key management (admin-only CRUD)",
+    },
+    {
+        "name": "system",
+        "description": "Non-sensitive runtime info for dashboards and monitoring",
+    },
+    {
+        "name": "webhooks",
+        "description": "Register HTTP callbacks for task/crew/session lifecycle events",
+    },
+    {
+        "name": "eval",
+        "description": "Agent benchmark evaluation — run standard tasks and score results",
+    },
+    {
+        "name": "ide",
+        "description": "AI-powered vibecoding IDE — completions, explanations, refactoring",
+    },
+    {
+        "name": "cde",
+        "description": "Cloud Development Environment lifecycle management",
+    },
     {"name": "platform", "description": "Developer portal and tool landscape registry"},
-    {"name": "memory", "description": "Short-term, long-term, episodic and hybrid vector memory management"},
+    {
+        "name": "memory",
+        "description": "Short-term, long-term, episodic and hybrid vector memory management",
+    },
 ]
 
 
@@ -356,6 +415,7 @@ def create_app() -> FastAPI:
 
     # Middleware (applied in reverse — last added = outermost)
     from src.api.middleware.request_id import RequestIDMiddleware
+
     app.add_middleware(MetricsMiddleware)
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(APIKeyMiddleware)
@@ -363,6 +423,7 @@ def create_app() -> FastAPI:
 
     # Prometheus metrics endpoint
     from fastapi import Response as FastAPIResponse
+
     @app.get("/metrics", include_in_schema=False)
     async def prometheus_metrics() -> FastAPIResponse:
         return metrics_response()
@@ -380,18 +441,23 @@ def create_app() -> FastAPI:
     app.include_router(eval_router)
 
     from src.api.endpoints.auth import router as auth_router
+
     app.include_router(auth_router)
 
     from src.api.endpoints.system import router as system_router
+
     app.include_router(system_router)
 
     from src.api.endpoints.scheduler import router as scheduler_router
+
     app.include_router(scheduler_router)
 
     from src.api.endpoints.usage import router as usage_router
+
     app.include_router(usage_router)
 
     from src.api.endpoints.memory import router as memory_router
+
     app.include_router(memory_router)
 
     # Static dashboard — served at / and /static

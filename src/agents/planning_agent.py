@@ -62,7 +62,9 @@ class PlanningAgent(BaseAgent):
         """Process a planning task — decompose objective into steps."""
         objective = task.get("objective", task.get("task", ""))
         execute = task.get("execute", False)
-        logger.info("PlanningAgent processing objective: %s (execute=%s)", objective, execute)
+        logger.info(
+            "PlanningAgent processing objective: %s (execute=%s)", objective, execute
+        )
 
         plan = await self.create_executable_plan(objective)
 
@@ -99,22 +101,39 @@ class PlanningAgent(BaseAgent):
             agent = self._agent_factory.get_agent(agent_name)
 
             if agent is None:
-                logger.warning("Delegation: agent '%s' not found for step %s", agent_name, step_id)
-                step_results.append({"step_id": step_id, "agent": agent_name, "error": "agent not found"})
+                logger.warning(
+                    "Delegation: agent '%s' not found for step %s", agent_name, step_id
+                )
+                step_results.append(
+                    {
+                        "step_id": step_id,
+                        "agent": agent_name,
+                        "error": "agent not found",
+                    }
+                )
                 continue
 
             try:
                 task_dict = {"task": f"{description}\n\nContext: {context}"}
                 sub_result = await agent.process_task(task_dict)
-                step_results.append({"step_id": step_id, "agent": agent_name, "result": sub_result})
+                step_results.append(
+                    {"step_id": step_id, "agent": agent_name, "result": sub_result}
+                )
                 # Pass summary forward as context
                 for key in ("summary", "content", "analysis", "code", "review"):
                     if key in sub_result:
                         context = f"{objective}\n\nPrevious output ({step_id}): {sub_result[key]}"
                         break
             except Exception as exc:  # noqa: BLE001
-                logger.error("Delegation error for step %s via '%s': %s", step_id, agent_name, exc)
-                step_results.append({"step_id": step_id, "agent": agent_name, "error": str(exc)})
+                logger.error(
+                    "Delegation error for step %s via '%s': %s",
+                    step_id,
+                    agent_name,
+                    exc,
+                )
+                step_results.append(
+                    {"step_id": step_id, "agent": agent_name, "error": str(exc)}
+                )
 
         return step_results
 
@@ -124,7 +143,9 @@ class PlanningAgent(BaseAgent):
         Uses the LLM when available; falls back to a hard-coded pipeline otherwise.
         If an execution_agent is available the plan is validated before being returned.
         """
-        steps = await self._llm_decompose(objective) or self._decompose_objective(objective)
+        steps = await self._llm_decompose(objective) or self._decompose_objective(
+            objective
+        )
         dependencies = self._analyse_dependencies(steps)
 
         plan = ExecutablePlan(
@@ -166,7 +187,9 @@ class PlanningAgent(BaseAgent):
             if isinstance(steps, list) and steps:
                 return steps
         except (json.JSONDecodeError, ValueError):
-            logger.warning("LLM returned non-JSON plan; falling back to hardcoded decomposition")
+            logger.warning(
+                "LLM returned non-JSON plan; falling back to hardcoded decomposition"
+            )
         return None
 
     def _decompose_objective(self, objective: str) -> List[Dict[str, Any]]:

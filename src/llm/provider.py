@@ -50,7 +50,9 @@ def create_llm(
             logger.info("Initialised OpenAI LLM: %s", resolved_model)
             return llm
         except ImportError:
-            logger.warning("langchain-openai not installed — run: pip install langchain-openai")
+            logger.warning(
+                "langchain-openai not installed — run: pip install langchain-openai"
+            )
             return None
 
     if provider == LLMProvider.ANTHROPIC:
@@ -61,7 +63,9 @@ def create_llm(
         try:
             from langchain_anthropic import ChatAnthropic  # type: ignore
 
-            resolved_model = model or os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+            resolved_model = model or os.getenv(
+                "ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"
+            )
             llm = ChatAnthropic(
                 model=resolved_model,
                 temperature=temperature,
@@ -109,15 +113,21 @@ async def invoke_llm(
 
     # Capture usage metadata if available and tracker provided
     if tracker is not None:
-        usage = getattr(response, "usage_metadata", None) or getattr(response, "response_metadata", {})
+        usage = getattr(response, "usage_metadata", None) or getattr(
+            response, "response_metadata", {}
+        )
         model = getattr(llm, "model_name", getattr(llm, "model", "unknown"))
         input_tokens = (
             getattr(usage, "input_tokens", None)
-            or (usage.get("token_usage", {}) if isinstance(usage, dict) else {}).get("prompt_tokens", 0)
+            or (usage.get("token_usage", {}) if isinstance(usage, dict) else {}).get(
+                "prompt_tokens", 0
+            )
         ) or 0
         output_tokens = (
             getattr(usage, "output_tokens", None)
-            or (usage.get("token_usage", {}) if isinstance(usage, dict) else {}).get("completion_tokens", 0)
+            or (usage.get("token_usage", {}) if isinstance(usage, dict) else {}).get(
+                "completion_tokens", 0
+            )
         ) or 0
         try:
             tracker.record(  # type: ignore[attr-defined]

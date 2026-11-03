@@ -25,11 +25,19 @@ class JWTManager:
         self._expiry_seconds = expiry_seconds
 
     def create_token(self, key_id: str, name: str, role: str) -> str:
-        header = _b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode())
+        header = _b64encode(
+            json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode()
+        )
         now = int(time.time())
         payload = _b64encode(
             json.dumps(
-                {"sub": key_id, "name": name, "role": role, "iat": now, "exp": now + self._expiry_seconds},
+                {
+                    "sub": key_id,
+                    "name": name,
+                    "role": role,
+                    "iat": now,
+                    "exp": now + self._expiry_seconds,
+                },
                 separators=(",", ":"),
             ).encode()
         )
@@ -44,7 +52,9 @@ class JWTManager:
                 return None
             header_b64, payload_b64, sig_b64 = parts
             signing_input = f"{header_b64}.{payload_b64}".encode()
-            expected_sig = _b64encode(hmac.new(self._secret, signing_input, hashlib.sha256).digest())
+            expected_sig = _b64encode(
+                hmac.new(self._secret, signing_input, hashlib.sha256).digest()
+            )
             if not hmac.compare_digest(expected_sig, sig_b64):
                 return None
             payload = json.loads(_b64decode(payload_b64))

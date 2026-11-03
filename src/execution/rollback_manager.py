@@ -54,7 +54,11 @@ class RollbackPlan:
             cp = self._checkpoints[-1]
         else:
             cp = next(
-                (c for c in reversed(self._checkpoints) if c.checkpoint_id == target_id),
+                (
+                    c
+                    for c in reversed(self._checkpoints)
+                    if c.checkpoint_id == target_id
+                ),
                 self._checkpoints[-1],
             )
         logger.info("Rolling back to checkpoint '%s'", cp.checkpoint_id)

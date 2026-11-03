@@ -106,7 +106,10 @@ class TestMemoryRoundTrip:
     def test_retrieve_nonexistent_key_returns_none(self, client, auth_headers):
         retrieve_resp = client.get(
             "/api/v1/memory/retrieve",
-            params={"key": "definitely_does_not_exist_xyz", "memory_type": "short_term"},
+            params={
+                "key": "definitely_does_not_exist_xyz",
+                "memory_type": "short_term",
+            },
             headers=auth_headers,
         )
         assert retrieve_resp.status_code == 200
@@ -133,18 +136,17 @@ class TestTaskLifecycle:
         # Poll until completed or 3 s timeout
         deadline = time.time() + 3.0
         status = None
-        seen_queued = False
         while time.time() < deadline:
             poll_resp = client.get(f"/api/v1/tasks/{task_id}", headers=auth_headers)
             assert poll_resp.status_code == 200
             status = poll_resp.json()["status"]
-            if status in ("queued", "running"):
-                seen_queued = True
             if status == "completed":
                 break
             time.sleep(0.1)
 
-        assert status == "completed", f"Task did not complete in time; last status={status!r}"
+        assert status == "completed", (
+            f"Task did not complete in time; last status={status!r}"
+        )
 
     def test_submitted_task_has_task_id(self, client, auth_headers):
         resp = client.post(
@@ -272,7 +274,9 @@ class TestScheduleLifecycle:
         assert resume_resp.json()["enabled"] is True
 
         # Delete
-        del_resp = client.delete(f"/api/v1/schedules/{schedule_id}", headers=auth_headers)
+        del_resp = client.delete(
+            f"/api/v1/schedules/{schedule_id}", headers=auth_headers
+        )
         assert del_resp.status_code == 200
 
         # Confirm deletion

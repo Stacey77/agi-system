@@ -21,6 +21,7 @@ try:
         generate_latest,
         CONTENT_TYPE_LATEST,
     )
+
     _PROMETHEUS_AVAILABLE = True
 except ImportError:
     _PROMETHEUS_AVAILABLE = False
@@ -122,7 +123,9 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             HTTP_REQUESTS_TOTAL.labels(
                 method=request.method, path=path, status=response.status_code
             ).inc()
-            HTTP_REQUEST_DURATION.labels(method=request.method, path=path).observe(duration)
+            HTTP_REQUEST_DURATION.labels(method=request.method, path=path).observe(
+                duration
+            )
         return response
 
 

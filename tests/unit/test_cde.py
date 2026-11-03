@@ -14,6 +14,7 @@ from src.cde.cde_manager import CDEManager
 # CDEEnvironment
 # ---------------------------------------------------------------------------
 
+
 class TestCDEEnvironment:
     def test_defaults(self):
         env = CDEEnvironment(name="test")
@@ -39,6 +40,7 @@ class TestCDEEnvironment:
 # CDEResources
 # ---------------------------------------------------------------------------
 
+
 class TestCDEResources:
     def test_defaults(self):
         r = CDEResources()
@@ -55,6 +57,7 @@ class TestCDEResources:
 # ---------------------------------------------------------------------------
 # CDEManager
 # ---------------------------------------------------------------------------
+
 
 class TestCDEManager:
     def test_create_environment(self):
@@ -124,6 +127,7 @@ class TestCDEManager:
 # CDEAgent
 # ---------------------------------------------------------------------------
 
+
 class TestCDEAgent:
     def _make_agent(self) -> CDEAgent:
         config = AgentConfig(name="cde", agent_type=AgentType.CDE)
@@ -132,7 +136,9 @@ class TestCDEAgent:
     @pytest.mark.asyncio
     async def test_create_action(self):
         agent = self._make_agent()
-        result = await agent.process_task({"action": "create", "name": "my-env", "runtime": "python"})
+        result = await agent.process_task(
+            {"action": "create", "name": "my-env", "runtime": "python"}
+        )
         assert result["status"] == "completed"
         assert result["action"] == "create"
         assert result["environment"]["name"] == "my-env"

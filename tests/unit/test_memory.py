@@ -14,6 +14,7 @@ from src.memory.vector_store import VectorStore
 # ConversationMemory
 # ---------------------------------------------------------------------------
 
+
 class TestConversationMemory:
     def test_add_and_retrieve(self):
         mem = ConversationMemory(window_size=10)
@@ -56,6 +57,7 @@ class TestConversationMemory:
 # VectorStore (mock mode — no ChromaDB required)
 # ---------------------------------------------------------------------------
 
+
 class TestVectorStore:
     def test_add_and_search(self):
         store = VectorStore()
@@ -81,6 +83,7 @@ class TestVectorStore:
 # ---------------------------------------------------------------------------
 # MemoryManager
 # ---------------------------------------------------------------------------
+
 
 class TestMemoryManager:
     def test_store_and_retrieve_short_term(self):
@@ -118,6 +121,7 @@ class TestMemoryManager:
 # ---------------------------------------------------------------------------
 # HybridMemory
 # ---------------------------------------------------------------------------
+
 
 class TestHybridMemory:
     def test_add_shared_and_search(self):

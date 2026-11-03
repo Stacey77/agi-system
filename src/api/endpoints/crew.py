@@ -53,10 +53,16 @@ async def stream_crew(body: CrewTaskRequest, request: Request) -> StreamingRespo
         raise HTTPException(status_code=503, detail="Crew orchestrator not initialised")
 
     factory = getattr(request.app.state, "agent_factory", None)
-    agent_names = body.agents or ["research_agent", "analysis_agent", "writing_agent", "review_agent"]
+    agent_names = body.agents or [
+        "research_agent",
+        "analysis_agent",
+        "writing_agent",
+        "review_agent",
+    ]
 
     async def _generate():
         import json
+
         for name in agent_names:
             if factory is None:
                 break
@@ -88,9 +94,13 @@ async def stream_crew(body: CrewTaskRequest, request: Request) -> StreamingRespo
 @router.post("/templates", status_code=201)
 async def create_template(template: CrewTemplate, request: Request) -> CrewTemplate:
     """Create a named, reusable crew template."""
-    templates: Dict[str, CrewTemplate] = getattr(request.app.state, "crew_templates", {})
+    templates: Dict[str, CrewTemplate] = getattr(
+        request.app.state, "crew_templates", {}
+    )
     if template.name in templates:
-        raise HTTPException(status_code=409, detail=f"Template '{template.name}' already exists")
+        raise HTTPException(
+            status_code=409, detail=f"Template '{template.name}' already exists"
+        )
     templates[template.name] = template
     request.app.state.crew_templates = templates
     return template
@@ -99,14 +109,18 @@ async def create_template(template: CrewTemplate, request: Request) -> CrewTempl
 @router.get("/templates")
 async def list_templates(request: Request) -> List[CrewTemplate]:
     """List all stored crew templates."""
-    templates: Dict[str, CrewTemplate] = getattr(request.app.state, "crew_templates", {})
+    templates: Dict[str, CrewTemplate] = getattr(
+        request.app.state, "crew_templates", {}
+    )
     return list(templates.values())
 
 
 @router.get("/templates/{name}")
 async def get_template(name: str, request: Request) -> CrewTemplate:
     """Retrieve a single crew template by name."""
-    templates: Dict[str, CrewTemplate] = getattr(request.app.state, "crew_templates", {})
+    templates: Dict[str, CrewTemplate] = getattr(
+        request.app.state, "crew_templates", {}
+    )
     if name not in templates:
         raise HTTPException(status_code=404, detail=f"Template '{name}' not found")
     return templates[name]
@@ -115,16 +129,22 @@ async def get_template(name: str, request: Request) -> CrewTemplate:
 @router.delete("/templates/{name}", status_code=204)
 async def delete_template(name: str, request: Request) -> None:
     """Delete a crew template by name."""
-    templates: Dict[str, CrewTemplate] = getattr(request.app.state, "crew_templates", {})
+    templates: Dict[str, CrewTemplate] = getattr(
+        request.app.state, "crew_templates", {}
+    )
     if name not in templates:
         raise HTTPException(status_code=404, detail=f"Template '{name}' not found")
     del templates[name]
 
 
 @router.post("/templates/{name}/run")
-async def run_template(name: str, body: TemplateRunRequest, request: Request) -> Dict[str, Any]:
+async def run_template(
+    name: str, body: TemplateRunRequest, request: Request
+) -> Dict[str, Any]:
     """Run a named crew template with a given objective."""
-    templates: Dict[str, CrewTemplate] = getattr(request.app.state, "crew_templates", {})
+    templates: Dict[str, CrewTemplate] = getattr(
+        request.app.state, "crew_templates", {}
+    )
     if name not in templates:
         raise HTTPException(status_code=404, detail=f"Template '{name}' not found")
 
@@ -134,7 +154,9 @@ async def run_template(name: str, body: TemplateRunRequest, request: Request) ->
         raise HTTPException(status_code=503, detail="Crew orchestrator not initialised")
 
     try:
-        result = await orchestrator.run(body.objective, agent_names=template.agent_names)
+        result = await orchestrator.run(
+            body.objective, agent_names=template.agent_names
+        )
         result["template"] = name
         return result
     except Exception as exc:  # noqa: BLE001

@@ -90,10 +90,7 @@ async def detailed_health(request: Request) -> Dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         components["auth"] = {"status": "unhealthy", "error": str(exc)}
 
-    statuses = [
-        v["status"] if isinstance(v, dict) else v
-        for v in components.values()
-    ]
+    statuses = [v["status"] if isinstance(v, dict) else v for v in components.values()]
     all_ok = all(s in ("healthy", "mock_mode", "not_configured") for s in statuses)
 
     return {

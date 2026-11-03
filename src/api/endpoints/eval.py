@@ -49,7 +49,9 @@ async def run_evaluation(body: EvalRequest, request: Request) -> Dict[str, Any]:
 
     agent = factory.get_agent(body.agent_name)
     if agent is None:
-        raise HTTPException(status_code=404, detail=f"Agent '{body.agent_name}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Agent '{body.agent_name}' not found"
+        )
 
     if body.tasks:
         tasks_to_run = body.tasks
@@ -91,7 +93,9 @@ async def run_evaluation(body: EvalRequest, request: Request) -> Dict[str, Any]:
 
     total_duration = round(time.monotonic() - started, 3)
     total_score = (
-        sum(t["score"] for t in task_results) / len(task_results) if task_results else 0.0
+        sum(t["score"] for t in task_results) / len(task_results)
+        if task_results
+        else 0.0
     )
 
     eval_record: Dict[str, Any] = {
@@ -129,7 +133,9 @@ async def get_eval_result(eval_id: str, request: Request) -> Dict[str, Any]:
     else:
         result = _get_eval_results(request).get(eval_id)
     if result is None:
-        raise HTTPException(status_code=404, detail=f"Eval result '{eval_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Eval result '{eval_id}' not found"
+        )
     return result
 
 
@@ -144,7 +150,9 @@ async def delete_eval_result(eval_id: str, request: Request) -> Dict[str, str]:
         del eval_results[eval_id]
         deleted = True
     if not deleted:
-        raise HTTPException(status_code=404, detail=f"Eval result '{eval_id}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Eval result '{eval_id}' not found"
+        )
     return {"message": f"Eval result '{eval_id}' deleted"}
 
 

@@ -82,13 +82,19 @@ class CalculatorTool(BaseTool):
                 "required": ["expression"],
                 "optional": ["operation", "data"],
                 "properties": {
-                    "expression": {"type": "string", "description": "Math expression to evaluate"},
+                    "expression": {
+                        "type": "string",
+                        "description": "Math expression to evaluate",
+                    },
                     "operation": {
                         "type": "string",
                         "enum": ["evaluate", "statistics"],
                         "default": "evaluate",
                     },
-                    "data": {"type": "array", "description": "Numeric data for statistics"},
+                    "data": {
+                        "type": "array",
+                        "description": "Numeric data for statistics",
+                    },
                 },
             },
             return_type="Union[float, Dict]",

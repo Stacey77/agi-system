@@ -83,7 +83,9 @@ class AnalysisAgent(BaseAgent):
         """Delegate analysis to the LLM; return None on failure."""
         import json
 
-        user_prompt = f"Analysis type: {analysis_type}\nData: {json.dumps(data, default=str)}"
+        user_prompt = (
+            f"Analysis type: {analysis_type}\nData: {json.dumps(data, default=str)}"
+        )
         raw = await self._invoke_llm(self._SYSTEM_PROMPT, user_prompt)
         if not raw:
             return None
@@ -99,7 +101,9 @@ class AnalysisAgent(BaseAgent):
                 confidence=float(parsed.get("confidence", 0.8)),
             )
         except (json.JSONDecodeError, ValueError, TypeError):
-            logger.warning("LLM analysis returned non-JSON; falling back to algorithmic analysis")
+            logger.warning(
+                "LLM analysis returned non-JSON; falling back to algorithmic analysis"
+            )
             return None
 
     # ------------------------------------------------------------------
@@ -144,7 +148,9 @@ class AnalysisAgent(BaseAgent):
         words = set(text.lower().split())
         pos = len(words & positive_words)
         neg = len(words & negative_words)
-        sentiment = "positive" if pos > neg else ("negative" if neg > pos else "neutral")
+        sentiment = (
+            "positive" if pos > neg else ("negative" if neg > pos else "neutral")
+        )
         return AnalysisResult(
             analysis_type="sentiment",
             insights=[f"Overall sentiment: {sentiment}"],

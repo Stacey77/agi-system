@@ -39,7 +39,9 @@ def _get_cde_agent(request: Request) -> Any:
 
 
 @router.post("/environments")
-async def create_environment(body: CDECreateRequest, request: Request) -> Dict[str, Any]:
+async def create_environment(
+    body: CDECreateRequest, request: Request
+) -> Dict[str, Any]:
     """Provision a new cloud development environment."""
     cde_agent = _get_cde_agent(request)
     task: Dict[str, Any] = {
@@ -62,7 +64,9 @@ async def create_environment(body: CDECreateRequest, request: Request) -> Dict[s
 
 
 @router.get("/environments")
-async def list_environments(request: Request, owner: Optional[str] = None, status: Optional[str] = None) -> Dict[str, Any]:
+async def list_environments(
+    request: Request, owner: Optional[str] = None, status: Optional[str] = None
+) -> Dict[str, Any]:
     """List CDE environments, optionally filtered by owner or status."""
     cde_agent = _get_cde_agent(request)
     task: Dict[str, Any] = {"action": "list", "owner": owner, "filter_status": status}
@@ -85,7 +89,9 @@ async def start_environment(env_id: str, request: Request) -> Dict[str, Any]:
     cde_agent = _get_cde_agent(request)
     result = await cde_agent.process_task({"action": "start", "env_id": env_id})
     if result.get("status") == "error":
-        raise HTTPException(status_code=400, detail=f"Cannot start environment '{env_id}'")
+        raise HTTPException(
+            status_code=400, detail=f"Cannot start environment '{env_id}'"
+        )
     return result
 
 
@@ -95,7 +101,9 @@ async def stop_environment(env_id: str, request: Request) -> Dict[str, Any]:
     cde_agent = _get_cde_agent(request)
     result = await cde_agent.process_task({"action": "stop", "env_id": env_id})
     if result.get("status") == "error":
-        raise HTTPException(status_code=400, detail=f"Cannot stop environment '{env_id}'")
+        raise HTTPException(
+            status_code=400, detail=f"Cannot stop environment '{env_id}'"
+        )
     return result
 
 

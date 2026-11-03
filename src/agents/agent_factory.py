@@ -105,7 +105,9 @@ def create_agent_from_yaml(
 class AgentFactory:
     """Factory class wrapping the module-level helpers."""
 
-    def __init__(self, execution_agent: Optional[Any] = None, llm: Optional[Any] = None) -> None:
+    def __init__(
+        self, execution_agent: Optional[Any] = None, llm: Optional[Any] = None
+    ) -> None:
         self._execution_agent = execution_agent
         self._llm = llm
         self._agents: Dict[str, BaseAgent] = {}

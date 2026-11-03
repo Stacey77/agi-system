@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from src.tools.base_tool import BaseTool, ToolMetadata
 from src.tools.calculator_tool import CalculatorTool
 from src.tools.database_tool import DatabaseTool
 from src.tools.document_parser_tool import DocumentParserTool
@@ -15,6 +14,7 @@ from src.tools.web_search_tool import WebSearchTool
 # ---------------------------------------------------------------------------
 # ToolRegistry
 # ---------------------------------------------------------------------------
+
 
 class TestToolRegistry:
     def test_register_and_get(self):
@@ -57,6 +57,7 @@ class TestToolRegistry:
 # WebSearchTool
 # ---------------------------------------------------------------------------
 
+
 class TestWebSearchTool:
     def test_metadata(self):
         tool = WebSearchTool()
@@ -85,6 +86,7 @@ class TestWebSearchTool:
 # ---------------------------------------------------------------------------
 # CalculatorTool
 # ---------------------------------------------------------------------------
+
 
 class TestCalculatorTool:
     def test_simple_expression(self):
@@ -127,6 +129,7 @@ class TestCalculatorTool:
 # DocumentParserTool
 # ---------------------------------------------------------------------------
 
+
 class TestDocumentParserTool:
     def test_metadata(self):
         tool = DocumentParserTool()
@@ -155,6 +158,7 @@ class TestDocumentParserTool:
 # ---------------------------------------------------------------------------
 # DatabaseTool
 # ---------------------------------------------------------------------------
+
 
 class TestDatabaseTool:
     def test_metadata(self):

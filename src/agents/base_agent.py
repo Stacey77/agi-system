@@ -40,7 +40,7 @@ class AgentConfig:
     memory_size: int = 100
     tools: List[str] = field(default_factory=list)
     temperature: float = 0.7
-    max_retries: int = 2          # retries on transient task failures
+    max_retries: int = 2  # retries on transient task failures
     circuit_break_threshold: int = 5  # open circuit after N consecutive failures
 
 
@@ -91,6 +91,7 @@ class BaseAgent(ABC):
         if persist_memory:
             try:
                 from src.memory.task_memory import TaskMemory
+
                 self._task_memory = TaskMemory(agent_name=config.name)
                 logger.info("Persistent task memory enabled for '%s'", config.name)
             except Exception as exc:  # noqa: BLE001
@@ -113,6 +114,7 @@ class BaseAgent(ABC):
     async def stream_task(self, task: Dict[str, Any]) -> AsyncIterator[str]:
         """Stream task output as text chunks (default: yields full result as one chunk)."""
         import json
+
         result = await self.process_task(task)
         yield json.dumps(result)
 
@@ -123,7 +125,9 @@ class BaseAgent(ABC):
             "name": self.config.name,
             "type": self.config.agent_type,
             "memory_usage": len(self.memory),
-            "persistent_memory_size": len(self._task_memory) if self._task_memory else 0,
+            "persistent_memory_size": len(self._task_memory)
+            if self._task_memory
+            else 0,
             "capabilities": self.config.capabilities,
             "consecutive_failures": self._consecutive_failures,
             "circuit_open": circuit_open,
@@ -152,17 +156,21 @@ class BaseAgent(ABC):
                 self._consecutive_failures += 1
                 logger.warning(
                     "Agent '%s' task attempt %d/%d failed: %s",
-                    self.config.name, attempt + 1, self.config.max_retries + 1, exc,
+                    self.config.name,
+                    attempt + 1,
+                    self.config.max_retries + 1,
+                    exc,
                 )
                 if self._consecutive_failures >= self.config.circuit_break_threshold:
                     self._circuit_open_until = time.time() + 60.0
                     logger.error(
                         "Agent '%s' circuit breaker opened after %d consecutive failures",
-                        self.config.name, self._consecutive_failures,
+                        self.config.name,
+                        self._consecutive_failures,
                     )
                     raise
                 if attempt < self.config.max_retries:
-                    await asyncio.sleep(0.5 * (2 ** attempt))
+                    await asyncio.sleep(0.5 * (2**attempt))
         raise last_exc  # type: ignore[misc]
 
     def recall_similar_tasks(self, query: str, k: int = 3) -> List[Dict[str, Any]]:
@@ -214,6 +222,7 @@ class BaseAgent(ABC):
             return None
         try:
             from src.llm.provider import invoke_llm
+
             return await invoke_llm(
                 self.llm,
                 system_prompt,
@@ -232,6 +241,7 @@ class BaseAgent(ABC):
             return
         try:
             from src.llm.provider import stream_llm_response
+
             async for chunk in stream_llm_response(self.llm, prompt):
                 yield chunk
         except Exception as exc:  # noqa: BLE001

@@ -24,7 +24,12 @@ async def system_info(request: Request) -> Dict[str, Any]:
     agents = []
     if factory:
         names = factory.list_agents()
-        agents = [n if isinstance(n, str) else getattr(getattr(n, "config", None), "name", str(n)) for n in names]
+        agents = [
+            n
+            if isinstance(n, str)
+            else getattr(getattr(n, "config", None), "name", str(n))
+            for n in names
+        ]
 
     tools = []
     if tool_registry:
@@ -59,6 +64,7 @@ async def auth_status(request: Request) -> Dict[str, Any]:
     auth_enforced = len(configured_keys) > 0
 
     import os
+
     jwt_secret_stable = bool(os.getenv("JWT_SECRET"))
 
     return {

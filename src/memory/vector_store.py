@@ -71,7 +71,9 @@ class VectorStore:
                 self._collection_name,
                 embedding_function=ef,  # type: ignore[arg-type]
             )
-            logger.info("VectorStore: ChromaDB collection '%s' ready", self._collection_name)
+            logger.info(
+                "VectorStore: ChromaDB collection '%s' ready", self._collection_name
+            )
         except ImportError:
             logger.warning("chromadb not installed; using in-memory mock vector store")
             self._use_mock = True
@@ -100,7 +102,9 @@ class VectorStore:
                 )
             return
         # ChromaDB requires every metadata dict to be non-empty.
-        normalized = [m or {"_type": "document"} for m in (metadatas or [{} for _ in documents])]
+        normalized = [
+            m or {"_type": "document"} for m in (metadatas or [{} for _ in documents])
+        ]
         self._collection.add(  # type: ignore[union-attr]
             documents=documents,
             ids=ids,
@@ -108,14 +112,19 @@ class VectorStore:
         )
         logger.debug("VectorStore: added %d documents", len(documents))
 
-    def similarity_search(
-        self, query: str, k: int = 5
-    ) -> List[Dict[str, Any]]:
+    def similarity_search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
         """Return the *k* most similar documents to *query*."""
         if self._use_mock:
             # Simple substring mock similarity
             scored = [
-                (entry, sum(1 for w in query.lower().split() if w in entry["document"].lower()))
+                (
+                    entry,
+                    sum(
+                        1
+                        for w in query.lower().split()
+                        if w in entry["document"].lower()
+                    ),
+                )
                 for entry in self._mock_store
             ]
             scored.sort(key=lambda x: x[1], reverse=True)

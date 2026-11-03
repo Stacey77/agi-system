@@ -84,7 +84,9 @@ async def delete_short_term_key(key: str, request: Request) -> Dict[str, str]:
     """Delete a single key from short-term memory."""
     mm = _get_memory_manager(request)
     if key not in mm._short_term:
-        raise HTTPException(status_code=404, detail=f"Key '{key}' not found in short-term memory")
+        raise HTTPException(
+            status_code=404, detail=f"Key '{key}' not found in short-term memory"
+        )
     del mm._short_term[key]
     return {"message": f"Key '{key}' deleted from short-term memory"}
 
@@ -193,9 +195,13 @@ async def hybrid_store(body: HybridStoreRequest, request: Request) -> Dict[str, 
         if body.agent_id is not None:
             for doc in body.documents:
                 hm.add_agent_context(body.agent_id, doc)
-            return {"message": f"Stored {len(body.documents)} document(s) for agent '{body.agent_id}'"}
+            return {
+                "message": f"Stored {len(body.documents)} document(s) for agent '{body.agent_id}'"
+            }
         hm.add_to_shared(body.documents)
-        return {"message": f"Stored {len(body.documents)} document(s) in shared hybrid memory"}
+        return {
+            "message": f"Stored {len(body.documents)} document(s) in shared hybrid memory"
+        }
     except Exception as exc:  # noqa: BLE001
         logger.error("HybridMemory store error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc

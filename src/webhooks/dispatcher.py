@@ -62,14 +62,21 @@ class WebhookDispatcher:
                     webhook["last_error"] = None
                     logger.debug(
                         "Webhook delivered (id=%s event=%s attempt=%d status=%d)",
-                        webhook["id"], body.get("event"), attempt, resp.status_code,
+                        webhook["id"],
+                        body.get("event"),
+                        attempt,
+                        resp.status_code,
                     )
                     return
                 except Exception as exc:  # noqa: BLE001
                     last_exc = exc
                     logger.warning(
                         "Webhook delivery attempt %d/%d failed (id=%s url=%s): %s",
-                        attempt, _MAX_RETRIES, webhook["id"], webhook["url"], exc,
+                        attempt,
+                        _MAX_RETRIES,
+                        webhook["id"],
+                        webhook["url"],
+                        exc,
                     )
                     if attempt < _MAX_RETRIES:
                         await asyncio.sleep(delay)
@@ -78,5 +85,7 @@ class WebhookDispatcher:
         webhook["last_error"] = str(last_exc)
         logger.error(
             "Webhook delivery permanently failed after %d attempts (id=%s url=%s)",
-            _MAX_RETRIES, webhook["id"], webhook["url"],
+            _MAX_RETRIES,
+            webhook["id"],
+            webhook["url"],
         )

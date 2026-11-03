@@ -76,7 +76,9 @@ class ResearchAgent(BaseAgent):
                 sources.extend(r)
 
         quality = self._assess_quality(sources)
-        summary = await self._llm_summarise(query, sources) or self._build_summary(query, sources)
+        summary = await self._llm_summarise(query, sources) or self._build_summary(
+            query, sources
+        )
 
         return ResearchResult(
             query=query,
@@ -102,9 +104,7 @@ class ResearchAgent(BaseAgent):
         user_prompt = f"Query: {query}\n\nSources:\n{snippets}"
         return await self._invoke_llm(self._SYSTEM_PROMPT, user_prompt)
 
-    async def _search_source(
-        self, query: str, tool_name: str
-    ) -> List[Dict[str, Any]]:
+    async def _search_source(self, query: str, tool_name: str) -> List[Dict[str, Any]]:
         tool = self._get_tool(tool_name)
         if tool is None:
             return [
@@ -123,9 +123,7 @@ class ResearchAgent(BaseAgent):
             return 0.0
         return min(1.0, len(sources) / 5.0)
 
-    def _build_summary(
-        self, query: str, sources: List[Dict[str, Any]]
-    ) -> str:
+    def _build_summary(self, query: str, sources: List[Dict[str, Any]]) -> str:
         if not sources:
             return f"No results found for: {query}"
         snippets = [s.get("snippet", "") for s in sources[:3] if s.get("snippet")]

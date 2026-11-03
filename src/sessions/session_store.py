@@ -6,7 +6,7 @@ import json
 import logging
 import sqlite3
 import threading
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from src.sessions.session_manager import AgentSession
 
@@ -36,7 +36,9 @@ class SessionStore:
             self._conn.commit()
             logger.info("SessionStore initialised at %s", self._db_path)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("SessionStore init failed (%s) — running without persistence", exc)
+            logger.warning(
+                "SessionStore init failed (%s) — running without persistence", exc
+            )
             self._conn = None
 
     def save(self, session: AgentSession) -> None:
@@ -48,8 +50,12 @@ class SessionStore:
                     """INSERT INTO sessions (session_id, agent_name, created_at, messages)
                        VALUES (?,?,?,?)
                        ON CONFLICT(session_id) DO UPDATE SET messages=excluded.messages""",
-                    (session.session_id, session.agent_name, session.created_at,
-                     json.dumps(session.messages)),
+                    (
+                        session.session_id,
+                        session.agent_name,
+                        session.created_at,
+                        json.dumps(session.messages),
+                    ),
                 )
                 self._conn.commit()
             except Exception as exc:  # noqa: BLE001
@@ -60,7 +66,9 @@ class SessionStore:
             return
         with self._lock:
             try:
-                self._conn.execute("DELETE FROM sessions WHERE session_id=?", (session_id,))
+                self._conn.execute(
+                    "DELETE FROM sessions WHERE session_id=?", (session_id,)
+                )
                 self._conn.commit()
             except Exception as exc:  # noqa: BLE001
                 logger.warning("SessionStore.delete failed: %s", exc)

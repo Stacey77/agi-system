@@ -12,12 +12,12 @@ logger = logging.getLogger(__name__)
 
 # Approximate cost per 1K tokens (USD) — update as pricing changes
 _COST_PER_1K: Dict[str, Dict[str, float]] = {
-    "gpt-4o":         {"input": 0.0025, "output": 0.010},
-    "gpt-4o-mini":    {"input": 0.00015, "output": 0.0006},
-    "gpt-4-turbo":    {"input": 0.010, "output": 0.030},
-    "claude-opus-4-7":        {"input": 0.015, "output": 0.075},
-    "claude-sonnet-4-6":    {"input": 0.003, "output": 0.015},
-    "claude-haiku-4-5-20251001":    {"input": 0.00025, "output": 0.00125},
+    "gpt-4o": {"input": 0.0025, "output": 0.010},
+    "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
+    "gpt-4-turbo": {"input": 0.010, "output": 0.030},
+    "claude-opus-4-7": {"input": 0.015, "output": 0.075},
+    "claude-sonnet-4-6": {"input": 0.003, "output": 0.015},
+    "claude-haiku-4-5-20251001": {"input": 0.00025, "output": 0.00125},
 }
 
 
@@ -37,7 +37,9 @@ class UsageRecord:
     @property
     def estimated_cost_usd(self) -> float:
         costs = _COST_PER_1K.get(self.model, {"input": 0.002, "output": 0.002})
-        return (self.input_tokens * costs["input"] + self.output_tokens * costs["output"]) / 1000
+        return (
+            self.input_tokens * costs["input"] + self.output_tokens * costs["output"]
+        ) / 1000
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -81,7 +83,11 @@ class TokenTracker:
                 self._records = self._records[-self._max_records :]
         logger.debug(
             "Token usage: agent=%s model=%s in=%d out=%d cost=$%.5f",
-            agent_name, model, input_tokens, output_tokens, r.estimated_cost_usd,
+            agent_name,
+            model,
+            input_tokens,
+            output_tokens,
+            r.estimated_cost_usd,
         )
         return r
 
@@ -92,14 +98,22 @@ class TokenTracker:
         total_input = total_output = 0.0
         total_cost = 0.0
         for r in records:
-            agg = by_agent.setdefault(r.agent_name, {
-                "input_tokens": 0, "output_tokens": 0,
-                "total_tokens": 0, "estimated_cost_usd": 0.0, "calls": 0,
-            })
+            agg = by_agent.setdefault(
+                r.agent_name,
+                {
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                    "estimated_cost_usd": 0.0,
+                    "calls": 0,
+                },
+            )
             agg["input_tokens"] += r.input_tokens
             agg["output_tokens"] += r.output_tokens
             agg["total_tokens"] += r.total_tokens
-            agg["estimated_cost_usd"] = round(agg["estimated_cost_usd"] + r.estimated_cost_usd, 6)
+            agg["estimated_cost_usd"] = round(
+                agg["estimated_cost_usd"] + r.estimated_cost_usd, 6
+            )
             agg["calls"] += 1
             total_input += r.input_tokens
             total_output += r.output_tokens

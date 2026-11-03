@@ -31,7 +31,12 @@ class CrewOrchestrator:
             (research → analysis → writing → review).
         """
         if agent_names is None:
-            agent_names = ["research_agent", "analysis_agent", "writing_agent", "review_agent"]
+            agent_names = [
+                "research_agent",
+                "analysis_agent",
+                "writing_agent",
+                "review_agent",
+            ]
 
         langgraph_result = await self._try_langgraph(objective, agent_names)
         if langgraph_result is not None:
@@ -53,6 +58,7 @@ class CrewOrchestrator:
         """Attempt to run the crew via LangGraph StateGraph; return None if unavailable."""
         try:
             from src.crew.langgraph_orchestrator import run_langgraph_crew
+
             return await run_langgraph_crew(objective, agent_names, self._factory)
         except Exception as exc:  # noqa: BLE001
             logger.warning("LangGraph path failed: %s — falling back", exc)
@@ -80,7 +86,8 @@ class CrewOrchestrator:
             crew_agents.append(
                 Agent(
                     role=agt.config.agent_type.value.title(),
-                    goal=agt.config.description or f"Complete tasks as a {agt.config.agent_type.value} agent",
+                    goal=agt.config.description
+                    or f"Complete tasks as a {agt.config.agent_type.value} agent",
                     backstory=f"An expert {agt.config.agent_type.value} agent in an AGI system.",
                     llm=self._llm,
                     verbose=False,
@@ -115,6 +122,7 @@ class CrewOrchestrator:
                 verbose=False,
             )
             import asyncio
+
             result = await asyncio.to_thread(crew.kickoff)
             return {
                 "status": "completed",
@@ -156,7 +164,11 @@ class CrewOrchestrator:
                 logger.error("Agent '%s' failed: %s", name, exc)
                 step_results.append({"agent": name, "error": str(exc)})
 
-        final = step_results[-1]["result"] if step_results and "result" in step_results[-1] else {}
+        final = (
+            step_results[-1]["result"]
+            if step_results and "result" in step_results[-1]
+            else {}
+        )
         return {
             "status": "completed",
             "engine": "sequential",

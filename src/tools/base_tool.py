@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,9 @@ class BaseTool(ABC):
         required = self.metadata.parameters.get("required", [])
         missing = [p for p in required if p not in kwargs]
         if missing:
-            logger.warning("Tool '%s' missing parameters: %s", self.metadata.name, missing)
+            logger.warning(
+                "Tool '%s' missing parameters: %s", self.metadata.name, missing
+            )
             return False
         return True
 

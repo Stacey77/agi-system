@@ -51,7 +51,8 @@ class MemoryManager:
         self._validate_type(memory_type)
         if memory_type == "short_term":
             return [
-                v for k, v in self._short_term.items()
+                v
+                for k, v in self._short_term.items()
                 if query.lower() in str(k).lower() or query.lower() in str(v).lower()
             ]
         store = self._long_term if memory_type == "long_term" else self._episodic

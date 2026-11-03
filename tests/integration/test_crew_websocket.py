@@ -65,9 +65,13 @@ class TestCrewEndpoints:
             },
         )
         body = response.text
-        lines = [ln for ln in body.splitlines() if ln.startswith("data:") and "[DONE]" not in ln]
+        lines = [
+            ln
+            for ln in body.splitlines()
+            if ln.startswith("data:") and "[DONE]" not in ln
+        ]
         if lines:
-            payload = json.loads(lines[0][len("data:"):].strip())
+            payload = json.loads(lines[0][len("data:") :].strip())
             assert "agent" in payload
 
     def test_crew_run_no_orchestrator_returns_503(self, client):

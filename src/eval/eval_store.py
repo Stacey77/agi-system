@@ -45,9 +45,7 @@ class EvalStore:
 
     def delete(self, eval_id: str) -> bool:
         with self._lock:
-            cur = self._conn.execute(
-                "DELETE FROM evals WHERE eval_id = ?", (eval_id,)
-            )
+            cur = self._conn.execute("DELETE FROM evals WHERE eval_id = ?", (eval_id,))
             self._conn.commit()
         return cur.rowcount > 0
 
