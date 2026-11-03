@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +32,7 @@ class QualityAssessment:
 class ResultValidationSystem:
     """Validates and scores execution results."""
 
-    def validate_result(
-        self, task: Dict[str, Any], result: Any
-    ) -> QualityAssessment:
+    def validate_result(self, task: dict[str, Any], result: Any) -> QualityAssessment:
         """Assess the quality of *result* relative to *task*."""
         completeness = self._score_completeness(task, result)
         accuracy = self._score_accuracy(task, result)
@@ -61,7 +59,7 @@ class ResultValidationSystem:
     # Scoring methods
     # ------------------------------------------------------------------
 
-    def _score_completeness(self, task: Dict[str, Any], result: Any) -> float:
+    def _score_completeness(self, task: dict[str, Any], result: Any) -> float:
         if result is None:
             return 0.0
         required_fields = task.get("required_output_fields", [])
@@ -72,17 +70,17 @@ class ResultValidationSystem:
             return present / len(required_fields)
         return 0.8
 
-    def _score_accuracy(self, task: Dict[str, Any], result: Any) -> float:
+    def _score_accuracy(self, task: dict[str, Any], result: Any) -> float:
         # Without a ground-truth oracle we return a conservative default
         if isinstance(result, dict) and result.get("error"):
             return 0.3
         return 0.8
 
-    def _score_consistency(self, task: Dict[str, Any], result: Any) -> float:
+    def _score_consistency(self, task: dict[str, Any], result: Any) -> float:
         if isinstance(result, dict):
             # Check that result type matches expected type if specified
             expected_type = task.get("expected_result_type")
-            _ALLOWED_TYPES: Dict[str, type] = {
+            _ALLOWED_TYPES: dict[str, type] = {
                 "dict": dict,
                 "list": list,
                 "str": str,
@@ -90,9 +88,12 @@ class ResultValidationSystem:
                 "float": float,
                 "bool": bool,
             }
-            if expected_type and expected_type in _ALLOWED_TYPES:
-                if not isinstance(result.get("result"), _ALLOWED_TYPES[expected_type]):
-                    return 0.5
+            if (
+                expected_type
+                and expected_type in _ALLOWED_TYPES
+                and not isinstance(result.get("result"), _ALLOWED_TYPES[expected_type])
+            ):
+                return 0.5
         return 0.9
 
     def _score_safety(self, result: Any) -> float:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -31,7 +31,9 @@ def _get_factory(request: Request):
 
 
 @router.post("/", status_code=201)
-async def create_session(body: CreateSessionRequest, request: Request) -> Dict[str, Any]:
+async def create_session(
+    body: CreateSessionRequest, request: Request
+) -> dict[str, Any]:
     manager = _get_manager(request)
     session = manager.create_session(agent_name=body.agent_name)
     return {
@@ -42,7 +44,7 @@ async def create_session(body: CreateSessionRequest, request: Request) -> Dict[s
 
 
 @router.get("/")
-async def list_sessions(request: Request) -> List[Dict[str, Any]]:
+async def list_sessions(request: Request) -> list[dict[str, Any]]:
     manager = _get_manager(request)
     return [
         {
@@ -56,7 +58,7 @@ async def list_sessions(request: Request) -> List[Dict[str, Any]]:
 
 
 @router.get("/{session_id}")
-async def get_session(session_id: str, request: Request) -> Dict[str, Any]:
+async def get_session(session_id: str, request: Request) -> dict[str, Any]:
     manager = _get_manager(request)
     session = manager.get_session(session_id)
     if session is None:
@@ -70,7 +72,7 @@ async def get_session(session_id: str, request: Request) -> Dict[str, Any]:
 
 
 @router.delete("/{session_id}")
-async def delete_session(session_id: str, request: Request) -> Dict[str, str]:
+async def delete_session(session_id: str, request: Request) -> dict[str, str]:
     manager = _get_manager(request)
     removed = manager.delete_session(session_id)
     if not removed:
@@ -81,7 +83,7 @@ async def delete_session(session_id: str, request: Request) -> Dict[str, str]:
 @router.post("/{session_id}/message")
 async def send_message(
     session_id: str, body: MessageRequest, request: Request
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     manager = _get_manager(request)
     session = manager.get_session(session_id)
     if session is None:
@@ -106,8 +108,10 @@ async def send_message(
 
     try:
         result = await agent.process_task({"task": task_input})
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Agent '%s' error in session '%s': %s", session.agent_name, session_id, exc)
+    except Exception as exc:
+        logger.error(
+            "Agent '%s' error in session '%s': %s", session.agent_name, session_id, exc
+        )
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     output = result.get("result") or result.get("output") or str(result)
@@ -122,11 +126,11 @@ async def send_message(
 async def get_messages(
     session_id: str,
     request: Request,
-    role: Optional[str] = Query(default=None),
+    role: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
-    search: Optional[str] = Query(default=None),
-) -> Dict[str, Any]:
+    search: str | None = Query(default=None),
+) -> dict[str, Any]:
     manager = _get_manager(request)
     session = manager.get_session(session_id)
     if session is None:
@@ -139,10 +143,12 @@ async def get_messages(
         messages = [m for m in messages if m.get("role") == role]
     if search is not None:
         search_lower = search.lower()
-        messages = [m for m in messages if search_lower in str(m.get("content", "")).lower()]
+        messages = [
+            m for m in messages if search_lower in str(m.get("content", "")).lower()
+        ]
 
     total_filtered = len(messages)
-    messages = messages[offset: offset + limit]
+    messages = messages[offset : offset + limit]
 
     return {
         "messages": messages,
@@ -154,7 +160,7 @@ async def get_messages(
 
 
 @router.get("/{session_id}/history")
-async def get_history(session_id: str, request: Request) -> List[Dict[str, Any]]:
+async def get_history(session_id: str, request: Request) -> list[dict[str, Any]]:
     manager = _get_manager(request)
     session = manager.get_session(session_id)
     if session is None:

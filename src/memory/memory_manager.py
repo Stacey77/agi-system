@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.memory.conversation_memory import ConversationMemory
 from src.memory.vector_store import VectorStore
@@ -17,7 +17,7 @@ class MemoryManager:
     """Central coordinator for all memory subsystems."""
 
     def __init__(self) -> None:
-        self._short_term: Dict[str, Any] = {}
+        self._short_term: dict[str, Any] = {}
         self._long_term = VectorStore(collection_name="long_term")
         self._episodic = VectorStore(collection_name="episodic")
         self._conversation = ConversationMemory()
@@ -37,7 +37,7 @@ class MemoryManager:
             self._episodic.add_documents([str(value)], ids=[key])
         logger.debug("MemoryManager.store: key='%s' type='%s'", key, memory_type)
 
-    def retrieve(self, key: str, memory_type: str = "short_term") -> Optional[Any]:
+    def retrieve(self, key: str, memory_type: str = "short_term") -> Any | None:
         """Retrieve value for *key* from *memory_type*."""
         self._validate_type(memory_type)
         if memory_type == "short_term":
@@ -46,12 +46,13 @@ class MemoryManager:
         results = store.similarity_search(key, k=1)
         return results[0] if results else None
 
-    def search(self, query: str, memory_type: str = "long_term") -> List[Any]:
+    def search(self, query: str, memory_type: str = "long_term") -> list[Any]:
         """Semantic search across *memory_type* store."""
         self._validate_type(memory_type)
         if memory_type == "short_term":
             return [
-                v for k, v in self._short_term.items()
+                v
+                for k, v in self._short_term.items()
                 if query.lower() in str(k).lower() or query.lower() in str(v).lower()
             ]
         store = self._long_term if memory_type == "long_term" else self._episodic
@@ -64,7 +65,7 @@ class MemoryManager:
     def add_conversation_message(self, role: str, content: str) -> None:
         self._conversation.add_message(role, content)
 
-    def get_conversation_context(self, n: int = 5) -> List[Any]:
+    def get_conversation_context(self, n: int = 5) -> list[Any]:
         return self._conversation.get_recent_context(n)
 
     def clear_conversation(self) -> None:

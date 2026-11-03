@@ -7,7 +7,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Callable, Coroutine, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -16,15 +16,15 @@ logger = logging.getLogger(__name__)
 class ScheduledTask:
     schedule_id: str
     objective: str
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
     interval_seconds: float
     next_run_at: float
     enabled: bool = True
     run_count: int = 0
-    last_task_id: Optional[str] = None
+    last_task_id: str | None = None
     created_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "schedule_id": self.schedule_id,
             "objective": self.objective,
@@ -42,9 +42,9 @@ class TaskScheduler:
     """Submits tasks to a TaskQueue on a recurring interval."""
 
     def __init__(self) -> None:
-        self._schedules: Dict[str, ScheduledTask] = {}
-        self._queue: Optional[Any] = None
-        self._runner: Optional[asyncio.Task] = None
+        self._schedules: dict[str, ScheduledTask] = {}
+        self._queue: Any | None = None
+        self._runner: asyncio.Task | None = None
 
     def attach_queue(self, queue: Any) -> None:
         self._queue = queue
@@ -53,7 +53,7 @@ class TaskScheduler:
         self,
         objective: str,
         interval_seconds: float,
-        parameters: Optional[Dict[str, Any]] = None,
+        parameters: dict[str, Any] | None = None,
         run_immediately: bool = False,
     ) -> ScheduledTask:
         """Register a recurring task. Returns the ScheduledTask record."""
@@ -69,7 +69,9 @@ class TaskScheduler:
         self._schedules[schedule_id] = task
         logger.info(
             "Scheduled task '%s' every %.0fs (id=%s)",
-            objective[:50], interval_seconds, schedule_id,
+            objective[:50],
+            interval_seconds,
+            schedule_id,
         )
         return task
 
@@ -94,10 +96,10 @@ class TaskScheduler:
         task.enabled = True
         return True
 
-    def list_schedules(self) -> List[ScheduledTask]:
+    def list_schedules(self) -> list[ScheduledTask]:
         return list(self._schedules.values())
 
-    def get(self, schedule_id: str) -> Optional[ScheduledTask]:
+    def get(self, schedule_id: str) -> ScheduledTask | None:
         return self._schedules.get(schedule_id)
 
     async def start(self) -> None:
@@ -132,7 +134,11 @@ class TaskScheduler:
                     sched.next_run_at = now + sched.interval_seconds
                     logger.info(
                         "Scheduler fired '%s' → task %s (run #%d)",
-                        sched.objective[:40], record.task_id, sched.run_count,
+                        sched.objective[:40],
+                        record.task_id,
+                        sched.run_count,
                     )
                 except Exception as exc:  # noqa: BLE001
-                    logger.error("Scheduler submit failed for '%s': %s", sched.schedule_id, exc)
+                    logger.error(
+                        "Scheduler submit failed for '%s': %s", sched.schedule_id, exc
+                    )

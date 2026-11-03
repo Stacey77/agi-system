@@ -4,20 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Task retry endpoint
 # ---------------------------------------------------------------------------
 
+
 class TestTaskRetry:
     @pytest.fixture(scope="class")
     def client(self):
         from fastapi.testclient import TestClient
+
         from src.api.main import create_app
+
         with TestClient(create_app()) as c:
             yield c
 
@@ -32,14 +33,13 @@ class TestTaskRetry:
         task_id = r.json()["task_id"]
 
         # Force it to FAILED status via the queue directly
-        from src.tasks.queue import TaskStatus
         # Poll until not queued (may complete or fail)
         for _ in range(20):
             r2 = client.get(f"/api/v1/tasks/{task_id}")
             status = r2.json()["status"]
             if status not in ("queued", "running"):
                 break
-            import time; time.sleep(0.1)
+            time.sleep(0.1)
 
         # If completed, we can't retry — skip the rest of this test
         if r2.json()["status"] == "completed":
@@ -53,7 +53,7 @@ class TestTaskRetry:
             r2 = client.get(f"/api/v1/tasks/{task_id}")
             if r2.json()["status"] in ("completed", "failed"):
                 break
-            import time; time.sleep(0.1)
+            time.sleep(0.1)
         if r2.json()["status"] == "completed":
             r3 = client.post(f"/api/v1/tasks/{task_id}/retry")
             assert r3.status_code == 409
@@ -112,15 +112,18 @@ class TestTaskRetryUnit:
 # Rate limit middleware — role-based
 # ---------------------------------------------------------------------------
 
+
 class TestRateLimitBucketRoles:
     def test_bucket_allows_within_limit(self):
         from src.api.middleware.rate_limit import _Bucket
+
         b = _Bucket(capacity=10)
         for _ in range(10):
             assert b.consume(10, 1.0) is True
 
     def test_bucket_rejects_when_exhausted(self):
         from src.api.middleware.rate_limit import _Bucket
+
         b = _Bucket(capacity=2)
         b.consume(2, 1.0)
         b.consume(2, 1.0)
@@ -128,6 +131,7 @@ class TestRateLimitBucketRoles:
 
     def test_bucket_refills_over_time(self):
         from src.api.middleware.rate_limit import _Bucket
+
         b = _Bucket(capacity=1)
         b.consume(1, 10.0)
         b.last_refill -= 1.0  # simulate 1 second passing
@@ -135,7 +139,9 @@ class TestRateLimitBucketRoles:
 
     def test_rate_limit_headers_present(self):
         from fastapi.testclient import TestClient
+
         from src.api.main import create_app
+
         with TestClient(create_app()) as client:
             r = client.get("/health/detailed")
             # /health/detailed is excluded from rate limiting
@@ -149,20 +155,25 @@ class TestRateLimitBucketRoles:
 # Prometheus task metrics
 # ---------------------------------------------------------------------------
 
+
 class TestTaskQueueMetrics:
     def test_update_task_queue_metrics_no_crash(self):
         from src.api.middleware.metrics import update_task_queue_metrics
+
         # Should not raise even with various status values
         update_task_queue_metrics({"queued": 3, "running": 1, "completed": 10})
 
     def test_record_rate_limit_hit_no_crash(self):
         from src.api.middleware.metrics import record_rate_limit_hit
+
         record_rate_limit_hit("write")
         record_rate_limit_hit("unknown")
 
     def test_list_tasks_updates_metrics(self):
         from fastapi.testclient import TestClient
+
         from src.api.main import create_app
+
         with TestClient(create_app()) as client:
             # Submit a task to have something to count
             client.post("/api/v1/tasks/", json={"objective": "metrics test"})
@@ -174,7 +185,9 @@ class TestTaskQueueMetrics:
 
     def test_metrics_endpoint_available(self):
         from fastapi.testclient import TestClient
+
         from src.api.main import create_app
+
         with TestClient(create_app()) as client:
             r = client.get("/metrics")
             assert r.status_code == 200

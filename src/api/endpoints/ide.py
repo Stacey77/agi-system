@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -16,15 +16,15 @@ router = APIRouter(prefix="/api/v1/ide", tags=["ide"])
 class IDESessionRequest(BaseModel):
     language: str = "python"
     context: str = ""
-    metadata: Dict[str, Any] = {}
+    metadata: dict[str, Any] = {}
 
 
 class CodeActionRequest(BaseModel):
     action: str = "complete"
     prompt: str
     language: str = "python"
-    session_id: Optional[str] = None
-    parameters: Dict[str, Any] = {}
+    session_id: str | None = None
+    parameters: dict[str, Any] = {}
 
 
 def _get_ide_agent(request: Request) -> Any:
@@ -38,8 +38,9 @@ def _get_ide_agent(request: Request) -> Any:
 # Session management
 # ------------------------------------------------------------------
 
+
 @router.post("/sessions")
-async def create_session(body: IDESessionRequest, request: Request) -> Dict[str, Any]:
+async def create_session(body: IDESessionRequest, request: Request) -> dict[str, Any]:
     """Create a new vibecoding IDE session."""
     ide_agent = _get_ide_agent(request)
     session = ide_agent.session_manager.create_session(
@@ -51,7 +52,7 @@ async def create_session(body: IDESessionRequest, request: Request) -> Dict[str,
 
 
 @router.get("/sessions")
-async def list_sessions(request: Request) -> Dict[str, Any]:
+async def list_sessions(request: Request) -> dict[str, Any]:
     """List all IDE sessions."""
     ide_agent = _get_ide_agent(request)
     sessions = ide_agent.session_manager.list_sessions()
@@ -63,7 +64,7 @@ async def list_sessions(request: Request) -> Dict[str, Any]:
 
 
 @router.get("/sessions/{session_id}")
-async def get_session(session_id: str, request: Request) -> Dict[str, Any]:
+async def get_session(session_id: str, request: Request) -> dict[str, Any]:
     """Get details of a specific IDE session."""
     ide_agent = _get_ide_agent(request)
     session = ide_agent.session_manager.get_session(session_id)
@@ -73,7 +74,7 @@ async def get_session(session_id: str, request: Request) -> Dict[str, Any]:
 
 
 @router.delete("/sessions/{session_id}")
-async def close_session(session_id: str, request: Request) -> Dict[str, str]:
+async def close_session(session_id: str, request: Request) -> dict[str, str]:
     """Close an IDE session."""
     ide_agent = _get_ide_agent(request)
     closed = ide_agent.session_manager.close_session(session_id)
@@ -86,11 +87,14 @@ async def close_session(session_id: str, request: Request) -> Dict[str, str]:
 # Code actions
 # ------------------------------------------------------------------
 
+
 @router.post("/actions")
-async def execute_code_action(body: CodeActionRequest, request: Request) -> Dict[str, Any]:
+async def execute_code_action(
+    body: CodeActionRequest, request: Request
+) -> dict[str, Any]:
     """Execute an AI code action (complete / explain / refactor / fix / generate / review)."""
     ide_agent = _get_ide_agent(request)
-    task: Dict[str, Any] = {
+    task: dict[str, Any] = {
         "action": body.action,
         "prompt": body.prompt,
         "language": body.language,
@@ -99,13 +103,13 @@ async def execute_code_action(body: CodeActionRequest, request: Request) -> Dict
     }
     try:
         return await ide_agent.process_task(task)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.error("IDE action error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/status")
-async def ide_status(request: Request) -> Dict[str, Any]:
+async def ide_status(request: Request) -> dict[str, Any]:
     """Return IDE agent status and session metrics."""
     ide_agent = _get_ide_agent(request)
     return {

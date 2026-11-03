@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.agents.base_agent import AgentConfig, BaseAgent
 
@@ -17,10 +17,10 @@ class ResearchResult:
     """Aggregated research output."""
 
     query: str
-    sources: List[Dict[str, Any]] = field(default_factory=list)
+    sources: list[dict[str, Any]] = field(default_factory=list)
     summary: str = ""
     quality_score: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class ResearchAgent(BaseAgent):
@@ -35,19 +35,19 @@ class ResearchAgent(BaseAgent):
     def __init__(
         self,
         config: AgentConfig,
-        execution_agent: Optional[Any] = None,
-        llm: Optional[Any] = None,
+        execution_agent: Any | None = None,
+        llm: Any | None = None,
     ) -> None:
         super().__init__(config, execution_agent, llm)
 
-    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def process_task(self, task: dict[str, Any]) -> dict[str, Any]:
         """Process a research task."""
         query = task.get("query", task.get("task", ""))
         logger.info("ResearchAgent conducting research on: %s", query)
 
         research = await self.conduct_research(query)
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "status": "completed",
             "query": research.query,
             "sources": research.sources,
@@ -68,7 +68,7 @@ class ResearchAgent(BaseAgent):
             return_exceptions=True,
         )
 
-        sources: List[Dict[str, Any]] = []
+        sources: list[dict[str, Any]] = []
         for r in results:
             if isinstance(r, Exception):
                 logger.warning("Search failed: %s", r)
@@ -76,7 +76,9 @@ class ResearchAgent(BaseAgent):
                 sources.extend(r)
 
         quality = self._assess_quality(sources)
-        summary = await self._llm_summarise(query, sources) or self._build_summary(query, sources)
+        summary = await self._llm_summarise(query, sources) or self._build_summary(
+            query, sources
+        )
 
         return ResearchResult(
             query=query,
@@ -90,8 +92,8 @@ class ResearchAgent(BaseAgent):
     # ------------------------------------------------------------------
 
     async def _llm_summarise(
-        self, query: str, sources: List[Dict[str, Any]]
-    ) -> Optional[str]:
+        self, query: str, sources: list[dict[str, Any]]
+    ) -> str | None:
         """Use the LLM to synthesise a summary from gathered sources."""
         if not sources:
             return None
@@ -102,9 +104,7 @@ class ResearchAgent(BaseAgent):
         user_prompt = f"Query: {query}\n\nSources:\n{snippets}"
         return await self._invoke_llm(self._SYSTEM_PROMPT, user_prompt)
 
-    async def _search_source(
-        self, query: str, tool_name: str
-    ) -> List[Dict[str, Any]]:
+    async def _search_source(self, query: str, tool_name: str) -> list[dict[str, Any]]:
         tool = self._get_tool(tool_name)
         if tool is None:
             return [
@@ -118,14 +118,12 @@ class ResearchAgent(BaseAgent):
         raw = await asyncio.to_thread(tool.execute, query=query)
         return raw if isinstance(raw, list) else [raw]
 
-    def _assess_quality(self, sources: List[Dict[str, Any]]) -> float:
+    def _assess_quality(self, sources: list[dict[str, Any]]) -> float:
         if not sources:
             return 0.0
         return min(1.0, len(sources) / 5.0)
 
-    def _build_summary(
-        self, query: str, sources: List[Dict[str, Any]]
-    ) -> str:
+    def _build_summary(self, query: str, sources: list[dict[str, Any]]) -> str:
         if not sources:
             return f"No results found for: {query}"
         snippets = [s.get("snippet", "") for s in sources[:3] if s.get("snippet")]

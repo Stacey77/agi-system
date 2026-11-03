@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.agents.base_agent import AgentConfig, BaseAgent
 
@@ -17,10 +17,10 @@ class ReviewResult:
 
     is_approved: bool
     score: float = 0.0
-    issues: List[str] = field(default_factory=list)
-    suggestions: List[str] = field(default_factory=list)
-    corrected_content: Optional[Any] = None
-    reflection_notes: List[str] = field(default_factory=list)
+    issues: list[str] = field(default_factory=list)
+    suggestions: list[str] = field(default_factory=list)
+    corrected_content: Any | None = None
+    reflection_notes: list[str] = field(default_factory=list)
 
 
 class ReviewAgent(BaseAgent):
@@ -37,20 +37,22 @@ class ReviewAgent(BaseAgent):
     def __init__(
         self,
         config: AgentConfig,
-        execution_agent: Optional[Any] = None,
-        llm: Optional[Any] = None,
+        execution_agent: Any | None = None,
+        llm: Any | None = None,
     ) -> None:
         super().__init__(config, execution_agent, llm)
 
-    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def process_task(self, task: dict[str, Any]) -> dict[str, Any]:
         """Process a review task."""
         content = task.get("content")
         criteria = task.get("criteria", {})
-        logger.info("ReviewAgent reviewing content with criteria: %s", list(criteria.keys()))
+        logger.info(
+            "ReviewAgent reviewing content with criteria: %s", list(criteria.keys())
+        )
 
         review = await self.review_output(content, criteria)
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "status": "completed",
             "is_approved": review.is_approved,
             "score": review.score,
@@ -64,7 +66,7 @@ class ReviewAgent(BaseAgent):
         return result
 
     async def review_output(
-        self, content: Any, criteria: Dict[str, Any]
+        self, content: Any, criteria: dict[str, Any]
     ) -> ReviewResult:
         """Review content against the provided criteria.
 
@@ -74,9 +76,9 @@ class ReviewAgent(BaseAgent):
         if llm_result is not None:
             return llm_result
 
-        issues: List[str] = []
-        suggestions: List[str] = []
-        notes: List[str] = []
+        issues: list[str] = []
+        suggestions: list[str] = []
+        notes: list[str] = []
 
         # Completeness check
         if content is None or content == "":
@@ -98,7 +100,7 @@ class ReviewAgent(BaseAgent):
                     issues.append(f"Missing required keyword: '{kw}'")
 
         # Reflection loop — attempt self-correction
-        corrected: Optional[Any] = None
+        corrected: Any | None = None
         if issues and isinstance(content, str):
             corrected = self._self_correct(content, issues)
             notes.append("Self-correction applied based on identified issues")
@@ -120,8 +122,8 @@ class ReviewAgent(BaseAgent):
     # ------------------------------------------------------------------
 
     async def _llm_review(
-        self, content: Any, criteria: Dict[str, Any]
-    ) -> Optional[ReviewResult]:
+        self, content: Any, criteria: dict[str, Any]
+    ) -> ReviewResult | None:
         """Use the LLM to perform deep content review; return None on failure."""
         import json
 
@@ -133,8 +135,14 @@ class ReviewAgent(BaseAgent):
         if not raw:
             return None
         try:
-            raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
-            parsed: Dict[str, Any] = json.loads(raw)
+            raw = (
+                raw.strip()
+                .removeprefix("```json")
+                .removeprefix("```")
+                .removesuffix("```")
+                .strip()
+            )
+            parsed: dict[str, Any] = json.loads(raw)
             return ReviewResult(
                 is_approved=bool(parsed.get("is_approved", False)),
                 score=float(parsed.get("score", 0.0)),
@@ -143,13 +151,15 @@ class ReviewAgent(BaseAgent):
                 reflection_notes=parsed.get("reflection_notes", []),
             )
         except (json.JSONDecodeError, ValueError, TypeError):
-            logger.warning("LLM review returned non-JSON; falling back to rule-based review")
+            logger.warning(
+                "LLM review returned non-JSON; falling back to rule-based review"
+            )
             return None
 
     # ------------------------------------------------------------------
     # Self-correction
     # ------------------------------------------------------------------
 
-    def _self_correct(self, content: str, issues: List[str]) -> str:
+    def _self_correct(self, content: str, issues: list[str]) -> str:
         corrections = [f"[Correction: {issue}]" for issue in issues]
         return content + "\n\n" + "\n".join(corrections)

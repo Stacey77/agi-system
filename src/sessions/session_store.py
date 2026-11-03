@@ -6,7 +6,6 @@ import json
 import logging
 import sqlite3
 import threading
-from typing import Dict, List, Optional
 
 from src.sessions.session_manager import AgentSession
 
@@ -26,7 +25,7 @@ class SessionStore:
     def __init__(self, db_path: str = "sessions.db") -> None:
         self._db_path = db_path
         self._lock = threading.Lock()
-        self._conn: Optional[sqlite3.Connection] = None
+        self._conn: sqlite3.Connection | None = None
         self._init()
 
     def _init(self) -> None:
@@ -36,7 +35,9 @@ class SessionStore:
             self._conn.commit()
             logger.info("SessionStore initialised at %s", self._db_path)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("SessionStore init failed (%s) — running without persistence", exc)
+            logger.warning(
+                "SessionStore init failed (%s) — running without persistence", exc
+            )
             self._conn = None
 
     def save(self, session: AgentSession) -> None:
@@ -48,8 +49,12 @@ class SessionStore:
                     """INSERT INTO sessions (session_id, agent_name, created_at, messages)
                        VALUES (?,?,?,?)
                        ON CONFLICT(session_id) DO UPDATE SET messages=excluded.messages""",
-                    (session.session_id, session.agent_name, session.created_at,
-                     json.dumps(session.messages)),
+                    (
+                        session.session_id,
+                        session.agent_name,
+                        session.created_at,
+                        json.dumps(session.messages),
+                    ),
                 )
                 self._conn.commit()
             except Exception as exc:  # noqa: BLE001
@@ -60,15 +65,17 @@ class SessionStore:
             return
         with self._lock:
             try:
-                self._conn.execute("DELETE FROM sessions WHERE session_id=?", (session_id,))
+                self._conn.execute(
+                    "DELETE FROM sessions WHERE session_id=?", (session_id,)
+                )
                 self._conn.commit()
             except Exception as exc:  # noqa: BLE001
                 logger.warning("SessionStore.delete failed: %s", exc)
 
-    def load_all(self) -> Dict[str, AgentSession]:
+    def load_all(self) -> dict[str, AgentSession]:
         if self._conn is None:
             return {}
-        sessions: Dict[str, AgentSession] = {}
+        sessions: dict[str, AgentSession] = {}
         with self._lock:
             try:
                 cur = self._conn.execute(
@@ -92,6 +99,6 @@ class SessionStore:
             with self._lock:
                 try:
                     self._conn.close()
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001, S110
                     pass
             self._conn = None

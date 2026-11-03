@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.agents.base_agent import AgentConfig, BaseAgent
 
@@ -17,10 +17,10 @@ class SummaryResult:
 
     original_length: int
     summary: str = ""
-    key_points: List[str] = field(default_factory=list)
+    key_points: list[str] = field(default_factory=list)
     style: str = "concise"
     compression_ratio: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class SummarizationAgent(BaseAgent):
@@ -38,12 +38,12 @@ class SummarizationAgent(BaseAgent):
     def __init__(
         self,
         config: AgentConfig,
-        execution_agent: Optional[Any] = None,
-        llm: Optional[Any] = None,
+        execution_agent: Any | None = None,
+        llm: Any | None = None,
     ) -> None:
         super().__init__(config, execution_agent, llm)
 
-    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def process_task(self, task: dict[str, Any]) -> dict[str, Any]:
         """Process a summarization task.
 
         Expected task keys:
@@ -58,7 +58,7 @@ class SummarizationAgent(BaseAgent):
 
         result_obj = await self.summarize(text, style=style, max_length=max_length)
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "status": "completed",
             "summary": result_obj.summary,
             "key_points": result_obj.key_points,
@@ -73,7 +73,7 @@ class SummarizationAgent(BaseAgent):
         self,
         text: str,
         style: str = "concise",
-        max_length: Optional[int] = None,
+        max_length: int | None = None,
     ) -> SummaryResult:
         """Summarize *text* in the requested *style*."""
         original_length = len(text.split())
@@ -86,13 +86,21 @@ class SummarizationAgent(BaseAgent):
         raw = await self._invoke_llm(self._SYSTEM_PROMPT, user_prompt)
         if raw:
             try:
-                cleaned = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
-                parsed: Dict[str, Any] = json.loads(cleaned)
+                cleaned = (
+                    raw.strip()
+                    .removeprefix("```json")
+                    .removeprefix("```")
+                    .removesuffix("```")
+                    .strip()
+                )
+                parsed: dict[str, Any] = json.loads(cleaned)
                 summary = parsed.get("summary", "")
                 key_points = parsed.get("key_points", [])
                 summary_length = len(summary.split())
                 compression = (
-                    round(1 - summary_length / original_length, 2) if original_length > 0 else 0.0
+                    round(1 - summary_length / original_length, 2)
+                    if original_length > 0
+                    else 0.0
                 )
                 return SummaryResult(
                     original_length=original_length,
@@ -126,7 +134,9 @@ class SummarizationAgent(BaseAgent):
         key_points = [f"* {s}." for s in sentences[:5]]
         summary_length = len(summary.split())
         compression = (
-            round(1 - summary_length / original_length, 2) if original_length > 0 else 0.0
+            round(1 - summary_length / original_length, 2)
+            if original_length > 0
+            else 0.0
         )
         return SummaryResult(
             original_length=original_length,

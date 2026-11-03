@@ -5,8 +5,8 @@ from src.platform.tool_landscape import PlatformTool, ToolCategory, ToolLandscap
 
 __all__ = [
     "DeveloperPortal",
-    "PortalTier",
     "PlatformTool",
+    "PortalTier",
     "ToolCategory",
     "ToolLandscape",
 ]

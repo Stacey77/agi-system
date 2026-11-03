@@ -7,7 +7,7 @@ import logging
 import math
 import operator
 import statistics
-from typing import Any, Dict, List, Union
+from typing import Any
 
 from src.tools.base_tool import BaseTool, ToolMetadata
 
@@ -56,7 +56,7 @@ def _safe_eval(node: ast.expr) -> float:
         return op_fn(_safe_eval(node.operand))
     if isinstance(node, ast.Call):
         if not isinstance(node.func, ast.Name):
-            raise ValueError("Only simple function calls are allowed")
+            raise TypeError("Only simple function calls are allowed")
         fn = _SAFE_FUNCS.get(node.func.id)
         if fn is None:
             raise ValueError(f"Function not allowed: {node.func.id!r}")
@@ -82,13 +82,19 @@ class CalculatorTool(BaseTool):
                 "required": ["expression"],
                 "optional": ["operation", "data"],
                 "properties": {
-                    "expression": {"type": "string", "description": "Math expression to evaluate"},
+                    "expression": {
+                        "type": "string",
+                        "description": "Math expression to evaluate",
+                    },
                     "operation": {
                         "type": "string",
                         "enum": ["evaluate", "statistics"],
                         "default": "evaluate",
                     },
-                    "data": {"type": "array", "description": "Numeric data for statistics"},
+                    "data": {
+                        "type": "array",
+                        "description": "Numeric data for statistics",
+                    },
                 },
             },
             return_type="Union[float, Dict]",
@@ -103,7 +109,7 @@ class CalculatorTool(BaseTool):
         expression = kwargs["expression"]
 
         if operation == "statistics":
-            data: List[float] = kwargs.get("data", [])
+            data: list[float] = kwargs.get("data", [])
             return self._compute_statistics(data)
         return self._evaluate_expression(expression)
 
@@ -111,7 +117,7 @@ class CalculatorTool(BaseTool):
     # Evaluation
     # ------------------------------------------------------------------
 
-    def _evaluate_expression(self, expression: str) -> Union[float, Dict[str, str]]:
+    def _evaluate_expression(self, expression: str) -> float | dict[str, str]:
         """Safely evaluate *expression*."""
         try:
             tree = ast.parse(expression.strip(), mode="eval")
@@ -122,11 +128,11 @@ class CalculatorTool(BaseTool):
             logger.warning("Expression evaluation failed: %s", exc)
             return {"error": str(exc)}
 
-    def _compute_statistics(self, data: List[float]) -> Dict[str, Any]:
+    def _compute_statistics(self, data: list[float]) -> dict[str, Any]:
         if not data:
             return {"error": "No data provided"}
         nums = [float(x) for x in data]
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "count": len(nums),
             "mean": statistics.mean(nums),
             "median": statistics.median(nums),

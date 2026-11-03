@@ -2,19 +2,18 @@
 
 from __future__ import annotations
 
-import asyncio
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.agents.base_agent import AgentConfig, AgentType, BaseAgent
 from src.agents.planning_agent import ExecutablePlan, PlanningAgent
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_config(name: str, agent_type: AgentType = AgentType.RESEARCH) -> AgentConfig:
     return AgentConfig(name=name, agent_type=agent_type)
@@ -23,13 +22,14 @@ def _make_config(name: str, agent_type: AgentType = AgentType.RESEARCH) -> Agent
 class _SimpleAgent(BaseAgent):
     """Minimal concrete agent for testing."""
 
-    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def process_task(self, task: dict[str, Any]) -> dict[str, Any]:
         return {"status": "completed", "summary": f"done: {task.get('task', '')}"}
 
 
 # ---------------------------------------------------------------------------
 # TaskMemory
 # ---------------------------------------------------------------------------
+
 
 class TestTaskMemory:
     def test_remember_and_recall(self):
@@ -46,7 +46,9 @@ class TestTaskMemory:
         from src.memory.task_memory import TaskMemory
 
         mem = TaskMemory(agent_name="recall_agent")
-        mem.remember({"task": "analyse sales data"}, {"status": "done", "analysis": "growth"})
+        mem.remember(
+            {"task": "analyse sales data"}, {"status": "done", "analysis": "growth"}
+        )
         hits = mem.recall("sales analysis", k=1)
         assert isinstance(hits, list)
 
@@ -69,6 +71,7 @@ class TestTaskMemory:
 # ---------------------------------------------------------------------------
 # BaseAgent persistent memory integration
 # ---------------------------------------------------------------------------
+
 
 class TestBaseAgentPersistMemory:
     def test_persist_memory_disabled_by_default(self):
@@ -123,8 +126,9 @@ class TestBaseAgentPersistMemory:
 # CrewOrchestrator (sequential fallback — no crewai dependency)
 # ---------------------------------------------------------------------------
 
+
 class TestCrewOrchestrator:
-    def _make_factory(self, agents: Dict[str, BaseAgent]):
+    def _make_factory(self, agents: dict[str, BaseAgent]):
         factory = MagicMock()
         factory.get_agent.side_effect = lambda name: agents.get(name)
         return factory
@@ -135,10 +139,14 @@ class TestCrewOrchestrator:
 
         research = _SimpleAgent(_make_config("research_agent", AgentType.RESEARCH))
         analysis = _SimpleAgent(_make_config("analysis_agent", AgentType.ANALYSIS))
-        factory = self._make_factory({"research_agent": research, "analysis_agent": analysis})
+        factory = self._make_factory(
+            {"research_agent": research, "analysis_agent": analysis}
+        )
 
         orch = CrewOrchestrator(agent_factory=factory)
-        result = await orch._sequential_fallback("test objective", ["research_agent", "analysis_agent"])
+        result = await orch._sequential_fallback(
+            "test objective", ["research_agent", "analysis_agent"]
+        )
 
         assert result["status"] == "completed"
         assert result["engine"] == "sequential"
@@ -176,7 +184,7 @@ class TestCrewOrchestrator:
         """Summary from step N is passed as context to step N+1."""
         from src.crew.orchestrator import CrewOrchestrator
 
-        calls: List[Dict] = []
+        calls: list[dict] = []
 
         class _TrackingAgent(BaseAgent):
             async def process_task(self, task):
@@ -196,6 +204,7 @@ class TestCrewOrchestrator:
 # ---------------------------------------------------------------------------
 # PlanningAgent delegation
 # ---------------------------------------------------------------------------
+
 
 class TestPlanningAgentDelegation:
     def _make_planning_agent(self) -> PlanningAgent:
@@ -229,8 +238,18 @@ class TestPlanningAgentDelegation:
         plan = ExecutablePlan(
             objective="test objective",
             steps=[
-                {"step_id": "step_1", "action": "research", "description": "gather info", "agent": "research"},
-                {"step_id": "step_2", "action": "analyse", "description": "analyse it", "agent": "analysis"},
+                {
+                    "step_id": "step_1",
+                    "action": "research",
+                    "description": "gather info",
+                    "agent": "research",
+                },
+                {
+                    "step_id": "step_2",
+                    "action": "analyse",
+                    "description": "analyse it",
+                    "agent": "analysis",
+                },
             ],
         )
         results = await agent.execute_plan(plan, "test objective")
@@ -248,7 +267,12 @@ class TestPlanningAgentDelegation:
         plan = ExecutablePlan(
             objective="obj",
             steps=[
-                {"step_id": "step_1", "action": "research", "description": "d", "agent": "research"},
+                {
+                    "step_id": "step_1",
+                    "action": "research",
+                    "description": "d",
+                    "agent": "research",
+                },
             ],
         )
         results = await agent.execute_plan(plan, "obj")
@@ -261,12 +285,14 @@ class TestPlanningAgentDelegation:
         analysis = _SimpleAgent(_make_config("analysis_agent", AgentType.ANALYSIS))
         writing = _SimpleAgent(_make_config("writing_agent", AgentType.WRITING))
         review = _SimpleAgent(_make_config("review_agent", AgentType.REVIEW))
-        factory = self._make_factory({
-            "research_agent": research,
-            "analysis_agent": analysis,
-            "writing_agent": writing,
-            "review_agent": review,
-        })
+        factory = self._make_factory(
+            {
+                "research_agent": research,
+                "analysis_agent": analysis,
+                "writing_agent": writing,
+                "review_agent": review,
+            }
+        )
         agent.set_agent_factory(factory)
 
         result = await agent.process_task({"task": "build a report", "execute": True})

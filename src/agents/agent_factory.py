@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import yaml
 
@@ -41,8 +41,8 @@ _CONFIG_DIR = Path(__file__).resolve().parents[2] / "config" / "agents"
 
 def create_agent(
     config: AgentConfig,
-    execution_agent: Optional[Any] = None,
-    llm: Optional[Any] = None,
+    execution_agent: Any | None = None,
+    llm: Any | None = None,
 ) -> BaseAgent:
     """Instantiate an agent for the given *config*.
 
@@ -65,8 +65,8 @@ def create_agent(
 
 def create_agent_from_yaml(
     agent_name: str,
-    execution_agent: Optional[Any] = None,
-    llm: Optional[Any] = None,
+    execution_agent: Any | None = None,
+    llm: Any | None = None,
 ) -> BaseAgent:
     """Load an AgentConfig from a YAML file and create the agent.
 
@@ -82,7 +82,7 @@ def create_agent_from_yaml(
         raise FileNotFoundError(f"Agent config not found: {yaml_path}")
 
     with yaml_path.open("r", encoding="utf-8") as fh:
-        raw: Dict[str, Any] = yaml.safe_load(fh) or {}
+        raw: dict[str, Any] = yaml.safe_load(fh) or {}
 
     agent_type_str = raw.get("type", agent_name.replace("_agent", ""))
     try:
@@ -105,20 +105,22 @@ def create_agent_from_yaml(
 class AgentFactory:
     """Factory class wrapping the module-level helpers."""
 
-    def __init__(self, execution_agent: Optional[Any] = None, llm: Optional[Any] = None) -> None:
+    def __init__(
+        self, execution_agent: Any | None = None, llm: Any | None = None
+    ) -> None:
         self._execution_agent = execution_agent
         self._llm = llm
-        self._agents: Dict[str, BaseAgent] = {}
+        self._agents: dict[str, BaseAgent] = {}
 
     def create_agent(self, config: AgentConfig) -> BaseAgent:
         agent = create_agent(config, self._execution_agent, self._llm)
         self._agents[config.name] = agent
         return agent
 
-    def get_agent(self, name: str) -> Optional[BaseAgent]:
+    def get_agent(self, name: str) -> BaseAgent | None:
         return self._agents.get(name)
 
-    def list_agents(self) -> Dict[str, BaseAgent]:
+    def list_agents(self) -> dict[str, BaseAgent]:
         return dict(self._agents)
 
     def set_tool_registry(self, registry: Any) -> None:

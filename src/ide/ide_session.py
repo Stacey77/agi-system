@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class SessionState(str, Enum):
@@ -24,11 +24,11 @@ class IDESession:
     session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     language: str = "python"
     context: str = ""
-    history: List[Dict[str, Any]] = field(default_factory=list)
+    history: list[dict[str, Any]] = field(default_factory=list)
     state: SessionState = SessionState.ACTIVE
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def add_interaction(self, role: str, content: str) -> None:
         """Append an interaction to the session history."""
@@ -36,17 +36,17 @@ class IDESession:
             {
                 "role": role,
                 "content": content,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def close(self) -> None:
         """Mark the session as closed."""
         self.state = SessionState.CLOSED
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "session_id": self.session_id,
             "language": self.language,
@@ -63,13 +63,13 @@ class IDESessionManager:
     """Manages the lifecycle of vibecoding IDE sessions."""
 
     def __init__(self) -> None:
-        self._sessions: Dict[str, IDESession] = {}
+        self._sessions: dict[str, IDESession] = {}
 
     def create_session(
         self,
         language: str = "python",
         context: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> IDESession:
         """Create and register a new IDE session."""
         session = IDESession(
@@ -80,7 +80,7 @@ class IDESessionManager:
         self._sessions[session.session_id] = session
         return session
 
-    def get_session(self, session_id: str) -> Optional[IDESession]:
+    def get_session(self, session_id: str) -> IDESession | None:
         """Retrieve a session by ID."""
         return self._sessions.get(session_id)
 
@@ -92,7 +92,7 @@ class IDESessionManager:
         session.close()
         return True
 
-    def list_sessions(self, state: Optional[SessionState] = None) -> List[IDESession]:
+    def list_sessions(self, state: SessionState | None = None) -> list[IDESession]:
         """Return all sessions, optionally filtered by state."""
         sessions = list(self._sessions.values())
         if state is not None:

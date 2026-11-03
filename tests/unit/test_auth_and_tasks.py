@@ -3,20 +3,18 @@
 from __future__ import annotations
 
 import asyncio
-import time
-from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # KeyStore
 # ---------------------------------------------------------------------------
 
+
 class TestKeyStore:
     def test_create_and_validate_key(self):
-        from src.auth.key_store import KeyStore, KeyRole
+        from src.auth.key_store import KeyRole, KeyStore
+
         ks = KeyStore()
         raw, api_key = ks.create_key("test", KeyRole.WRITE)
         assert api_key.role == KeyRole.WRITE
@@ -27,11 +25,13 @@ class TestKeyStore:
 
     def test_validate_wrong_key_returns_none(self):
         from src.auth.key_store import KeyStore
+
         ks = KeyStore()
         assert ks.validate_key("not-a-real-key") is None
 
     def test_revoke_key(self):
-        from src.auth.key_store import KeyStore, KeyRole
+        from src.auth.key_store import KeyRole, KeyStore
+
         ks = KeyStore()
         raw, api_key = ks.create_key("to-revoke", KeyRole.READ)
         assert ks.revoke_key(api_key.key_id) is True
@@ -39,11 +39,13 @@ class TestKeyStore:
 
     def test_revoke_missing_key_returns_false(self):
         from src.auth.key_store import KeyStore
+
         ks = KeyStore()
         assert ks.revoke_key("nonexistent-id") is False
 
     def test_list_keys(self):
-        from src.auth.key_store import KeyStore, KeyRole
+        from src.auth.key_store import KeyRole, KeyStore
+
         ks = KeyStore()
         ks.create_key("key-a", KeyRole.READ)
         ks.create_key("key-b", KeyRole.ADMIN)
@@ -53,14 +55,18 @@ class TestKeyStore:
     def test_load_from_env_api_key(self, monkeypatch):
         monkeypatch.setenv("API_KEY", "sk-test-envkey")
         from importlib import reload
+
         import src.auth.key_store as ks_mod
+
         reload(ks_mod)
         from src.auth.key_store import KeyStore
+
         ks = KeyStore()
         assert ks.validate_key("sk-test-envkey") is not None
 
     def test_key_prefix_format(self):
-        from src.auth.key_store import KeyStore, KeyRole
+        from src.auth.key_store import KeyRole, KeyStore
+
         ks = KeyStore()
         raw, _ = ks.create_key("prefix-test", KeyRole.WRITE)
         assert raw.startswith("sk-")
@@ -70,9 +76,11 @@ class TestKeyStore:
 # JWTManager
 # ---------------------------------------------------------------------------
 
+
 class TestJWTManager:
     def _manager(self):
         from src.auth.jwt_manager import JWTManager
+
         return JWTManager(secret="test-secret-xyz", expiry_seconds=3600)
 
     def test_create_and_verify_token(self):
@@ -86,6 +94,7 @@ class TestJWTManager:
 
     def test_expired_token_rejected(self):
         from src.auth.jwt_manager import JWTManager
+
         jm = JWTManager(secret="test-secret-xyz", expiry_seconds=-1)
         token = jm.create_token(key_id="kid2", name="bob", role="read")
         payload = jm.verify_token(token)
@@ -101,6 +110,7 @@ class TestJWTManager:
 
     def test_wrong_secret_rejected(self):
         from src.auth.jwt_manager import JWTManager
+
         jm1 = JWTManager(secret="secret-a", expiry_seconds=3600)
         jm2 = JWTManager(secret="secret-b", expiry_seconds=3600)
         token = jm1.create_token(key_id="kid4", name="dave", role="admin")
@@ -117,9 +127,11 @@ class TestJWTManager:
 # TaskRecord
 # ---------------------------------------------------------------------------
 
+
 class TestTaskRecord:
     def test_to_dict_keys(self):
         from src.tasks.queue import TaskRecord, TaskStatus
+
         r = TaskRecord(task_id="t1", objective="do something")
         d = r.to_dict()
         assert d["task_id"] == "t1"
@@ -133,10 +145,12 @@ class TestTaskRecord:
 # TaskQueue (in-process asyncio, no Redis)
 # ---------------------------------------------------------------------------
 
+
 class TestTaskQueue:
     @pytest.mark.asyncio
     async def test_submit_and_get(self):
-        from src.tasks.queue import TaskQueue, TaskStatus
+        from src.tasks.queue import TaskQueue
+
         q = TaskQueue()
         handled = asyncio.Event()
 
@@ -152,6 +166,7 @@ class TestTaskQueue:
     @pytest.mark.asyncio
     async def test_task_completes(self):
         from src.tasks.queue import TaskQueue, TaskStatus
+
         q = TaskQueue()
         done = asyncio.Event()
 
@@ -172,6 +187,7 @@ class TestTaskQueue:
     @pytest.mark.asyncio
     async def test_task_failure(self):
         from src.tasks.queue import TaskQueue, TaskStatus
+
         q = TaskQueue()
 
         async def handler(record):
@@ -189,7 +205,8 @@ class TestTaskQueue:
 
     @pytest.mark.asyncio
     async def test_cancel_queued_task(self):
-        from src.tasks.queue import TaskQueue, TaskStatus
+        from src.tasks.queue import TaskQueue
+
         # Use a slow handler so we can cancel before it runs
         q = TaskQueue()
         start_event = asyncio.Event()
@@ -201,7 +218,7 @@ class TestTaskQueue:
 
         await q.start(slow_handler)
         # Submit two tasks — cancel the second before it's processed
-        r1 = await q.submit("task one", {})
+        await q.submit("task one", {})
         r2 = await q.submit("task two", {})
         # Wait for first to start, then cancel second
         await asyncio.wait_for(start_event.wait(), timeout=2.0)
@@ -214,6 +231,7 @@ class TestTaskQueue:
     @pytest.mark.asyncio
     async def test_list_all(self):
         from src.tasks.queue import TaskQueue
+
         q = TaskQueue()
         done = asyncio.Event()
 
@@ -230,7 +248,8 @@ class TestTaskQueue:
 
     @pytest.mark.asyncio
     async def test_subscribe_receives_events(self):
-        from src.tasks.queue import TaskQueue, TaskStatus
+        from src.tasks.queue import TaskQueue
+
         q = TaskQueue()
         done = asyncio.Event()
 
@@ -253,7 +272,8 @@ class TestTaskQueue:
 
     @pytest.mark.asyncio
     async def test_update_progress(self):
-        from src.tasks.queue import TaskQueue, TaskStatus
+        from src.tasks.queue import TaskQueue
+
         q = TaskQueue()
         progress_events = []
         done = asyncio.Event()
@@ -280,6 +300,7 @@ class TestTaskQueue:
     @pytest.mark.asyncio
     async def test_update_progress_noop_when_not_running(self):
         from src.tasks.queue import TaskQueue
+
         q = TaskQueue()
         done = asyncio.Event()
 
@@ -301,11 +322,14 @@ class TestTaskQueue:
 # Integration: auth and task endpoints
 # ---------------------------------------------------------------------------
 
+
 class TestAuthEndpoints:
     @pytest.fixture(scope="class")
     def client(self):
         from fastapi.testclient import TestClient
+
         from src.api.main import create_app
+
         with TestClient(create_app()) as c:
             yield c
 
@@ -326,12 +350,16 @@ class TestTaskEndpoints:
     @pytest.fixture(scope="class")
     def client(self):
         from fastapi.testclient import TestClient
+
         from src.api.main import create_app
+
         with TestClient(create_app()) as c:
             yield c
 
     def test_submit_task(self, client):
-        r = client.post("/api/v1/tasks/", json={"objective": "test task", "parameters": {}})
+        r = client.post(
+            "/api/v1/tasks/", json={"objective": "test task", "parameters": {}}
+        )
         assert r.status_code == 200
         data = r.json()
         assert "task_id" in data

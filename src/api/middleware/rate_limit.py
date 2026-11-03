@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import defaultdict
-from typing import Callable, Dict
+from collections.abc import Callable
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -19,13 +19,20 @@ from starlette.types import ASGIApp
 
 logger = logging.getLogger(__name__)
 
-_EXCLUDED_PATHS = {"/health", "/health/detailed", "/docs", "/openapi.json", "/redoc", "/"}
+_EXCLUDED_PATHS = {
+    "/health",
+    "/health/detailed",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/",
+}
 
 
 class _Bucket:
     """Token-bucket state for one client."""
 
-    __slots__ = ("tokens", "last_refill")
+    __slots__ = ("last_refill", "tokens")
 
     def __init__(self, capacity: float) -> None:
         self.tokens = capacity
@@ -55,13 +62,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
         from src.config import get_settings
+
         cfg = get_settings()
         self._capacity = float(cfg.rate_limit_requests)
         self._refill_rate = self._capacity / cfg.rate_limit_window
-        self._buckets: Dict[str, _Bucket] = defaultdict(lambda: _Bucket(self._capacity))
+        self._buckets: dict[str, _Bucket] = defaultdict(lambda: _Bucket(self._capacity))
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        if request.url.path in _EXCLUDED_PATHS or request.url.path.startswith("/static/"):
+        if request.url.path in _EXCLUDED_PATHS or request.url.path.startswith(
+            "/static/"
+        ):
             return await call_next(request)
 
         # Determine role from auth state (set by APIKeyMiddleware which runs first)
@@ -80,21 +90,20 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # by APIKeyMiddleware; fall back to the raw header value and then to IP.
         auth_identity = getattr(getattr(request, "state", None), "auth_identity", None)
         client_ip = request.client.host if request.client else "unknown"
-        client_id = (
-            auth_identity
-            or request.headers.get("X-API-Key")
-            or client_ip
-        )
+        client_id = auth_identity or request.headers.get("X-API-Key") or client_ip
         # Use a non-sensitive identifier for logging: prefer the internal identity
         # or IP address rather than the raw API key header.
         log_id = auth_identity or client_ip
         bucket = self._buckets[client_id]
         if not bucket.consume(effective_capacity, effective_refill):
-            logger.warning("Rate limit exceeded for client '%s' (role=%s)", log_id, auth_role)
+            logger.warning(
+                "Rate limit exceeded for client '%s' (role=%s)", log_id, auth_role
+            )
             try:
                 from src.api.middleware.metrics import record_rate_limit_hit
+
                 record_rate_limit_hit(auth_role or "unknown")
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001, S110
                 pass
             return JSONResponse(
                 status_code=429,

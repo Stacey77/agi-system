@@ -4,7 +4,7 @@ import json
 import sqlite3
 import threading
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class EvalStore:
@@ -20,7 +20,7 @@ class EvalStore:
         )
         self._conn.commit()
 
-    def save(self, result: Dict[str, Any]) -> None:
+    def save(self, result: dict[str, Any]) -> None:
         eval_id = result["eval_id"]
         with self._lock:
             self._conn.execute(
@@ -29,14 +29,14 @@ class EvalStore:
             )
             self._conn.commit()
 
-    def load_all(self) -> List[Dict[str, Any]]:
+    def load_all(self) -> list[dict[str, Any]]:
         with self._lock:
             rows = self._conn.execute(
                 "SELECT data FROM evals ORDER BY created_at ASC"
             ).fetchall()
         return [json.loads(row[0]) for row in rows]
 
-    def get(self, eval_id: str) -> Optional[Dict[str, Any]]:
+    def get(self, eval_id: str) -> dict[str, Any] | None:
         with self._lock:
             row = self._conn.execute(
                 "SELECT data FROM evals WHERE eval_id = ?", (eval_id,)
@@ -45,9 +45,7 @@ class EvalStore:
 
     def delete(self, eval_id: str) -> bool:
         with self._lock:
-            cur = self._conn.execute(
-                "DELETE FROM evals WHERE eval_id = ?", (eval_id,)
-            )
+            cur = self._conn.execute("DELETE FROM evals WHERE eval_id = ?", (eval_id,))
             self._conn.commit()
         return cur.rowcount > 0
 
@@ -56,6 +54,6 @@ class EvalStore:
             with self._lock:
                 try:
                     self._conn.close()
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001, S110
                     pass
             self._conn = None

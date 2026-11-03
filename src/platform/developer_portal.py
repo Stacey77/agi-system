@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class PortalTier(str, Enum):
@@ -34,15 +34,15 @@ class DeveloperService:
     description: str = ""
     tier: PortalTier = PortalTier.INTERNAL
     version: str = "v1"
-    api_base_url: Optional[str] = None
-    docs_url: Optional[str] = None
+    api_base_url: str | None = None
+    docs_url: str | None = None
     status: ServiceStatus = ServiceStatus.OPERATIONAL
     owner_team: str = ""
-    tags: List[str] = field(default_factory=list)
-    registered_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+    registered_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "service_id": self.service_id,
             "name": self.name,
@@ -59,7 +59,7 @@ class DeveloperService:
 
 
 # Built-in platform services
-_DEFAULT_SERVICES: List[Dict[str, Any]] = [
+_DEFAULT_SERVICES: list[dict[str, Any]] = [
     {
         "name": "AGI Task API",
         "description": "Submit and track AGI tasks",
@@ -131,7 +131,7 @@ class DeveloperPortal:
     """
 
     def __init__(self, load_defaults: bool = True) -> None:
-        self._services: Dict[str, DeveloperService] = {}
+        self._services: dict[str, DeveloperService] = {}
         if load_defaults:
             self._seed_defaults()
 
@@ -145,11 +145,11 @@ class DeveloperPortal:
         description: str = "",
         tier: PortalTier = PortalTier.INTERNAL,
         version: str = "v1",
-        api_base_url: Optional[str] = None,
-        docs_url: Optional[str] = None,
+        api_base_url: str | None = None,
+        docs_url: str | None = None,
         owner_team: str = "",
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> DeveloperService:
         svc = DeveloperService(
             name=name,
@@ -165,7 +165,7 @@ class DeveloperPortal:
         self._services[svc.service_id] = svc
         return svc
 
-    def get_service(self, service_id: str) -> Optional[DeveloperService]:
+    def get_service(self, service_id: str) -> DeveloperService | None:
         return self._services.get(service_id)
 
     def update_status(self, service_id: str, status: ServiceStatus) -> bool:
@@ -181,10 +181,10 @@ class DeveloperPortal:
 
     def list_services(
         self,
-        tier: Optional[PortalTier] = None,
-        tag: Optional[str] = None,
-        status: Optional[ServiceStatus] = None,
-    ) -> List[DeveloperService]:
+        tier: PortalTier | None = None,
+        tag: str | None = None,
+        status: ServiceStatus | None = None,
+    ) -> list[DeveloperService]:
         svcs = list(self._services.values())
         if tier:
             svcs = [s for s in svcs if s.tier == tier]
@@ -194,7 +194,7 @@ class DeveloperPortal:
             svcs = [s for s in svcs if s.status == status]
         return svcs
 
-    def search(self, query: str) -> List[DeveloperService]:
+    def search(self, query: str) -> list[DeveloperService]:
         q = query.lower()
         return [
             s
@@ -204,15 +204,16 @@ class DeveloperPortal:
             or any(q in tag for tag in s.tags)
         ]
 
-    def health_dashboard(self) -> Dict[str, Any]:
+    def health_dashboard(self) -> dict[str, Any]:
         """Return a high-level health summary of all registered services."""
-        counts: Dict[str, int] = {s.value: 0 for s in ServiceStatus}
+        counts: dict[str, int] = {s.value: 0 for s in ServiceStatus}
         for svc in self._services.values():
             counts[svc.status.value] += 1
         return {
             "total_services": len(self._services),
             "status_counts": counts,
-            "fully_operational": counts[ServiceStatus.OPERATIONAL.value] == len(self._services),
+            "fully_operational": counts[ServiceStatus.OPERATIONAL.value]
+            == len(self._services),
         }
 
     def total_count(self) -> int:

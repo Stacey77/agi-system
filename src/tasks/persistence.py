@@ -6,8 +6,6 @@ import json
 import logging
 import sqlite3
 import threading
-import time
-from typing import Dict, List, Optional
 
 from src.tasks.queue import TaskRecord, TaskStatus
 
@@ -35,7 +33,7 @@ class TaskPersistence:
     def __init__(self, db_path: str = "tasks.db") -> None:
         self._db_path = db_path
         self._lock = threading.Lock()
-        self._conn: Optional[sqlite3.Connection] = None
+        self._conn: sqlite3.Connection | None = None
         self._init_db()
 
     def _init_db(self) -> None:
@@ -45,7 +43,9 @@ class TaskPersistence:
             self._conn.commit()
             logger.info("TaskPersistence initialised at %s", self._db_path)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("TaskPersistence init failed (%s) — running without persistence", exc)
+            logger.warning(
+                "TaskPersistence init failed (%s) — running without persistence", exc
+            )
             self._conn = None
 
     def save(self, record: TaskRecord) -> None:
@@ -72,7 +72,9 @@ class TaskPersistence:
                         record.task_id,
                         record.objective,
                         record.status,
-                        json.dumps(record.result) if record.result is not None else None,
+                        json.dumps(record.result)
+                        if record.result is not None
+                        else None,
                         record.error,
                         record.created_at,
                         record.started_at,
@@ -85,10 +87,10 @@ class TaskPersistence:
             except Exception as exc:  # noqa: BLE001
                 logger.warning("TaskPersistence.save failed: %s", exc)
 
-    def load_all(self) -> Dict[str, TaskRecord]:
+    def load_all(self) -> dict[str, TaskRecord]:
         if self._conn is None:
             return {}
-        records: Dict[str, TaskRecord] = {}
+        records: dict[str, TaskRecord] = {}
         with self._lock:
             try:
                 cur = self._conn.execute(
@@ -96,8 +98,17 @@ class TaskPersistence:
                     "created_at, started_at, completed_at, progress FROM tasks"
                 )
                 for row in cur.fetchall():
-                    (task_id, objective, status, result_json, error,
-                     created_at, started_at, completed_at, progress) = row
+                    (
+                        task_id,
+                        objective,
+                        status,
+                        result_json,
+                        error,
+                        created_at,
+                        started_at,
+                        completed_at,
+                        progress,
+                    ) = row
                     r = TaskRecord(
                         task_id=task_id,
                         objective=objective,
@@ -119,6 +130,6 @@ class TaskPersistence:
             with self._lock:
                 try:
                     self._conn.close()
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001, S110
                     pass
             self._conn = None

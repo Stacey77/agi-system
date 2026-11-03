@@ -8,10 +8,10 @@ from src.agents.base_agent import AgentConfig, AgentType
 from src.ide.ide_agent import IDEAgent
 from src.ide.ide_session import IDESession, IDESessionManager, SessionState
 
-
 # ---------------------------------------------------------------------------
 # IDESession
 # ---------------------------------------------------------------------------
+
 
 class TestIDESession:
     def test_initial_state(self):
@@ -43,6 +43,7 @@ class TestIDESession:
 # IDESessionManager
 # ---------------------------------------------------------------------------
 
+
 class TestIDESessionManager:
     def test_create_and_retrieve(self):
         mgr = IDESessionManager()
@@ -69,7 +70,7 @@ class TestIDESessionManager:
     def test_active_count(self):
         mgr = IDESessionManager()
         s1 = mgr.create_session()
-        s2 = mgr.create_session()
+        mgr.create_session()
         mgr.close_session(s1.session_id)
         assert mgr.active_count() == 1
 
@@ -77,6 +78,7 @@ class TestIDESessionManager:
 # ---------------------------------------------------------------------------
 # IDEAgent
 # ---------------------------------------------------------------------------
+
 
 class TestIDEAgent:
     def _make_agent(self) -> IDEAgent:
@@ -95,7 +97,9 @@ class TestIDEAgent:
     @pytest.mark.asyncio
     async def test_explain_code(self):
         agent = self._make_agent()
-        result = await agent.explain_code("for i in range(10): print(i)", language="python")
+        result = await agent.explain_code(
+            "for i in range(10): print(i)", language="python"
+        )
         assert result.action == "explain"
         assert len(result.completion) > 0
 
@@ -114,7 +118,9 @@ class TestIDEAgent:
     @pytest.mark.asyncio
     async def test_generate_code(self):
         agent = self._make_agent()
-        result = await agent.generate_code("a function that reverses a string", language="python")
+        result = await agent.generate_code(
+            "a function that reverses a string", language="python"
+        )
         assert result.action == "generate"
         assert "solution" in result.completion.lower() or "TODO" in result.completion
 
@@ -128,7 +134,9 @@ class TestIDEAgent:
     @pytest.mark.asyncio
     async def test_process_task_dispatches(self):
         agent = self._make_agent()
-        result = await agent.process_task({"action": "complete", "prompt": "hello world", "language": "python"})
+        result = await agent.process_task(
+            {"action": "complete", "prompt": "hello world", "language": "python"}
+        )
         assert result["status"] == "completed"
         assert result["action"] == "complete"
         assert "session_id" in result
@@ -136,9 +144,13 @@ class TestIDEAgent:
     @pytest.mark.asyncio
     async def test_session_reuse(self):
         agent = self._make_agent()
-        result1 = await agent.process_task({"action": "complete", "prompt": "foo", "language": "python"})
+        result1 = await agent.process_task(
+            {"action": "complete", "prompt": "foo", "language": "python"}
+        )
         sid = result1["session_id"]
-        result2 = await agent.process_task({"action": "explain", "prompt": "bar", "session_id": sid})
+        result2 = await agent.process_task(
+            {"action": "explain", "prompt": "bar", "session_id": sid}
+        )
         assert result2["session_id"] == sid
 
     @pytest.mark.asyncio
