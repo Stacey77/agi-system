@@ -19,6 +19,7 @@ class CrewOrchestrator:
         self,
         objective: str,
         agent_names: list[str] | None = None,
+        max_iterations: int = 3,
     ) -> dict[str, Any]:
         """Execute *objective* using a collaborative crew.
 

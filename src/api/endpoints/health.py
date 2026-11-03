@@ -34,8 +34,8 @@ async def detailed_health(request: Request) -> dict[str, Any]:
             components["task_queue"] = {"status": "healthy", "total_tasks": total}
         else:
             components["task_queue"] = {"status": "not_initialised"}
-    except Exception as exc:  # noqa: BLE001
-        components["task_queue"] = {"status": "unhealthy", "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        components["task_queue"] = {"status": "unhealthy", "error": "check failed"}
 
     # Redis (if configured)
     try:
@@ -45,8 +45,8 @@ async def detailed_health(request: Request) -> dict[str, Any]:
             components["redis"] = {"status": "healthy"}
         else:
             components["redis"] = {"status": "not_configured"}
-    except Exception as exc:  # noqa: BLE001
-        components["redis"] = {"status": "unhealthy", "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        components["redis"] = {"status": "unhealthy", "error": "check failed"}
 
     # LLM
     try:
@@ -55,8 +55,8 @@ async def detailed_health(request: Request) -> dict[str, Any]:
             components["llm"] = {"status": "healthy", "provider": type(llm).__name__}
         else:
             components["llm"] = {"status": "mock_mode"}
-    except Exception as exc:  # noqa: BLE001
-        components["llm"] = {"status": "unhealthy", "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        components["llm"] = {"status": "unhealthy", "error": "check failed"}
 
     # Agent factory
     try:
@@ -66,8 +66,8 @@ async def detailed_health(request: Request) -> dict[str, Any]:
             components["agent_factory"] = {"status": "healthy", "agents": agent_names}
         else:
             components["agent_factory"] = {"status": "not_initialised"}
-    except Exception as exc:  # noqa: BLE001
-        components["agent_factory"] = {"status": "unhealthy", "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        components["agent_factory"] = {"status": "unhealthy", "error": "check failed"}
 
     # Task persistence (SQLite)
     try:
@@ -76,8 +76,8 @@ async def detailed_health(request: Request) -> dict[str, Any]:
             components["task_db"] = {"status": "healthy", "path": persistence._db_path}
         else:
             components["task_db"] = {"status": "not_configured"}
-    except Exception as exc:  # noqa: BLE001
-        components["task_db"] = {"status": "unhealthy", "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        components["task_db"] = {"status": "unhealthy", "error": "check failed"}
 
     # Key store
     try:
@@ -87,11 +87,33 @@ async def detailed_health(request: Request) -> dict[str, Any]:
             components["auth"] = {"status": "healthy", "active_keys": active}
         else:
             components["auth"] = {"status": "not_initialised"}
-    except Exception as exc:  # noqa: BLE001
-        components["auth"] = {"status": "unhealthy", "error": str(exc)}
+    except Exception:  # noqa: BLE001
+        components["auth"] = {"status": "unhealthy", "error": "check failed"}
+
+    # Process memory
+    try:
+        import resource
+
+        rusage = resource.getrusage(resource.RUSAGE_SELF)
+        # ru_maxrss is in KB on Linux, bytes on macOS — normalise to bytes
+        import sys
+
+        rss_bytes = rusage.ru_maxrss * (1 if sys.platform == "darwin" else 1024)
+        components["process_memory"] = {
+            "status": "healthy",
+            "peak_rss_bytes": rss_bytes,
+            "peak_rss_mb": round(rss_bytes / (1024 * 1024), 2),
+        }
+    except Exception:  # noqa: BLE001
+        components["process_memory"] = {
+            "status": "unavailable",
+            "error": "check failed",
+        }
 
     statuses = [v["status"] if isinstance(v, dict) else v for v in components.values()]
-    all_ok = all(s in ("healthy", "mock_mode", "not_configured") for s in statuses)
+    all_ok = all(
+        s in ("healthy", "mock_mode", "not_configured", "unavailable") for s in statuses
+    )
 
     return {
         "status": "healthy" if all_ok else "degraded",

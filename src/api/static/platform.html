@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AGI System — Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:#070d1a; --surface:#0d1628; --surface-hi:#132038;
+    --border:#1c2e4a; --border-hi:#243d61;
+    --accent:#00c8ff; --accent2:#0070f3;
+    --success:#00e5a0; --warn:#ffb82e; --danger:#ff4d6d;
+    --fg:#d8e8f8; --fg-2:#9ab4d0; --muted:#4d6889;
+    --mono:"IBM Plex Mono","Fira Code",monospace;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+    --r:12px;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+
+  /* Nav */
+  nav{position:sticky;top:0;z-index:100;background:rgba(7,13,26,.92);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;
+    justify-content:space-between;height:60px}
+  .nav-logo{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .nav-logo svg{width:28px;height:28px;fill:var(--accent);flex-shrink:0}
+  nav ul{display:flex;gap:4px;list-style:none}
+  nav a{color:var(--fg-2);text-decoration:none;font-size:14px;padding:6px 12px;border-radius:6px;transition:color .15s,background .15s}
+  nav a:hover{color:var(--fg);background:var(--surface-hi)}
+  .nav-cta{background:var(--accent2);color:#fff!important;font-weight:600;border-radius:8px!important}
+  .nav-cta:hover{background:var(--accent)!important;color:var(--bg)!important}
+
+  /* Hero */
+  .hero{padding:96px 24px 80px;text-align:center;max-width:800px;margin:0 auto}
+  .hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(0,200,255,.1);
+    border:1px solid rgba(0,200,255,.3);border-radius:20px;padding:4px 12px;font-size:12px;
+    color:var(--accent);font-family:var(--mono);margin-bottom:24px}
+  .hero-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 8px var(--accent);animation:pulse 2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  h1{font-size:clamp(36px,6vw,64px);font-weight:700;line-height:1.1;margin-bottom:20px}
+  h1 span{background:linear-gradient(135deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .hero p{font-size:18px;color:var(--fg-2);line-height:1.7;margin-bottom:40px;max-width:580px;margin-left:auto;margin-right:auto}
+  .hero-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:10px;
+    font-size:15px;font-weight:600;text-decoration:none;transition:all .2s;cursor:pointer;border:none}
+  .btn-primary{background:var(--accent2);color:#fff}
+  .btn-primary:hover{background:var(--accent);color:var(--bg);transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,200,255,.3)}
+  .btn-outline{background:transparent;color:var(--fg);border:1px solid var(--border-hi)}
+  .btn-outline:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,200,255,.07)}
+
+  /* Stats strip */
+  .stats{display:flex;justify-content:center;gap:40px;padding:40px 24px;
+    border-top:1px solid var(--border);border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .stat{text-align:center}
+  .stat-val{font-size:32px;font-weight:700;font-family:var(--mono);
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .stat-label{font-size:13px;color:var(--fg-2);margin-top:4px}
+
+  /* Features */
+  section{max-width:1100px;margin:0 auto;padding:80px 24px}
+  .section-label{font-size:12px;font-family:var(--mono);color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
+  h2{font-size:clamp(28px,4vw,40px);font-weight:700;margin-bottom:16px}
+  .section-sub{font-size:16px;color:var(--fg-2);line-height:1.7;max-width:600px;margin-bottom:48px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+    padding:28px;transition:border-color .2s,transform .2s}
+  .card:hover{border-color:var(--border-hi);transform:translateY(-2px)}
+  .card-icon{width:44px;height:44px;border-radius:10px;background:var(--surface-hi);
+    display:flex;align-items:center;justify-content:center;margin-bottom:16px;
+    border:1px solid var(--border)}
+  .card-icon svg{width:22px;height:22px;fill:var(--accent)}
+  .card h3{font-size:17px;font-weight:600;margin-bottom:8px}
+  .card p{font-size:14px;color:var(--fg-2);line-height:1.6}
+
+  /* Architecture */
+  .arch-diagram{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+    padding:40px;margin-top:20px;text-align:center}
+  .arch-row{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin:16px 0}
+  .arch-box{background:var(--surface-hi);border:1px solid var(--border);border-radius:8px;
+    padding:10px 18px;font-size:13px;font-family:var(--mono);color:var(--fg-2)}
+  .arch-box.highlight{border-color:var(--accent);color:var(--accent);background:rgba(0,200,255,.07)}
+  .arch-arrow{font-size:20px;color:var(--muted);display:flex;align-items:center;justify-content:center;margin:8px 0}
+
+  /* Integrations */
+  .int-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;margin-top:20px}
+  .int-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+    padding:24px;display:flex;flex-direction:column;align-items:center;gap:12px;
+    font-size:13px;font-weight:600;color:var(--fg-2);text-align:center;transition:border-color .2s}
+  .int-card:hover{border-color:var(--border-hi)}
+  .int-icon{width:40px;height:40px;border-radius:8px;background:var(--surface-hi);
+    display:flex;align-items:center;justify-content:center}
+  .int-icon svg{width:22px;height:22px}
+
+  /* CTA */
+  .cta-section{background:linear-gradient(135deg,rgba(0,112,243,.15),rgba(0,200,255,.1));
+    border:1px solid rgba(0,200,255,.2);border-radius:16px;padding:60px;text-align:center;margin:0 24px 80px}
+  .cta-section h2{margin-bottom:16px}
+  .cta-section p{color:var(--fg-2);font-size:16px;margin-bottom:32px}
+
+  /* Footer */
+  footer{border-top:1px solid var(--border);padding:32px 24px;display:flex;
+    justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;
+    color:var(--muted);font-size:13px}
+  footer a{color:var(--muted);text-decoration:none}
+  footer a:hover{color:var(--fg-2)}
+
+  @media(max-width:640px){
+    nav ul{display:none}
+    .stats{gap:24px}
+    .cta-section{padding:40px 24px}
+    footer{flex-direction:column;text-align:center}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 12c5.33 0 8 2.67 8 4v2H4v-2c0-1.33 2.67-4 8-4z"/></svg>
+    AGI System
+  </div>
+  <ul>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#integrations">Integrations</a></li>
+    <li><a href="/docs" target="_blank">API Docs</a></li>
+    <li><a href="/api/v1/health" class="nav-cta">Status</a></li>
+  </ul>
+</nav>
+
+<div class="hero">
+  <div class="hero-badge">Production-Grade · 88 REST Endpoints · LangChain + CrewAI</div>
+  <h1>The <span>Autonomous Intelligent</span> Workforce Platform</h1>
+  <p>Deploy, orchestrate, and scale AI agents across your enterprise. Built on FastAPI with end-to-end observability, RBAC governance, and native integrations.</p>
+  <div class="hero-actions">
+    <a href="/docs" target="_blank" class="btn btn-primary">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+      Explore API
+    </a>
+    <a href="/" class="btn btn-outline">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+      Dashboard
+    </a>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-val" id="stat-agents">—</div><div class="stat-label">Registered Agents</div></div>
+  <div class="stat"><div class="stat-val" id="stat-tasks">—</div><div class="stat-label">Tasks Processed</div></div>
+  <div class="stat"><div class="stat-val" id="stat-workers">—</div><div class="stat-label">Active Workers</div></div>
+  <div class="stat"><div class="stat-val">99.9%</div><div class="stat-label">API Uptime</div></div>
+</div>
+
+<section id="features">
+  <div class="section-label">// capabilities</div>
+  <h2>Everything you need to run an AI workforce</h2>
+  <p class="section-sub">A batteries-included platform — from agent orchestration to enterprise governance — so you can focus on building, not plumbing.</p>
+  <div class="grid">
+    <div class="card">
+      <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 1 1-5 5 5 5 0 0 1 5-5m0 12c5.33 0 8 2.67 8 4v2H4v-2c0-1.33 2.67-4 8-4z"/></svg></div>
+      <h3>Autonomous Agents</h3>
+      <p>12 built-in agent types — Planning, Research, Analysis, Coding, Execution, and more — with circuit-breaker retry logic.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M17 8C8 10 5.9 16.17 3.82 20.34L5.71 21l1-2.3A4.49 4.49 0 0 0 8 19c8 0 10-7 10-7s-3 4-8 4c0 0 0-3 3-5 3.17-2.17 5.09-2 7-2-1 0-1 0-3 2z"/></svg></div>
+      <h3>CrewAI Orchestration</h3>
+      <p>Multi-agent crews with role assignment, task dependencies, and parallel execution via LangChain pipelines.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/></svg></div>
+      <h3>Conversational AI</h3>
+      <p>Session-persistent conversations with intent classification, sliding context windows, and automatic agent routing.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg></div>
+      <h3>Task Queue</h3>
+      <p>Redis-backed (with asyncio fallback) task queue with SSE streaming, priority levels, dead-letter handling, and persistence.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg></div>
+      <h3>Enterprise Security</h3>
+      <p>JWT + API key auth, RBAC with 4 built-in roles, multi-tenant isolation, and immutable SQLite audit logs.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg></div>
+      <h3>Workforce Management</h3>
+      <p>Hire/fire workers, assign objectives, auto-scale by agent type, and monitor pool utilisation in real time.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg></div>
+      <h3>Hybrid Memory</h3>
+      <p>Short-term in-process memory, long-term ChromaDB vector search, and episodic recall across agent invocations.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+      <h3>Observability</h3>
+      <p>Prometheus metrics at <code>/metrics</code>, OpenTelemetry tracing, structured JSON logs, and per-key rate limiting.</p>
+    </div>
+  </div>
+</section>
+
+<section id="architecture">
+  <div class="section-label">// architecture</div>
+  <h2>How it all fits together</h2>
+  <p class="section-sub">A clean, layered design — API → Orchestration → Agents → Memory — with every component swappable.</p>
+  <div class="arch-diagram">
+    <div class="arch-row">
+      <div class="arch-box highlight">REST Clients</div>
+      <div class="arch-box highlight">Chat Widget</div>
+      <div class="arch-box highlight">CI / Webhooks</div>
+    </div>
+    <div class="arch-arrow">↓</div>
+    <div class="arch-row">
+      <div class="arch-box highlight">FastAPI (88 endpoints)</div>
+    </div>
+    <div class="arch-row" style="font-size:12px;color:var(--muted)">Auth · Rate Limit · Metrics · Body Limit</div>
+    <div class="arch-arrow">↓</div>
+    <div class="arch-row">
+      <div class="arch-box">CrewAI Orchestrator</div>
+      <div class="arch-box">Task Queue (Redis / asyncio)</div>
+      <div class="arch-box">Workforce Manager</div>
+    </div>
+    <div class="arch-arrow">↓</div>
+    <div class="arch-row">
+      <div class="arch-box highlight">Agent Pool (Planning · Research · Coding · Execution · IDE · CDE · …)</div>
+    </div>
+    <div class="arch-arrow">↓</div>
+    <div class="arch-row">
+      <div class="arch-box">LLM Provider (OpenAI / Anthropic)</div>
+      <div class="arch-box">ChromaDB Vector Store</div>
+      <div class="arch-box">SQLite (sessions · tasks · audit)</div>
+    </div>
+  </div>
+</section>
+
+<section id="integrations">
+  <div class="section-label">// integrations</div>
+  <h2>Connect your existing tools</h2>
+  <p class="section-sub">Native connectors for the tools your team already uses, available through the <code>/api/v1/integrations</code> hub.</p>
+  <div class="int-grid">
+    <div class="int-card">
+      <div class="int-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="#E01E5A"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/></svg></div>
+      Slack
+    </div>
+    <div class="int-card">
+      <div class="int-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="#0052CC"><path d="M.778 1.213a.768.768 0 0 0-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 0 0 .77-.646l3.27-20.03a.768.768 0 0 0-.768-.893L.778 1.213zM14.52 15.53H9.522L8.17 8.466h7.561l-1.211 7.064z"/></svg></div>
+      Jira
+    </div>
+    <div class="int-card">
+      <div class="int-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg></div>
+      GitHub
+    </div>
+    <div class="int-card">
+      <div class="int-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="#6264A7"><path d="M19.19 4.82H4.81C3.81 4.82 3 5.63 3 6.63v10.74c0 1 .81 1.81 1.81 1.81h14.38c1 0 1.81-.81 1.81-1.81V6.63c0-1-.81-1.81-1.81-1.81zm-9.55 9.83H7.38V10.3h2.26v4.35zm-1.13-4.94a1.31 1.31 0 1 1 0-2.62 1.31 1.31 0 0 1 0 2.62zm9.12 4.94h-2.25v-2.12c0-.84-.3-1.41-1.05-1.41-.57 0-.91.38-1.06.75-.05.14-.07.33-.07.52v2.26h-2.25s.03-3.67 0-4.35h2.25v.62c.3-.46.83-1.11 2.02-1.11 1.48 0 2.41.97 2.41 3.05v1.79z"/></svg></div>
+      Teams
+    </div>
+    <div class="int-card">
+      <div class="int-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="#4285F4"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/></svg></div>
+      Notion
+    </div>
+    <div class="int-card">
+      <div class="int-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="#FF9900"><path d="M13.527.099C6.955-.744.942 3.9.099 10.473c-.843 6.572 3.8 12.584 10.373 13.428 6.573.843 12.585-3.801 13.428-10.374C24.744 6.955 20.101.943 13.527.099zm3.942 16.404c-.202-.202-.459-.309-.717-.309s-.515.107-.717.309l-.924.924-1.649-1.649 1.648-1.648.937-.937c.395-.395.395-1.035 0-1.43l-2.878-2.878a1.009 1.009 0 0 0-1.43 0l-.937.937-1.648-1.648.937-.937c.395-.395.395-1.035 0-1.43L7.266 5.432a1.009 1.009 0 0 0-1.43 0l-2.04 2.04C3.38 7.795 3.38 8.435 3.773 8.83l2.878 2.878c.198.197.456.306.715.306s.517-.109.715-.306l.937-.937 1.648 1.648-.937.937c-.395.395-.395 1.035 0 1.43l2.878 2.878c.198.197.456.306.715.306s.517-.109.715-.306l2.04-2.04c.394-.394.394-1.034 0-1.421z"/></svg></div>
+      AWS
+    </div>
+    <div class="int-card">
+      <div class="int-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="#2684FF"><path d="M.778 1.213a.768.768 0 0 0-.768.892l3.263 19.81c.084.5.515.868 1.022.873H3.78V1.213H.778zm22.444 0H3.78v21.575h18.442a.772.772 0 0 0 .77-.646l3.27-20.03a.768.768 0 0 0-.768-.893l-.272-.006z" fill="none"/><path d="M11.5 6.5h-1v1h1v-1zm1 0h1v1h-1v-1zm-3 2h1v1h-1v-1zm0-2h1v1h-1v-1z" fill="currentColor"/></svg></div>
+      Confluence
+    </div>
+    <div class="int-card">
+      <div class="int-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="#00A3E0"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm-1.25 17.292l-4.5-4.364 1.857-1.858 2.643 2.506 5.643-5.784 1.857 1.857-7.5 7.643z"/></svg></div>
+      ServiceNow
+    </div>
+  </div>
+</section>
+
+<div class="cta-section">
+  <h2>Ready to build your AI workforce?</h2>
+  <p>Explore the interactive API documentation or jump straight into the control-plane dashboard.</p>
+  <div class="hero-actions">
+    <a href="/docs" target="_blank" class="btn btn-primary">View API Docs</a>
+    <a href="/" class="btn btn-outline">Open Dashboard</a>
+  </div>
+</div>
+
+<footer>
+  <span>AGI System &copy; 2025 — Production-grade autonomous AI platform</span>
+  <div style="display:flex;gap:20px">
+    <a href="/docs" target="_blank">API Docs</a>
+    <a href="/api/v1/health">Health</a>
+    <a href="/metrics">Metrics</a>
+  </div>
+</footer>
+
+<!-- Floating widget -->
+<script src="/static/widget.js"></script>
+
+<script>
+  async function loadStats() {
+    try {
+      const [health, workforce] = await Promise.allSettled([
+        fetch('/api/v1/health').then(r => r.json()),
+        fetch('/api/v1/workforce/status').then(r => r.json()),
+      ]);
+      if (health.status === 'fulfilled') {
+        const agents = health.value?.registered_agents;
+        if (agents !== undefined) {
+          document.getElementById('stat-agents').textContent = agents;
+        }
+      }
+      if (workforce.status === 'fulfilled') {
+        const wf = workforce.value;
+        document.getElementById('stat-workers').textContent = wf?.total ?? '—';
+        document.getElementById('stat-tasks').textContent = wf?.tasks_completed ?? '—';
+      }
+    } catch (_) {}
+  }
+  loadStats();
+</script>
+</body>
+</html>
