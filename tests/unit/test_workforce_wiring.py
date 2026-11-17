@@ -122,7 +122,9 @@ class TestAssignObjective:
 
         with patch(
             "asyncio.create_task",
-            side_effect=lambda c, **kw: created_tasks.append(c) or asyncio.ensure_future(c),
+            side_effect=lambda c, **kw: (
+                created_tasks.append(c) or asyncio.ensure_future(c)
+            ),
         ):
             result = await wm.assign_objective("do something")
 

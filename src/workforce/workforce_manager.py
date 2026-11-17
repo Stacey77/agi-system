@@ -89,9 +89,7 @@ class WorkforceManager:
             await agent.process_task({"objective": objective, "task_id": task_id})
             self._pool.complete_task(worker_id, success=True)
         except Exception:
-            logger.exception(
-                "Agent %s failed executing task %s", agent_name, task_id
-            )
+            logger.exception("Agent %s failed executing task %s", agent_name, task_id)
             self._pool.complete_task(worker_id, success=False)
 
     async def assign_batch(
