@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Any
 
 from src.workforce.task_dispatcher import TaskDispatcher
 from src.workforce.worker_pool import WorkerPool
+
+logger = logging.getLogger(__name__)
 
 
 class WorkforceManager:
@@ -54,9 +58,41 @@ class WorkforceManager:
         objective: str,
         required_skills: list[str] | None = None,
     ) -> dict[str, Any]:
-        return await self._dispatcher.dispatch(
+        result = await self._dispatcher.dispatch(
             objective, required_skills=required_skills
         )
+        if result.get("status") == "assigned" and result.get("worker_id"):
+            asyncio.create_task(
+                self._execute_via_agent(
+                    objective=objective,
+                    task_id=result["task_id"],
+                    worker_id=result["worker_id"],
+                )
+            )
+        return result
+
+    async def _execute_via_agent(
+        self, objective: str, task_id: str, worker_id: str
+    ) -> None:
+        worker = self._pool.get_worker(worker_id)
+        if worker is None or self._factory is None:
+            self._pool.complete_task(worker_id, success=False)
+            return
+        agent_name = f"{worker.agent_type}_agent"
+        get_agent = getattr(self._factory, "get_agent", None)
+        agent = get_agent(agent_name) if get_agent else None
+        if agent is None:
+            # No matching agent — mark complete gracefully.
+            self._pool.complete_task(worker_id, success=True)
+            return
+        try:
+            await agent.process_task({"objective": objective, "task_id": task_id})
+            self._pool.complete_task(worker_id, success=True)
+        except Exception:
+            logger.exception(
+                "Agent %s failed executing task %s", agent_name, task_id
+            )
+            self._pool.complete_task(worker_id, success=False)
 
     async def assign_batch(
         self, objectives: list[str], required_skills: list[str] | None = None

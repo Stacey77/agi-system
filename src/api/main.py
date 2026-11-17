@@ -177,12 +177,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.intent_classifier = IntentClassifier(llm=llm)
     app.state.context_tracker = ContextTracker()
 
-    # Workforce
-    from src.workforce.workforce_manager import WorkforceManager
-
-    workforce_manager = WorkforceManager(agent_factory=factory)
-    app.state.workforce_manager = workforce_manager
-
     # Enterprise governance
     from src.enterprise.audit_log import AuditLog
     from src.enterprise.rbac import RBACManager
@@ -302,6 +296,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await task_queue.start(_default_task_handler)
     app.state.task_queue = task_queue
     app.state.task_persistence = task_persistence
+
+    # Workforce — initialised after task_queue so dispatch can submit real tasks
+    from src.workforce.workforce_manager import WorkforceManager
+
+    workforce_manager = WorkforceManager(agent_factory=factory, task_queue=task_queue)
+    await workforce_manager.initialize_from_factory()
+    app.state.workforce_manager = workforce_manager
 
     # Task scheduler
     from src.tasks.scheduler import TaskScheduler
