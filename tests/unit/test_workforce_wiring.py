@@ -7,9 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.workforce.worker_pool import WorkerPool
 from src.workforce.workforce_manager import WorkforceManager
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -96,7 +94,7 @@ class TestInitializeFromFactory:
 class TestAssignObjective:
     @pytest.mark.asyncio
     async def test_background_task_created_when_worker_available(self):
-        factory, agent = _make_factory("planning_agent")
+        factory, _agent = _make_factory("planning_agent")
         q = _make_queue()
         wm = WorkforceManager(agent_factory=factory, task_queue=q)
         wm._pool.add_worker(name="planning_agent", agent_type="planning", skills=[])
@@ -157,7 +155,7 @@ class TestExecuteViaAgent:
 
     @pytest.mark.asyncio
     async def test_complete_task_success_true_on_success(self):
-        factory, agent = _make_factory("planning_agent")
+        factory, _agent = _make_factory("planning_agent")
         wm = WorkforceManager(agent_factory=factory)
         worker = wm._pool.add_worker(
             name="planning_agent", agent_type="planning", skills=[]
