@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/api/main.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/src/api/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "src/api/main.py"
+    }
+  ],
+  "env": {
+    "LLM_PROVIDER": "openai",
+    "LOG_FORMAT": "json",
+    "LOG_LEVEL": "INFO",
+    "PYTHONPATH": "/var/task"
+  }
+}
