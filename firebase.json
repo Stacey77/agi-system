@@ -3,22 +3,16 @@
     "public": "src/api/static",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
-      {
-        "source": "/api/**",
-        "function": "api"
-      },
-      {
-        "source": "/health",
-        "function": "api"
-      },
-      {
-        "source": "/metrics",
-        "function": "api"
-      },
-      {
-        "source": "/**",
-        "destination": "/index.html"
-      }
+      { "source": "/api/**", "function": "api" },
+      { "source": "/health", "function": "api" },
+      { "source": "/health/**", "function": "api" },
+      { "source": "/metrics", "function": "api" },
+      { "source": "/docs", "function": "api" },
+      { "source": "/docs/**", "function": "api" },
+      { "source": "/redoc", "function": "api" },
+      { "source": "/openapi.json", "function": "api" },
+      { "source": "/static/**", "function": "api" },
+      { "source": "/**", "destination": "/index.html" }
     ],
     "headers": [
       {
