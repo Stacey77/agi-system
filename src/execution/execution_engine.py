@@ -7,7 +7,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.execution.error_handler import ErrorHandler
 from src.execution.task_validation import TaskValidationSystem
@@ -31,10 +31,10 @@ class ExecutionResult:
 
     task_id: str
     status: ExecutionStatus
-    result: Optional[Any] = None
-    error: Optional[str] = None
+    result: Any | None = None
+    error: str | None = None
     execution_time: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class ExecutionEngine:
@@ -44,10 +44,10 @@ class ExecutionEngine:
         self._semaphore = asyncio.Semaphore(max_concurrency)
         self._validator = TaskValidationSystem()
         self._error_handler = ErrorHandler()
-        self._resources: Dict[str, Any] = {}
+        self._resources: dict[str, Any] = {}
         logger.info("ExecutionEngine initialised (max_concurrency=%d)", max_concurrency)
 
-    async def execute_plan(self, plan: Dict[str, Any]) -> List[ExecutionResult]:
+    async def execute_plan(self, plan: dict[str, Any]) -> list[ExecutionResult]:
         """Execute all tasks in *plan* respecting declared dependencies."""
         tasks = plan.get("tasks", [])
         if not tasks:
@@ -60,19 +60,17 @@ class ExecutionEngine:
     # ------------------------------------------------------------------
 
     async def _execute_with_dependencies(
-        self, plan: Dict[str, Any]
-    ) -> List[ExecutionResult]:
-        tasks: List[Dict[str, Any]] = plan.get("tasks", [])
-        dependencies: Dict[str, List[str]] = plan.get("dependencies", {})
+        self, plan: dict[str, Any]
+    ) -> list[ExecutionResult]:
+        tasks: list[dict[str, Any]] = plan.get("tasks", [])
+        dependencies: dict[str, list[str]] = plan.get("dependencies", {})
 
         # Topological sort
         ordered = self._topological_sort(tasks, dependencies)
 
-        results: Dict[str, ExecutionResult] = {}
+        results: dict[str, ExecutionResult] = {}
         for batch in ordered:
-            batch_coros = [
-                self._execute_single_task(task, results) for task in batch
-            ]
+            batch_coros = [self._execute_single_task(task, results) for task in batch]
             batch_results = await asyncio.gather(*batch_coros, return_exceptions=True)
             for task, br in zip(batch, batch_results):
                 tid = task.get("task_id", "unknown")
@@ -89,8 +87,8 @@ class ExecutionEngine:
 
     async def _execute_single_task(
         self,
-        task: Dict[str, Any],
-        context: Dict[str, ExecutionResult],
+        task: dict[str, Any],
+        context: dict[str, ExecutionResult],
     ) -> ExecutionResult:
         task_id = task.get("task_id", "unknown")
 
@@ -139,7 +137,7 @@ class ExecutionEngine:
     # ------------------------------------------------------------------
 
     async def _dispatch(
-        self, task: Dict[str, Any], context: Dict[str, ExecutionResult]
+        self, task: dict[str, Any], context: dict[str, ExecutionResult]
     ) -> Any:
         task_type = task.get("type", "generic")
         handlers = {
@@ -152,27 +150,27 @@ class ExecutionEngine:
         return await handler(task, context)
 
     async def _run_tool(
-        self, task: Dict[str, Any], context: Dict[str, ExecutionResult]
+        self, task: dict[str, Any], context: dict[str, ExecutionResult]
     ) -> Any:
         return {"type": "tool_execution", "task_id": task.get("task_id")}
 
     async def _run_code(
-        self, task: Dict[str, Any], context: Dict[str, ExecutionResult]
+        self, task: dict[str, Any], context: dict[str, ExecutionResult]
     ) -> Any:
         return {"type": "code_execution", "task_id": task.get("task_id")}
 
     async def _run_api_call(
-        self, task: Dict[str, Any], context: Dict[str, ExecutionResult]
+        self, task: dict[str, Any], context: dict[str, ExecutionResult]
     ) -> Any:
         return {"type": "api_call", "task_id": task.get("task_id")}
 
     async def _run_file_op(
-        self, task: Dict[str, Any], context: Dict[str, ExecutionResult]
+        self, task: dict[str, Any], context: dict[str, ExecutionResult]
     ) -> Any:
         return {"type": "file_operation", "task_id": task.get("task_id")}
 
     async def _run_generic(
-        self, task: Dict[str, Any], context: Dict[str, ExecutionResult]
+        self, task: dict[str, Any], context: dict[str, ExecutionResult]
     ) -> Any:
         await asyncio.sleep(0)  # yield
         return {"type": "generic", "task_id": task.get("task_id"), "status": "done"}
@@ -181,11 +179,11 @@ class ExecutionEngine:
     # Resource management
     # ------------------------------------------------------------------
 
-    async def _allocate_resources(self, task: Dict[str, Any]) -> None:
+    async def _allocate_resources(self, task: dict[str, Any]) -> None:
         task_id = task.get("task_id", "unknown")
         self._resources[task_id] = {"allocated": True}
 
-    async def _release_resources(self, task: Dict[str, Any]) -> None:
+    async def _release_resources(self, task: dict[str, Any]) -> None:
         task_id = task.get("task_id", "unknown")
         self._resources.pop(task_id, None)
 
@@ -195,13 +193,13 @@ class ExecutionEngine:
 
     def _topological_sort(
         self,
-        tasks: List[Dict[str, Any]],
-        dependencies: Dict[str, List[str]],
-    ) -> List[List[Dict[str, Any]]]:
+        tasks: list[dict[str, Any]],
+        dependencies: dict[str, list[str]],
+    ) -> list[list[dict[str, Any]]]:
         """Return tasks grouped into sequential batches (Kahn's algorithm)."""
         task_map = {t["task_id"]: t for t in tasks if "task_id" in t}
-        in_degree: Dict[str, int] = {tid: 0 for tid in task_map}
-        reverse_deps: Dict[str, List[str]] = {tid: [] for tid in task_map}
+        in_degree: dict[str, int] = {tid: 0 for tid in task_map}
+        reverse_deps: dict[str, list[str]] = {tid: [] for tid in task_map}
 
         for tid, deps in dependencies.items():
             for dep in deps:
@@ -209,14 +207,14 @@ class ExecutionEngine:
                     in_degree[tid] += 1
                     reverse_deps[dep].append(tid)
 
-        batches: List[List[Dict[str, Any]]] = []
+        batches: list[list[dict[str, Any]]] = []
         ready = [tid for tid, deg in in_degree.items() if deg == 0]
 
         while ready:
             batch = [task_map[tid] for tid in ready if tid in task_map]
             if batch:
                 batches.append(batch)
-            next_ready: List[str] = []
+            next_ready: list[str] = []
             for tid in ready:
                 for dependent in reverse_deps.get(tid, []):
                     in_degree[dependent] -= 1

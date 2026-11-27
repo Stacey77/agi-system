@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from src.agents.base_agent import AgentConfig, BaseAgent
 
@@ -22,8 +22,8 @@ class FeedbackSignal:
     value: float = 0.0
     threshold: float = 0.0
     severity: str = "info"
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -33,10 +33,10 @@ class ClosedLoopReport:
     report_id: str = ""
     signals_analysed: int = 0
     anomalies_detected: int = 0
-    recommendations: List[str] = field(default_factory=list)
-    actions_taken: List[str] = field(default_factory=list)
+    recommendations: list[str] = field(default_factory=list)
+    actions_taken: list[str] = field(default_factory=list)
     health_score: float = 1.0
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class KallyAgent(BaseAgent):
@@ -52,17 +52,17 @@ class KallyAgent(BaseAgent):
     def __init__(
         self,
         config: AgentConfig,
-        execution_agent: Optional[Any] = None,
+        execution_agent: Any | None = None,
     ) -> None:
         super().__init__(config, execution_agent)
-        self._signal_buffer: List[FeedbackSignal] = []
-        self._action_log: List[str] = []
+        self._signal_buffer: list[FeedbackSignal] = []
+        self._action_log: list[str] = []
 
     # ------------------------------------------------------------------
     # BaseAgent interface
     # ------------------------------------------------------------------
 
-    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def process_task(self, task: dict[str, Any]) -> dict[str, Any]:
         """Dispatch a Kally AI task."""
         action = task.get("action", "analyse")
         logger.info("KallyAgent action='%s'", action)
@@ -75,7 +75,7 @@ class KallyAgent(BaseAgent):
         }
         handler = dispatcher.get(action)
         if handler is None:
-            result: Dict[str, Any] = {
+            result: dict[str, Any] = {
                 "status": "error",
                 "error": f"Unknown action '{action}'",
             }
@@ -92,7 +92,11 @@ class KallyAgent(BaseAgent):
     async def ingest_signal(self, signal: FeedbackSignal) -> None:
         """Ingest a feedback signal into the Kally buffer."""
         self._signal_buffer.append(signal)
-        logger.debug("KallyAgent: ingested signal from '%s' metric='%s'", signal.source, signal.metric)
+        logger.debug(
+            "KallyAgent: ingested signal from '%s' metric='%s'",
+            signal.source,
+            signal.metric,
+        )
 
     async def run_closed_loop(self) -> ClosedLoopReport:
         """Execute a full closed-loop analysis cycle."""
@@ -104,7 +108,7 @@ class KallyAgent(BaseAgent):
     # Action handlers
     # ------------------------------------------------------------------
 
-    async def _handle_ingest(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_ingest(self, task: dict[str, Any]) -> dict[str, Any]:
         signal = FeedbackSignal(
             signal_id=task.get("signal_id", ""),
             source=task.get("source", "unknown"),
@@ -121,7 +125,7 @@ class KallyAgent(BaseAgent):
             "buffer_size": len(self._signal_buffer),
         }
 
-    async def _handle_analyse(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_analyse(self, task: dict[str, Any]) -> dict[str, Any]:
         report = await self.run_closed_loop()
         return {
             "status": "completed",
@@ -134,7 +138,7 @@ class KallyAgent(BaseAgent):
             "timestamp": report.timestamp,
         }
 
-    async def _handle_report(self, _task: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_report(self, _task: dict[str, Any]) -> dict[str, Any]:
         return {
             "status": "completed",
             "action": "report",
@@ -143,7 +147,7 @@ class KallyAgent(BaseAgent):
             "health_score": self._compute_health_score(),
         }
 
-    async def _handle_reset(self, _task: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_reset(self, _task: dict[str, Any]) -> dict[str, Any]:
         cleared = len(self._signal_buffer)
         self._signal_buffer.clear()
         self._action_log.clear()
@@ -155,8 +159,8 @@ class KallyAgent(BaseAgent):
 
     async def _analyse_signals(self) -> ClosedLoopReport:
         signals = list(self._signal_buffer)
-        anomalies: List[FeedbackSignal] = []
-        recommendations: List[str] = []
+        anomalies: list[FeedbackSignal] = []
+        recommendations: list[str] = []
 
         for sig in signals:
             if sig.threshold > 0 and sig.value > sig.threshold:
@@ -167,11 +171,15 @@ class KallyAgent(BaseAgent):
                 )
 
         if not signals:
-            recommendations.append("No signals buffered. Increase observability coverage.")
+            recommendations.append(
+                "No signals buffered. Increase observability coverage."
+            )
 
         health = self._compute_health_score()
         if health < 0.8:
-            recommendations.append("Overall health below 80% — review anomalous services.")
+            recommendations.append(
+                "Overall health below 80% — review anomalous services."
+            )
 
         return ClosedLoopReport(
             signals_analysed=len(signals),
@@ -183,7 +191,7 @@ class KallyAgent(BaseAgent):
     async def _apply_recommendations(self, report: ClosedLoopReport) -> None:
         """Record auto-applied actions from recommendations."""
         for rec in report.recommendations:
-            action_entry = f"[{datetime.now(timezone.utc).isoformat()}] AUTO: {rec[:120]}"
+            action_entry = f"[{datetime.now(UTC).isoformat()}] AUTO: {rec[:120]}"
             self._action_log.append(action_entry)
             report.actions_taken.append(action_entry)
         logger.info(
@@ -198,9 +206,7 @@ class KallyAgent(BaseAgent):
         if not self._signal_buffer:
             return 1.0
         breach_count = sum(
-            1
-            for s in self._signal_buffer
-            if s.threshold > 0 and s.value > s.threshold
+            1 for s in self._signal_buffer if s.threshold > 0 and s.value > s.threshold
         )
         ratio = breach_count / len(self._signal_buffer)
         return round(max(0.0, 1.0 - ratio), 3)

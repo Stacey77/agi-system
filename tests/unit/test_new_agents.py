@@ -6,7 +6,7 @@ import pytest
 
 from src.agents.base_agent import AgentConfig, AgentType
 from src.agents.coding_agent import CodeResult, CodingAgent
-from src.agents.summarization_agent import SummaryResult, SummarizationAgent
+from src.agents.summarization_agent import SummarizationAgent, SummaryResult
 
 
 def _coding_agent() -> CodingAgent:
@@ -31,6 +31,7 @@ def _summarization_agent() -> SummarizationAgent:
 
 # ── CodingAgent ──────────────────────────────────────────────────────────────
 
+
 class TestCodingAgentFallback:
     @pytest.mark.asyncio
     async def test_generate_returns_stub(self):
@@ -50,7 +51,10 @@ class TestCodingAgentFallback:
     async def test_review_suggests_docstring_when_missing(self):
         agent = _coding_agent()
         result = await agent.review_code("def foo():\n    return 1\n", "python")
-        assert any("docstring" in s.lower() or "comment" in s.lower() for s in result.suggestions)
+        assert any(
+            "docstring" in s.lower() or "comment" in s.lower()
+            for s in result.suggestions
+        )
 
     @pytest.mark.asyncio
     async def test_explain_returns_explanation(self):
@@ -62,7 +66,9 @@ class TestCodingAgentFallback:
     @pytest.mark.asyncio
     async def test_process_task_generate(self):
         agent = _coding_agent()
-        result = await agent.process_task({"task": "reverse a string", "mode": "generate", "language": "python"})
+        result = await agent.process_task(
+            {"task": "reverse a string", "mode": "generate", "language": "python"}
+        )
         assert result["status"] == "completed"
         assert "code" in result
         assert result["mode"] == "generate"
@@ -70,14 +76,18 @@ class TestCodingAgentFallback:
     @pytest.mark.asyncio
     async def test_process_task_review(self):
         agent = _coding_agent()
-        result = await agent.process_task({"mode": "review", "code": "x = 1", "language": "python"})
+        result = await agent.process_task(
+            {"mode": "review", "code": "x = 1", "language": "python"}
+        )
         assert result["status"] == "completed"
         assert "issues" in result
 
     @pytest.mark.asyncio
     async def test_process_task_explain(self):
         agent = _coding_agent()
-        result = await agent.process_task({"mode": "explain", "code": "print('hi')", "language": "python"})
+        result = await agent.process_task(
+            {"mode": "explain", "code": "print('hi')", "language": "python"}
+        )
         assert result["status"] == "completed"
         assert "explanation" in result
 
@@ -85,15 +95,19 @@ class TestCodingAgentFallback:
     async def test_stream_task_yields_json(self):
         agent = _coding_agent()
         chunks = []
-        async for chunk in agent.stream_task({"task": "hello world", "language": "python"}):
+        async for chunk in agent.stream_task(
+            {"task": "hello world", "language": "python"}
+        ):
             chunks.append(chunk)
         assert len(chunks) >= 1
         import json
+
         data = json.loads(chunks[0])
         assert "status" in data
 
 
 # ── SummarizationAgent ───────────────────────────────────────────────────────
+
 
 class TestSummarizationAgentFallback:
     _TEXT = (
@@ -151,5 +165,11 @@ class TestSummarizationAgentFallback:
         agent = _summarization_agent()
         result = await agent.process_task({"text": self._TEXT, "style": "concise"})
         assert result["status"] == "completed"
-        for key in ("summary", "key_points", "style", "original_length", "compression_ratio"):
+        for key in (
+            "summary",
+            "key_points",
+            "style",
+            "original_length",
+            "compression_ratio",
+        ):
             assert key in result

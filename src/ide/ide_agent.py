@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.agents.base_agent import AgentConfig, BaseAgent
 from src.ide.ide_session import IDESession, IDESessionManager, SessionState
@@ -12,7 +12,7 @@ from src.ide.ide_session import IDESession, IDESessionManager, SessionState
 logger = logging.getLogger(__name__)
 
 # Completion templates keyed by action
-_ACTION_TEMPLATES: Dict[str, str] = {
+_ACTION_TEMPLATES: dict[str, str] = {
     "complete": "# AI completion for: {prompt}\n",
     "explain": "# Explanation: {prompt}\n",
     "refactor": "# Refactored: {prompt}\n",
@@ -29,10 +29,10 @@ class CodeCompletion:
     prompt: str
     language: str
     completion: str
-    suggestions: List[str] = field(default_factory=list)
+    suggestions: list[str] = field(default_factory=list)
     confidence: float = 0.0
     action: str = "complete"
-    session_id: Optional[str] = None
+    session_id: str | None = None
 
 
 class IDEAgent(BaseAgent):
@@ -45,8 +45,8 @@ class IDEAgent(BaseAgent):
     def __init__(
         self,
         config: AgentConfig,
-        execution_agent: Optional[Any] = None,
-        session_manager: Optional[IDESessionManager] = None,
+        execution_agent: Any | None = None,
+        session_manager: IDESessionManager | None = None,
     ) -> None:
         super().__init__(config, execution_agent)
         self.session_manager = session_manager or IDESessionManager()
@@ -55,19 +55,19 @@ class IDEAgent(BaseAgent):
     # BaseAgent interface
     # ------------------------------------------------------------------
 
-    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def process_task(self, task: dict[str, Any]) -> dict[str, Any]:
         """Dispatch an IDE task (complete / explain / refactor / fix / generate / review)."""
         action = task.get("action", "complete")
         prompt = task.get("prompt", task.get("task", ""))
         language = task.get("language", "python")
-        session_id: Optional[str] = task.get("session_id")
+        session_id: str | None = task.get("session_id")
 
         logger.info("IDEAgent action='%s' language='%s'", action, language)
 
         session = self._resolve_session(session_id, language)
         completion = await self._handle_action(action, prompt, language, session)
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "status": "completed",
             "action": completion.action,
             "language": completion.language,
@@ -84,28 +84,28 @@ class IDEAgent(BaseAgent):
     # ------------------------------------------------------------------
 
     async def complete_code(
-        self, prompt: str, language: str = "python", session_id: Optional[str] = None
+        self, prompt: str, language: str = "python", session_id: str | None = None
     ) -> CodeCompletion:
         """Generate a code completion for the given prompt."""
         session = self._resolve_session(session_id, language)
         return await self._handle_action("complete", prompt, language, session)
 
     async def explain_code(
-        self, code: str, language: str = "python", session_id: Optional[str] = None
+        self, code: str, language: str = "python", session_id: str | None = None
     ) -> CodeCompletion:
         """Generate a natural-language explanation of the supplied code."""
         session = self._resolve_session(session_id, language)
         return await self._handle_action("explain", code, language, session)
 
     async def refactor_code(
-        self, code: str, language: str = "python", session_id: Optional[str] = None
+        self, code: str, language: str = "python", session_id: str | None = None
     ) -> CodeCompletion:
         """Suggest a refactored version of the supplied code."""
         session = self._resolve_session(session_id, language)
         return await self._handle_action("refactor", code, language, session)
 
     async def fix_code(
-        self, code: str, language: str = "python", session_id: Optional[str] = None
+        self, code: str, language: str = "python", session_id: str | None = None
     ) -> CodeCompletion:
         """Attempt to fix bugs in the supplied code."""
         session = self._resolve_session(session_id, language)
@@ -115,14 +115,14 @@ class IDEAgent(BaseAgent):
         self,
         description: str,
         language: str = "python",
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
     ) -> CodeCompletion:
         """Generate code from a natural-language description."""
         session = self._resolve_session(session_id, language)
         return await self._handle_action("generate", description, language, session)
 
     async def review_code(
-        self, code: str, language: str = "python", session_id: Optional[str] = None
+        self, code: str, language: str = "python", session_id: str | None = None
     ) -> CodeCompletion:
         """Review code and return feedback suggestions."""
         session = self._resolve_session(session_id, language)
@@ -132,9 +132,7 @@ class IDEAgent(BaseAgent):
     # Internals
     # ------------------------------------------------------------------
 
-    def _resolve_session(
-        self, session_id: Optional[str], language: str
-    ) -> IDESession:
+    def _resolve_session(self, session_id: str | None, language: str) -> IDESession:
         if session_id:
             session = self.session_manager.get_session(session_id)
             if session and session.state != SessionState.CLOSED:
@@ -176,7 +174,7 @@ class IDEAgent(BaseAgent):
         )
 
     def _build_code_skeleton(self, prompt: str, language: str) -> str:
-        skeletons: Dict[str, str] = {
+        skeletons: dict[str, str] = {
             "python": f"def solution():\n    # TODO: implement {prompt[:60]}\n    pass\n",
             "javascript": f"function solution() {{\n  // TODO: implement {prompt[:60]}\n}}\n",
             "typescript": f"function solution(): void {{\n  // TODO: implement {prompt[:60]}\n}}\n",
@@ -198,21 +196,19 @@ class IDEAgent(BaseAgent):
             f"# Refactoring suggestions for {language}:\n"
             "# 1. Extract repeated logic into helper functions\n"
             "# 2. Use descriptive variable names\n"
-            "# 3. Add type annotations where applicable\n"
-            + code
+            "# 3. Add type annotations where applicable\n" + code
         )
 
     def _build_fix_hints(self, code: str, language: str) -> str:
         return (
             f"# Bug-fix pass for {language}:\n"
             "# - Checked for null/undefined references\n"
-            "# - Added boundary checks\n"
-            + code
+            "# - Added boundary checks\n" + code
         )
 
     def _build_review_feedback(self, code: str, language: str) -> str:
         lines = code.splitlines()
-        issues: List[str] = []
+        issues: list[str] = []
         if len(lines) > 50:
             issues.append("Function is long — consider splitting into smaller units.")
         if not any("test" in ln.lower() for ln in lines):
@@ -221,7 +217,7 @@ class IDEAgent(BaseAgent):
             issues.append("Code looks clean. No immediate issues found.")
         return "\n".join(f"- {i}" for i in issues)
 
-    def _derive_suggestions(self, action: str, language: str) -> List[str]:
+    def _derive_suggestions(self, action: str, language: str) -> list[str]:
         base = [
             f"Consider adding {language} type hints.",
             "Write unit tests to validate the logic.",

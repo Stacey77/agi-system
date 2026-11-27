@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import time
-from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -12,8 +11,12 @@ from src.agents.base_agent import AgentConfig, AgentType, BaseAgent
 
 
 class _SimpleAgent(BaseAgent):
-    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        return {"status": "completed", "summary": "done", "output": f"result: {task.get('task','')}"}
+    async def process_task(self, task: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "status": "completed",
+            "summary": "done",
+            "output": f"result: {task.get('task', '')}",
+        }
 
 
 def _cfg(name: str, t: AgentType = AgentType.RESEARCH) -> AgentConfig:
@@ -24,15 +27,18 @@ def _cfg(name: str, t: AgentType = AgentType.RESEARCH) -> AgentConfig:
 # Rate-limit bucket
 # ---------------------------------------------------------------------------
 
+
 class TestRateLimitBucket:
     def test_bucket_allows_within_limit(self):
         from src.api.middleware.rate_limit import _Bucket
+
         b = _Bucket(capacity=5)
         for _ in range(5):
             assert b.consume(5, 1.0) is True
 
     def test_bucket_rejects_when_exhausted(self):
         from src.api.middleware.rate_limit import _Bucket
+
         b = _Bucket(capacity=2)
         b.consume(2, 1.0)
         b.consume(2, 1.0)
@@ -40,6 +46,7 @@ class TestRateLimitBucket:
 
     def test_bucket_refills_over_time(self):
         from src.api.middleware.rate_limit import _Bucket
+
         b = _Bucket(capacity=1)
         b.consume(1, 10.0)
         b.last_refill -= 1.0
@@ -50,9 +57,11 @@ class TestRateLimitBucket:
 # Metrics helpers
 # ---------------------------------------------------------------------------
 
+
 class TestMetricsHelpers:
     def test_record_agent_task_no_crash_without_prometheus(self):
         from src.api.middleware import metrics as m
+
         orig = m._PROMETHEUS_AVAILABLE
         m._PROMETHEUS_AVAILABLE = False
         try:
@@ -62,6 +71,7 @@ class TestMetricsHelpers:
 
     def test_metrics_response_returns_text_when_prometheus_missing(self):
         from src.api.middleware import metrics as m
+
         orig = m._PROMETHEUS_AVAILABLE
         m._PROMETHEUS_AVAILABLE = False
         try:
@@ -75,26 +85,31 @@ class TestMetricsHelpers:
 # WebhookDispatcher
 # ---------------------------------------------------------------------------
 
+
 class TestWebhookDispatcher:
     def test_register_returns_id(self):
         from src.webhooks.dispatcher import WebhookDispatcher
+
         d = WebhookDispatcher()
         wid = d.register("http://example.com/hook", ["task.completed"])
         assert isinstance(wid, str) and len(wid) > 0
 
     def test_unregister_existing(self):
         from src.webhooks.dispatcher import WebhookDispatcher
+
         d = WebhookDispatcher()
         wid = d.register("http://example.com/hook", ["crew.completed"])
         assert d.unregister(wid) is True
 
     def test_unregister_missing_returns_false(self):
         from src.webhooks.dispatcher import WebhookDispatcher
+
         d = WebhookDispatcher()
         assert d.unregister("nonexistent-id") is False
 
     def test_list_webhooks(self):
         from src.webhooks.dispatcher import WebhookDispatcher
+
         d = WebhookDispatcher()
         d.register("http://a.com", ["task.completed"])
         d.register("http://b.com", ["crew.completed"])
@@ -104,8 +119,9 @@ class TestWebhookDispatcher:
     @pytest.mark.asyncio
     async def test_dispatch_fires_matching_webhooks(self):
         from src.webhooks.dispatcher import WebhookDispatcher
+
         d = WebhookDispatcher()
-        wid = d.register("http://example.com/hook", ["task.completed"])
+        d.register("http://example.com/hook", ["task.completed"])
         with patch("httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -118,6 +134,7 @@ class TestWebhookDispatcher:
     @pytest.mark.asyncio
     async def test_dispatch_skips_non_matching_events(self):
         from src.webhooks.dispatcher import WebhookDispatcher
+
         d = WebhookDispatcher()
         d.register("http://example.com/hook", ["task.completed"])
         with patch("httpx.AsyncClient") as mock_client_cls:
@@ -134,9 +151,11 @@ class TestWebhookDispatcher:
 # SessionManager
 # ---------------------------------------------------------------------------
 
+
 class TestSessionManager:
     def test_create_session(self):
         from src.sessions.session_manager import SessionManager
+
         sm = SessionManager()
         session = sm.create_session("research_agent")
         assert session.agent_name == "research_agent"
@@ -144,17 +163,20 @@ class TestSessionManager:
 
     def test_get_session(self):
         from src.sessions.session_manager import SessionManager
+
         sm = SessionManager()
         s = sm.create_session("writing_agent")
         assert sm.get_session(s.session_id) is s
 
     def test_get_missing_session_returns_none(self):
         from src.sessions.session_manager import SessionManager
+
         sm = SessionManager()
         assert sm.get_session("nonexistent") is None
 
     def test_list_sessions(self):
         from src.sessions.session_manager import SessionManager
+
         sm = SessionManager()
         sm.create_session("research_agent")
         sm.create_session("analysis_agent")
@@ -162,6 +184,7 @@ class TestSessionManager:
 
     def test_delete_session(self):
         from src.sessions.session_manager import SessionManager
+
         sm = SessionManager()
         s = sm.create_session("coding_agent")
         assert sm.delete_session(s.session_id) is True
@@ -169,6 +192,7 @@ class TestSessionManager:
 
     def test_add_message(self):
         from src.sessions.session_manager import SessionManager
+
         sm = SessionManager()
         s = sm.create_session("review_agent")
         sm.add_message(s.session_id, "user", "Hello")
@@ -182,11 +206,14 @@ class TestSessionManager:
 # Integration: sessions + eval endpoints
 # ---------------------------------------------------------------------------
 
+
 class TestIntegrationEndpoints:
     @pytest.fixture(scope="class")
     def client(self):
         from fastapi.testclient import TestClient
+
         from src.api.main import create_app
+
         with TestClient(create_app()) as c:
             yield c
 
@@ -203,7 +230,9 @@ class TestIntegrationEndpoints:
     def test_session_send_message(self, client):
         r = client.post("/api/v1/sessions", json={"agent_name": "research_agent"})
         sid = r.json()["session_id"]
-        r2 = client.post(f"/api/v1/sessions/{sid}/message", json={"message": "Tell me about AI"})
+        r2 = client.post(
+            f"/api/v1/sessions/{sid}/message", json={"message": "Tell me about AI"}
+        )
         assert r2.status_code == 200
         data = r2.json()
         assert data["role"] == "assistant"
@@ -230,10 +259,13 @@ class TestIntegrationEndpoints:
         assert "score" in data
 
     def test_webhooks_register(self, client):
-        r = client.post("/api/v1/webhooks", json={
-            "url": "http://example.com/hook",
-            "events": ["task.completed"],
-        })
+        r = client.post(
+            "/api/v1/webhooks",
+            json={
+                "url": "http://example.com/hook",
+                "events": ["task.completed"],
+            },
+        )
         assert r.status_code in (200, 201)
         assert "webhook_id" in r.json()
 

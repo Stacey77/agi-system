@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any
 
 from src.tools.base_tool import BaseTool, ToolMetadata
 
@@ -23,7 +23,10 @@ class DocumentParserTool(BaseTool):
                 "required": ["file_path"],
                 "optional": ["output_format"],
                 "properties": {
-                    "file_path": {"type": "string", "description": "Path to the document"},
+                    "file_path": {
+                        "type": "string",
+                        "description": "Path to the document",
+                    },
                     "output_format": {
                         "type": "string",
                         "enum": ["text", "structured"],
@@ -35,7 +38,7 @@ class DocumentParserTool(BaseTool):
             category="information_retrieval",
         )
 
-    def execute(self, **kwargs: Any) -> Dict[str, Any]:
+    def execute(self, **kwargs: Any) -> dict[str, Any]:
         if not self.validate_parameters(**kwargs):
             return {"error": "Missing required parameters", "content": None}
 
@@ -63,36 +66,58 @@ class DocumentParserTool(BaseTool):
     # Parsers
     # ------------------------------------------------------------------
 
-    def _parse_pdf(self, path: Path, fmt: str) -> Dict[str, Any]:
+    def _parse_pdf(self, path: Path, fmt: str) -> dict[str, Any]:
         try:
             import pypdf  # type: ignore[import]
 
             reader = pypdf.PdfReader(str(path))
             pages = [page.extract_text() or "" for page in reader.pages]
-            content: Union[str, List[str]] = pages if fmt == "structured" else "\n".join(pages)
-            return {"file": str(path), "type": "pdf", "pages": len(pages), "content": content}
+            content: str | list[str] = (
+                pages if fmt == "structured" else "\n".join(pages)
+            )
+            return {
+                "file": str(path),
+                "type": "pdf",
+                "pages": len(pages),
+                "content": content,
+            }
         except ImportError:
             logger.warning("pypdf not installed; returning mock PDF content")
-            return {"file": str(path), "type": "pdf", "content": "[PDF content placeholder]"}
+            return {
+                "file": str(path),
+                "type": "pdf",
+                "content": "[PDF content placeholder]",
+            }
 
-    def _parse_word(self, path: Path, fmt: str) -> Dict[str, Any]:
+    def _parse_word(self, path: Path, fmt: str) -> dict[str, Any]:
         try:
             import docx  # type: ignore[import]
 
             doc = docx.Document(str(path))
             paragraphs = [p.text for p in doc.paragraphs]
-            content: Union[str, List[str]] = paragraphs if fmt == "structured" else "\n".join(paragraphs)
-            return {"file": str(path), "type": "docx", "paragraphs": len(paragraphs), "content": content}
+            content: str | list[str] = (
+                paragraphs if fmt == "structured" else "\n".join(paragraphs)
+            )
+            return {
+                "file": str(path),
+                "type": "docx",
+                "paragraphs": len(paragraphs),
+                "content": content,
+            }
         except ImportError:
             logger.warning("python-docx not installed; returning mock Word content")
-            return {"file": str(path), "type": "docx", "content": "[Word content placeholder]"}
+            return {
+                "file": str(path),
+                "type": "docx",
+                "content": "[Word content placeholder]",
+            }
 
-    def _parse_excel(self, path: Path, fmt: str) -> Dict[str, Any]:
+    def _parse_excel(self, path: Path, fmt: str) -> dict[str, Any]:
         try:
             import openpyxl  # type: ignore[import]
 
             wb = openpyxl.load_workbook(str(path), data_only=True)
-            sheets: Dict[str, List[List[Any]]] = {}
+            sheets: dict[str, list[list[Any]]] = {}
             for sheet in wb.sheetnames:
                 ws = wb[sheet]
                 sheets[sheet] = [[cell.value for cell in row] for row in ws.iter_rows()]
@@ -106,8 +131,12 @@ class DocumentParserTool(BaseTool):
             return {"file": str(path), "type": "xlsx", "content": "\n".join(rows)}
         except ImportError:
             logger.warning("openpyxl not installed; returning mock Excel content")
-            return {"file": str(path), "type": "xlsx", "content": "[Excel content placeholder]"}
+            return {
+                "file": str(path),
+                "type": "xlsx",
+                "content": "[Excel content placeholder]",
+            }
 
-    def _parse_text(self, path: Path) -> Dict[str, Any]:
+    def _parse_text(self, path: Path) -> dict[str, Any]:
         content = path.read_text(encoding="utf-8", errors="replace")
         return {"file": str(path), "type": "text", "content": content}

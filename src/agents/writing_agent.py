@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any
 
 from src.agents.base_agent import AgentConfig, BaseAgent
 
@@ -17,12 +18,12 @@ class Document:
 
     title: str
     content: str = ""
-    outline: List[str] = field(default_factory=list)
-    sections: List[Dict[str, Any]] = field(default_factory=list)
+    outline: list[str] = field(default_factory=list)
+    sections: list[dict[str, Any]] = field(default_factory=list)
     word_count: int = 0
     tone: str = "professional"
-    citations: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    citations: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class WritingAgent(BaseAgent):
@@ -42,15 +43,16 @@ class WritingAgent(BaseAgent):
     def __init__(
         self,
         config: AgentConfig,
-        execution_agent: Optional[Any] = None,
-        llm: Optional[Any] = None,
+        execution_agent: Any | None = None,
+        llm: Any | None = None,
     ) -> None:
         super().__init__(config, execution_agent, llm)
 
-    async def stream_task(self, task: Dict[str, Any]) -> AsyncIterator[str]:
+    async def stream_task(self, task: dict[str, Any]) -> AsyncIterator[str]:
         """Stream document content token-by-token when an LLM is available."""
         if self.llm is None:
             import json
+
             result = await self.process_task(task)
             yield json.dumps(result)
             return
@@ -68,7 +70,7 @@ class WritingAgent(BaseAgent):
         async for chunk in self._stream_llm(prompt):
             yield chunk
 
-    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def process_task(self, task: dict[str, Any]) -> dict[str, Any]:
         """Process a writing task."""
         topic = task.get("topic", task.get("task", ""))
         requirements = task.get("requirements", {})
@@ -76,7 +78,7 @@ class WritingAgent(BaseAgent):
 
         doc = await self.create_document(topic, requirements)
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "status": "completed",
             "title": doc.title,
             "content": doc.content,
@@ -89,18 +91,19 @@ class WritingAgent(BaseAgent):
         return result
 
     async def create_document(
-        self, topic: str, requirements: Dict[str, Any]
+        self, topic: str, requirements: dict[str, Any]
     ) -> Document:
         """Generate a document through the outline→draft→edit pipeline."""
         tone = requirements.get("tone", "professional")
         audience = requirements.get("audience", "general")
         doc_format = requirements.get("format", "article")
 
-        outline = (
-            await self._llm_create_outline(topic, doc_format, audience)
-            or self._create_outline(topic, doc_format)
+        outline = await self._llm_create_outline(
+            topic, doc_format, audience
+        ) or self._create_outline(topic, doc_format)
+        sections = await self._llm_draft_sections(
+            outline, topic, tone, audience, doc_format
         )
-        sections = await self._llm_draft_sections(outline, topic, tone, audience, doc_format)
         content = self._assemble_content(sections)
         content = self._edit_content(content, requirements)
 
@@ -120,7 +123,7 @@ class WritingAgent(BaseAgent):
 
     async def _llm_create_outline(
         self, topic: str, doc_format: str, audience: str
-    ) -> Optional[List[str]]:
+    ) -> list[str] | None:
         """Ask the LLM to produce an outline; return None on failure."""
         import json
 
@@ -129,8 +132,14 @@ class WritingAgent(BaseAgent):
         if not raw:
             return None
         try:
-            raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```")
-            outline: List[str] = json.loads(raw)
+            raw = (
+                raw.strip()
+                .removeprefix("```json")
+                .removeprefix("```")
+                .removesuffix("```")
+                .strip()
+            )
+            outline: list[str] = json.loads(raw)
             if isinstance(outline, list) and outline:
                 return outline
         except (json.JSONDecodeError, ValueError):
@@ -139,14 +148,14 @@ class WritingAgent(BaseAgent):
 
     async def _llm_draft_sections(
         self,
-        outline: List[str],
+        outline: list[str],
         topic: str,
         tone: str,
         audience: str,
         doc_format: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Draft each section using the LLM if available, else use placeholder text."""
-        sections: List[Dict[str, Any]] = []
+        sections: list[dict[str, Any]] = []
         for heading in outline:
             if self.llm is not None:
                 prompt = self._SECTION_PROMPT.format(
@@ -164,7 +173,7 @@ class WritingAgent(BaseAgent):
             sections.append({"heading": heading, "content": content})
         return sections
 
-    def _create_outline(self, topic: str, doc_format: str) -> List[str]:
+    def _create_outline(self, topic: str, doc_format: str) -> list[str]:
         if doc_format == "report":
             return [
                 "Executive Summary",
@@ -183,13 +192,13 @@ class WritingAgent(BaseAgent):
             "Conclusion",
         ]
 
-    def _assemble_content(self, sections: List[Dict[str, Any]]) -> str:
-        parts: List[str] = []
+    def _assemble_content(self, sections: list[dict[str, Any]]) -> str:
+        parts: list[str] = []
         for section in sections:
             parts.append(f"## {section['heading']}\n\n{section['content']}")
         return "\n\n".join(parts)
 
-    def _edit_content(self, content: str, requirements: Dict[str, Any]) -> str:
+    def _edit_content(self, content: str, requirements: dict[str, Any]) -> str:
         max_words = requirements.get("max_words")
         if max_words:
             words = content.split()

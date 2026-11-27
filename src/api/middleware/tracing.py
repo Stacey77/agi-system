@@ -4,21 +4,23 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Generator, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 try:
     from opentelemetry import trace
+    from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
-    from opentelemetry.sdk.resources import Resource
+
     _OTEL_AVAILABLE = True
 except ImportError:
     _OTEL_AVAILABLE = False
 
-_tracer: Optional[Any] = None
+_tracer: Any | None = None
 
 
 def setup_tracing(service_name: str = "agi-system") -> None:
@@ -34,11 +36,18 @@ def setup_tracing(service_name: str = "agi-system") -> None:
 
     if endpoint:
         try:
-            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter  # type: ignore
-            provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+                OTLPSpanExporter,  # type: ignore
+            )
+
+            provider.add_span_processor(
+                BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
+            )
             logger.info("OTLP tracing enabled → %s", endpoint)
         except ImportError:
-            logger.warning("opentelemetry-exporter-otlp not installed — traces will not be exported")
+            logger.warning(
+                "opentelemetry-exporter-otlp not installed — traces will not be exported"
+            )
 
     trace.set_tracer_provider(provider)
     _tracer = trace.get_tracer(service_name)
@@ -46,7 +55,7 @@ def setup_tracing(service_name: str = "agi-system") -> None:
 
 
 @contextmanager
-def span(name: str, attributes: Optional[dict] = None) -> Generator[Any, None, None]:
+def span(name: str, attributes: dict | None = None) -> Generator[Any, None, None]:
     """Context manager that creates a tracing span, or no-ops if tracing unavailable."""
     if _tracer is None or not _OTEL_AVAILABLE:
         yield None

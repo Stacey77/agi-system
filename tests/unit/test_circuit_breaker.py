@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
 import time
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -17,7 +16,7 @@ class _CountingAgent(BaseAgent):
         self._call_count = 0
         self._fail_times = fail_times
 
-    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def process_task(self, task: dict[str, Any]) -> dict[str, Any]:
         self._call_count += 1
         if self._call_count <= self._fail_times:
             raise ValueError(f"Deliberate failure #{self._call_count}")

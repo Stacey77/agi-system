@@ -105,6 +105,29 @@ Orchestration: CrewAI (`src/crew/`), LangGraph (within agent pipelines), `Execut
 2. `app.include_router(router, ...)` in `create_app()` in `src/api/main.py`.
 3. Append an OpenAPI tag object to `_OPENAPI_TAGS` in the same file.
 
+## Netlify Deployment
+
+The app deploys to Netlify via `netlify.toml`:
+- **Static dashboard** — `src/api/static/` served at `/`
+- **API** — all `/api/*` requests proxied to `netlify/functions/api.py` (mangum ASGI adapter)
+- **Env vars** — set `NOTION_API_KEY`, `OPENAI_API_KEY`, `JWT_SECRET`, etc. in Netlify → Site settings → Environment variables
+
+```bash
+# local preview (requires netlify-cli)
+netlify dev
+```
+
+## Notion Integration
+
+`src/integrations/notion_client.py` — async Notion REST client.  
+Endpoints at `/api/v1/notion/` (tag: `notion`): pages CRUD, database query, full-text search, paginated row listing.
+
+| Var | Notes |
+|---|---|
+| `NOTION_API_KEY` | Notion internal integration token — create at notion.so/my-integrations |
+
+`GET /api/v1/notion/status` returns `{"configured": true/false}` without requiring a key.
+
 ## Docker / Kubernetes
 
 ```bash

@@ -7,9 +7,10 @@ import logging
 import os
 import time
 import uuid
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Coroutine, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +28,14 @@ class TaskRecord:
     task_id: str
     objective: str
     status: TaskStatus = TaskStatus.QUEUED
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    result: dict[str, Any] | None = None
+    error: str | None = None
     created_at: float = field(default_factory=time.time)
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
+    started_at: float | None = None
+    completed_at: float | None = None
     progress: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "task_id": self.task_id,
             "objective": self.objective,
@@ -58,22 +59,24 @@ class TaskQueue:
 
     def __init__(
         self,
-        persistence: Optional[Any] = None,
+        persistence: Any | None = None,
         retention_seconds: float = 86400.0,  # 24 hours
     ) -> None:
-        self._records: Dict[str, TaskRecord] = {}
+        self._records: dict[str, TaskRecord] = {}
         self._queue: asyncio.Queue[str] = asyncio.Queue()
-        self._handlers: Dict[str, Callable[..., Coroutine]] = {}
-        self._redis: Optional[Any] = None
-        self._worker_task: Optional[asyncio.Task] = None
-        self._cleanup_task: Optional[asyncio.Task] = None
-        self._subscribers: Dict[str, List[asyncio.Queue]] = {}
+        self._handlers: dict[str, Callable[..., Coroutine]] = {}
+        self._redis: Any | None = None
+        self._worker_task: asyncio.Task | None = None
+        self._cleanup_task: asyncio.Task | None = None
+        self._subscribers: dict[str, list[asyncio.Queue]] = {}
         self._persistence = persistence
         self._retention_seconds = retention_seconds
         self._stop_event: asyncio.Event = asyncio.Event()
         if persistence is not None:
             self._records = persistence.load_all()
-            logger.info("TaskQueue restored %d records from persistence", len(self._records))
+            logger.info(
+                "TaskQueue restored %d records from persistence", len(self._records)
+            )
 
     async def start(self, handler: Callable[[TaskRecord], Coroutine]) -> None:
         """Start background worker with *handler* called for each task."""
@@ -84,7 +87,9 @@ class TaskQueue:
             await self._init_redis(redis_url)
         self._worker_task = asyncio.create_task(self._worker())
         self._cleanup_task = asyncio.create_task(self._cleanup_loop())
-        logger.info("TaskQueue started (backend=%s)", "redis" if self._redis else "asyncio")
+        logger.info(
+            "TaskQueue started (backend=%s)", "redis" if self._redis else "asyncio"
+        )
 
     async def stop(self) -> None:
         self._stop_event.set()
@@ -95,20 +100,24 @@ class TaskQueue:
                 task.cancel()
                 try:
                     await asyncio.wait_for(asyncio.shield(task), timeout=5.0)
-                except (asyncio.CancelledError, asyncio.TimeoutError):
+                except (TimeoutError, asyncio.CancelledError):
                     pass
         self._worker_task = None
         self._cleanup_task = None
         if self._redis:
             try:
                 await self._redis.aclose()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001, S110
                 pass
 
-    async def submit(self, objective: str, parameters: Dict[str, Any] = {}) -> TaskRecord:
+    async def submit(
+        self, objective: str, parameters: dict[str, Any] | None = None
+    ) -> TaskRecord:
         task_id = str(uuid.uuid4())
         record = TaskRecord(task_id=task_id, objective=objective)
-        record.__dict__.update({"parameters": parameters})
+        record.__dict__.update(
+            {"parameters": parameters if parameters is not None else {}}
+        )
         self._records[task_id] = record
         if self._persistence:
             self._persistence.save(record)
@@ -117,20 +126,25 @@ class TaskQueue:
         logger.info("Task '%s' submitted: %s", task_id, objective[:60])
         return record
 
-    def get(self, task_id: str) -> Optional[TaskRecord]:
+    def get(self, task_id: str) -> TaskRecord | None:
         return self._records.get(task_id)
 
-    def list_all(self) -> List[TaskRecord]:
+    def list_all(self) -> list[TaskRecord]:
         return list(self._records.values())
 
     def cancel(self, task_id: str) -> bool:
         record = self._records.get(task_id)
-        if record is None or record.status not in (TaskStatus.QUEUED, TaskStatus.RUNNING):
+        if record is None or record.status not in (
+            TaskStatus.QUEUED,
+            TaskStatus.RUNNING,
+        ):
             return False
         record.status = TaskStatus.CANCELLED
         return True
 
-    async def update_progress(self, task_id: str, progress: int, message: str = "") -> None:
+    async def update_progress(
+        self, task_id: str, progress: int, message: str = ""
+    ) -> None:
         """Push a progress update (0-100) from within a task handler."""
         record = self._records.get(task_id)
         if record is None or record.status != TaskStatus.RUNNING:
@@ -160,6 +174,7 @@ class TaskQueue:
     async def _init_redis(self, url: str) -> None:
         try:
             import redis.asyncio as aioredis  # type: ignore[import]
+
             self._redis = aioredis.from_url(url, decode_responses=True)
             await self._redis.ping()
             logger.info("TaskQueue connected to Redis at %s", url)
@@ -194,7 +209,7 @@ class TaskQueue:
             except asyncio.CancelledError:
                 logger.info("TaskQueue worker cancelled")
                 raise
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 await asyncio.sleep(0)
                 continue
             except Exception as exc:  # noqa: BLE001
@@ -249,17 +264,20 @@ class TaskQueue:
                 # Wait for stop signal or for the retention interval to elapse
                 await asyncio.wait_for(self._stop_event.wait(), timeout=3600)
                 return  # stop event fired
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass  # retention interval elapsed; run cleanup below
             except asyncio.CancelledError:
                 return
             cutoff = time.time() - self._retention_seconds
             to_delete = [
-                tid for tid, r in list(self._records.items())
+                tid
+                for tid, r in list(self._records.items())
                 if r.status in _TERMINAL and (r.completed_at or 0) < cutoff
             ]
             for tid in to_delete:
                 del self._records[tid]
                 self._subscribers.pop(tid, None)
             if to_delete:
-                logger.info("TaskQueue cleanup: removed %d expired records", len(to_delete))
+                logger.info(
+                    "TaskQueue cleanup: removed %d expired records", len(to_delete)
+                )

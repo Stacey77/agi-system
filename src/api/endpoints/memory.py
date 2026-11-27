@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -36,8 +36,8 @@ class HybridContextRequest(BaseModel):
 
 
 class HybridStoreRequest(BaseModel):
-    documents: List[str]
-    agent_id: Optional[str] = None
+    documents: list[str]
+    agent_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -65,14 +65,14 @@ def _get_hybrid_memory(request: Request):
 
 
 @router.get("/short-term")
-async def list_short_term(request: Request) -> Dict[str, Any]:
+async def list_short_term(request: Request) -> dict[str, Any]:
     """Return all keys and values stored in short-term memory."""
     mm = _get_memory_manager(request)
     return {"memory": mm._short_term}
 
 
 @router.delete("/short-term")
-async def clear_short_term(request: Request) -> Dict[str, str]:
+async def clear_short_term(request: Request) -> dict[str, str]:
     """Clear all short-term memory entries."""
     mm = _get_memory_manager(request)
     mm._short_term.clear()
@@ -80,11 +80,13 @@ async def clear_short_term(request: Request) -> Dict[str, str]:
 
 
 @router.delete("/short-term/{key}")
-async def delete_short_term_key(key: str, request: Request) -> Dict[str, str]:
+async def delete_short_term_key(key: str, request: Request) -> dict[str, str]:
     """Delete a single key from short-term memory."""
     mm = _get_memory_manager(request)
     if key not in mm._short_term:
-        raise HTTPException(status_code=404, detail=f"Key '{key}' not found in short-term memory")
+        raise HTTPException(
+            status_code=404, detail=f"Key '{key}' not found in short-term memory"
+        )
     del mm._short_term[key]
     return {"message": f"Key '{key}' deleted from short-term memory"}
 
@@ -95,7 +97,7 @@ async def delete_short_term_key(key: str, request: Request) -> Dict[str, str]:
 
 
 @router.post("/store")
-async def store_memory(body: StoreRequest, request: Request) -> Dict[str, str]:
+async def store_memory(body: StoreRequest, request: Request) -> dict[str, str]:
     """Store a value in the specified memory type."""
     mm = _get_memory_manager(request)
     try:
@@ -110,7 +112,7 @@ async def retrieve_memory(
     request: Request,
     key: str,
     memory_type: str = "short_term",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Retrieve a value by key from the specified memory type."""
     mm = _get_memory_manager(request)
     try:
@@ -125,7 +127,7 @@ async def search_memory(
     request: Request,
     query: str,
     memory_type: str = "long_term",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Semantic search across the specified memory type."""
     mm = _get_memory_manager(request)
     try:
@@ -141,7 +143,7 @@ async def search_memory(
 
 
 @router.get("/conversation")
-async def get_conversation(request: Request, n: int = 10) -> Dict[str, Any]:
+async def get_conversation(request: Request, n: int = 10) -> dict[str, Any]:
     """Return the last *n* conversation messages."""
     mm = _get_memory_manager(request)
     context = mm.get_conversation_context(n)
@@ -151,7 +153,7 @@ async def get_conversation(request: Request, n: int = 10) -> Dict[str, Any]:
 @router.post("/conversation")
 async def add_conversation_message(
     body: ConversationMessageRequest, request: Request
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Append a message to the conversation history."""
     mm = _get_memory_manager(request)
     mm.add_conversation_message(body.role, body.content)
@@ -159,7 +161,7 @@ async def add_conversation_message(
 
 
 @router.delete("/conversation")
-async def clear_conversation(request: Request) -> Dict[str, str]:
+async def clear_conversation(request: Request) -> dict[str, str]:
     """Clear all conversation history."""
     mm = _get_memory_manager(request)
     mm.clear_conversation()
@@ -174,35 +176,39 @@ async def clear_conversation(request: Request) -> Dict[str, str]:
 @router.post("/hybrid/context")
 async def hybrid_get_context(
     body: HybridContextRequest, request: Request
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Retrieve merged context for an agent from hybrid memory."""
     hm = _get_hybrid_memory(request)
     try:
         context = hm.get_context(body.agent_id, body.query, k=body.k)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.error("HybridMemory.get_context error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {"agent_id": body.agent_id, "query": body.query, "context": context}
 
 
 @router.post("/hybrid/store")
-async def hybrid_store(body: HybridStoreRequest, request: Request) -> Dict[str, str]:
+async def hybrid_store(body: HybridStoreRequest, request: Request) -> dict[str, str]:
     """Store documents in hybrid memory — agent-specific or shared."""
     hm = _get_hybrid_memory(request)
     try:
         if body.agent_id is not None:
             for doc in body.documents:
                 hm.add_agent_context(body.agent_id, doc)
-            return {"message": f"Stored {len(body.documents)} document(s) for agent '{body.agent_id}'"}
+            return {
+                "message": f"Stored {len(body.documents)} document(s) for agent '{body.agent_id}'"
+            }
         hm.add_to_shared(body.documents)
-        return {"message": f"Stored {len(body.documents)} document(s) in shared hybrid memory"}
-    except Exception as exc:  # noqa: BLE001
+        return {
+            "message": f"Stored {len(body.documents)} document(s) in shared hybrid memory"
+        }
+    except Exception as exc:
         logger.error("HybridMemory store error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.delete("/hybrid/{agent_id}")
-async def hybrid_clear_agent(agent_id: str, request: Request) -> Dict[str, str]:
+async def hybrid_clear_agent(agent_id: str, request: Request) -> dict[str, str]:
     """Clear all hybrid memory context for the given agent."""
     hm = _get_hybrid_memory(request)
     hm.clear_agent_context(agent_id)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional
 
 from src.cde.cde_environment import (
     CDEEnvironment,
@@ -19,7 +18,7 @@ class CDEManager:
     """Manages create / start / stop / delete lifecycle of CDEs."""
 
     def __init__(self) -> None:
-        self._environments: Dict[str, CDEEnvironment] = {}
+        self._environments: dict[str, CDEEnvironment] = {}
 
     # ------------------------------------------------------------------
     # CRUD
@@ -31,12 +30,12 @@ class CDEManager:
         runtime: CDERuntime = CDERuntime.PYTHON,
         runtime_version: str = "latest",
         owner: str = "",
-        repository_url: Optional[str] = None,
+        repository_url: str | None = None,
         branch: str = "main",
-        resources: Optional[CDEResources] = None,
-        env_vars: Optional[Dict[str, str]] = None,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict] = None,
+        resources: CDEResources | None = None,
+        env_vars: dict[str, str] | None = None,
+        tags: list[str] | None = None,
+        metadata: dict | None = None,
     ) -> CDEEnvironment:
         """Provision a new CDE and register it."""
         env = CDEEnvironment(
@@ -57,14 +56,14 @@ class CDEManager:
         logger.info("CDEManager: created env '%s' (id=%s)", name, env.env_id)
         return env
 
-    def get_environment(self, env_id: str) -> Optional[CDEEnvironment]:
+    def get_environment(self, env_id: str) -> CDEEnvironment | None:
         return self._environments.get(env_id)
 
     def list_environments(
         self,
-        owner: Optional[str] = None,
-        status: Optional[CDEStatus] = None,
-    ) -> List[CDEEnvironment]:
+        owner: str | None = None,
+        status: CDEStatus | None = None,
+    ) -> list[CDEEnvironment]:
         envs = list(self._environments.values())
         if owner:
             envs = [e for e in envs if e.owner == owner]
@@ -106,7 +105,9 @@ class CDEManager:
     # ------------------------------------------------------------------
 
     def running_count(self) -> int:
-        return sum(1 for e in self._environments.values() if e.status == CDEStatus.RUNNING)
+        return sum(
+            1 for e in self._environments.values() if e.status == CDEStatus.RUNNING
+        )
 
     def total_count(self) -> int:
         return len(self._environments)

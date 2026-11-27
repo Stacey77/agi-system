@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional
 
 from src.tools.base_tool import BaseTool, ToolMetadata
 
@@ -14,7 +13,7 @@ class ToolRegistry:
     """Central registry for all available tools."""
 
     def __init__(self) -> None:
-        self._tools: Dict[str, BaseTool] = {}
+        self._tools: dict[str, BaseTool] = {}
 
     def register_tool(self, tool: BaseTool) -> None:
         """Register *tool* by its metadata name."""
@@ -30,11 +29,11 @@ class ToolRegistry:
             raise KeyError(f"No tool registered with name: '{name}'")
         return self._tools[name]
 
-    def get_tools_by_category(self, category: str) -> List[BaseTool]:
+    def get_tools_by_category(self, category: str) -> list[BaseTool]:
         """Return all tools belonging to *category*."""
         return [t for t in self._tools.values() if t.metadata.category == category]
 
-    def list_tools(self) -> List[ToolMetadata]:
+    def list_tools(self) -> list[ToolMetadata]:
         """Return metadata for all registered tools."""
         return [t.metadata for t in self._tools.values()]
 

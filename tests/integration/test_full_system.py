@@ -111,7 +111,10 @@ class TestNewAgents:
     def test_coding_agent_generate(self, client):
         response = client.post(
             "/api/v1/agents/coding_agent/execute",
-            json={"task": "reverse a string", "parameters": {"mode": "generate", "language": "python"}},
+            json={
+                "task": "reverse a string",
+                "parameters": {"mode": "generate", "language": "python"},
+            },
         )
         assert response.status_code == 200
         data = response.json()["result"]
@@ -121,7 +124,14 @@ class TestNewAgents:
     def test_coding_agent_review(self, client):
         response = client.post(
             "/api/v1/agents/coding_agent/execute",
-            json={"task": "review code", "parameters": {"mode": "review", "code": "x = eval(input())", "language": "python"}},
+            json={
+                "task": "review code",
+                "parameters": {
+                    "mode": "review",
+                    "code": "x = eval(input())",
+                    "language": "python",
+                },
+            },
         )
         assert response.status_code == 200
         data = response.json()["result"]
@@ -130,7 +140,13 @@ class TestNewAgents:
     def test_summarization_agent_execute(self, client):
         response = client.post(
             "/api/v1/agents/summarization_agent/execute",
-            json={"task": "summarize", "parameters": {"text": "The quick brown fox. Machine learning is great. AI is transforming industries.", "style": "concise"}},
+            json={
+                "task": "summarize",
+                "parameters": {
+                    "text": "The quick brown fox. Machine learning is great. AI is transforming industries.",
+                    "style": "concise",
+                },
+            },
         )
         assert response.status_code == 200
         data = response.json()["result"]
@@ -143,7 +159,13 @@ class TestStreamingEndpoint:
         with client.stream(
             "POST",
             "/api/v1/agents/summarization_agent/stream",
-            json={"task": "summarize this", "parameters": {"text": "Hello world. This is a test.", "style": "concise"}},
+            json={
+                "task": "summarize this",
+                "parameters": {
+                    "text": "Hello world. This is a test.",
+                    "style": "concise",
+                },
+            },
         ) as response:
             assert response.status_code == 200
             assert "text/event-stream" in response.headers.get("content-type", "")

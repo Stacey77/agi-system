@@ -7,9 +7,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from src.execution.execution_engine import ExecutionEngine, ExecutionResult, ExecutionStatus
+from src.execution.execution_engine import (
+    ExecutionEngine,
+    ExecutionResult,
+    ExecutionStatus,
+)
 from src.execution.task_validation import TaskValidationSystem, ValidationResult
 
 logger = logging.getLogger(__name__)
@@ -20,9 +24,9 @@ class ExecutionResult2:  # alias kept for backward compatibility
     """Aggregate result from an agent plan execution."""
 
     success: bool
-    task_results: List[ExecutionResult] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    task_results: list[ExecutionResult] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class ExecutionAgent:
@@ -36,18 +40,16 @@ class ExecutionAgent:
 
     PRIORITY_SCORE: float = 9.7
 
-    def __init__(self, execution_engine: Optional[ExecutionEngine] = None) -> None:
+    def __init__(self, execution_engine: ExecutionEngine | None = None) -> None:
         self._engine = execution_engine or ExecutionEngine()
         self._validator = TaskValidationSystem()
-        logger.info(
-            "ExecutionAgent initialised (priority=%.1f)", self.PRIORITY_SCORE
-        )
+        logger.info("ExecutionAgent initialised (priority=%.1f)", self.PRIORITY_SCORE)
 
     # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
 
-    async def execute_plan(self, agent_plan: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_plan(self, agent_plan: dict[str, Any]) -> dict[str, Any]:
         """Validate and execute *agent_plan*.
 
         Parameters
@@ -83,8 +85,8 @@ class ExecutionAgent:
         }
 
     async def orchestrate_execution(
-        self, plan: Dict[str, Any], crew: Any
-    ) -> Dict[str, Any]:
+        self, plan: dict[str, Any], crew: Any
+    ) -> dict[str, Any]:
         """Orchestrate execution across a CrewAI *crew*.
 
         If crew supports a ``kickoff`` method it will be invoked;
@@ -100,11 +102,11 @@ class ExecutionAgent:
 
         return await self.execute_plan(plan)
 
-    async def validate_plan(self, plan: Dict[str, Any]) -> Dict[str, Any]:
+    async def validate_plan(self, plan: dict[str, Any]) -> dict[str, Any]:
         """Validate *plan* and return a validation summary."""
         tasks = plan.get("tasks", [])
-        all_errors: List[str] = []
-        all_warnings: List[str] = []
+        all_errors: list[str] = []
+        all_warnings: list[str] = []
 
         for task in tasks:
             result: ValidationResult = self._validator.validate_task(task)

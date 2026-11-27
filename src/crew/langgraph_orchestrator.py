@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, TypedDict
 
 logger = logging.getLogger(__name__)
 
@@ -14,18 +14,18 @@ class AgentState(TypedDict):
 
     objective: str
     context: str
-    agent_names: List[str]
-    step_results: List[Dict[str, Any]]
+    agent_names: list[str]
+    step_results: list[dict[str, Any]]
     current_idx: int
     error: str
 
 
 async def run_langgraph_crew(
     objective: str,
-    agent_names: List[str],
+    agent_names: list[str],
     factory: Any,
     max_retries: int = 2,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Execute a crew workflow via LangGraph StateGraph.
 
     Returns a result dict on success, or None if LangGraph is unavailable.
@@ -43,6 +43,7 @@ async def run_langgraph_crew(
 
     # Build one node per agent
     for name in agent_names:
+
         async def _make_node(state: AgentState, _name: str = name) -> AgentState:
             agent = factory.get_agent(_name)
             if agent is None:
@@ -50,7 +51,7 @@ async def run_langgraph_crew(
                 return state
 
             task_dict = {"task": state["context"]}
-            last_exc: Optional[Exception] = None
+            last_exc: Exception | None = None
 
             for attempt in range(max_retries + 1):
                 try:
@@ -77,17 +78,23 @@ async def run_langgraph_crew(
                         await asyncio.sleep(0.5 * (attempt + 1))
                         logger.warning(
                             "LangGraph: agent '%s' attempt %d failed: %s — retrying",
-                            _name, attempt + 1, exc,
+                            _name,
+                            attempt + 1,
+                            exc,
                         )
 
-            logger.error("LangGraph: agent '%s' failed after %d retries: %s", _name, max_retries, last_exc)
+            logger.error(
+                "LangGraph: agent '%s' failed after %d retries: %s",
+                _name,
+                max_retries,
+                last_exc,
+            )
             return AgentState(
                 objective=state["objective"],
                 context=state["context"],
                 agent_names=state["agent_names"],
-                step_results=list(state["step_results"]) + [
-                    {"agent": _name, "error": str(last_exc)}
-                ],
+                step_results=list(state["step_results"])
+                + [{"agent": _name, "error": str(last_exc)}],
                 current_idx=state["current_idx"] + 1,
                 error=str(last_exc),
             )
@@ -111,7 +118,7 @@ async def run_langgraph_crew(
             error="",
         )
         final_state = await compiled.ainvoke(initial_state)
-        step_results: List[Dict[str, Any]] = final_state.get("step_results", [])
+        step_results: list[dict[str, Any]] = final_state.get("step_results", [])
         final_result = next(
             (s["result"] for s in reversed(step_results) if "result" in s), {}
         )

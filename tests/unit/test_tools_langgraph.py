@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,23 +13,24 @@ from src.tools.calculator_tool import CalculatorTool
 from src.tools.tool_registry import ToolRegistry
 from src.tools.web_search_tool import WebSearchTool
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_config(name: str, agent_type: AgentType = AgentType.RESEARCH) -> AgentConfig:
     return AgentConfig(name=name, agent_type=agent_type)
 
 
 class _SimpleAgent(BaseAgent):
-    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def process_task(self, task: dict[str, Any]) -> dict[str, Any]:
         return {"status": "completed", "summary": f"done: {task.get('task', '')}"}
 
 
 # ---------------------------------------------------------------------------
 # ToolRegistry
 # ---------------------------------------------------------------------------
+
 
 class TestToolRegistry:
     def test_register_and_get(self):
@@ -64,6 +65,7 @@ class TestToolRegistry:
 # CalculatorTool
 # ---------------------------------------------------------------------------
 
+
 class TestCalculatorTool:
     def test_evaluate_simple_expression(self):
         calc = CalculatorTool()
@@ -76,7 +78,9 @@ class TestCalculatorTool:
 
     def test_statistics_mode(self):
         calc = CalculatorTool()
-        result = calc.execute(expression="mean", operation="statistics", data=[1, 2, 3, 4, 5])
+        result = calc.execute(
+            expression="mean", operation="statistics", data=[1, 2, 3, 4, 5]
+        )
         assert result["mean"] == 3.0
         assert result["count"] == 5
 
@@ -94,6 +98,7 @@ class TestCalculatorTool:
 # ---------------------------------------------------------------------------
 # WebSearchTool
 # ---------------------------------------------------------------------------
+
 
 class TestWebSearchTool:
     def test_mock_search_returns_results(self):
@@ -123,6 +128,7 @@ class TestWebSearchTool:
 # ---------------------------------------------------------------------------
 # AgentFactory tool registry injection
 # ---------------------------------------------------------------------------
+
 
 class TestAgentFactoryToolRegistry:
     def test_set_tool_registry_propagates(self):
@@ -162,6 +168,7 @@ class TestAgentFactoryToolRegistry:
 # ---------------------------------------------------------------------------
 # LangGraph orchestrator
 # ---------------------------------------------------------------------------
+
 
 class TestLangGraphOrchestrator:
     def _make_factory(self, agents):

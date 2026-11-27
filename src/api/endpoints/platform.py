@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, TypeVar
+from typing import Any, TypeVar
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -46,7 +46,7 @@ def _get_kally_agent(request: Request) -> KallyAgent:
     return agent
 
 
-def _parse_enum(enum_cls: Type[_EnumT], value: str, field_name: str) -> _EnumT:
+def _parse_enum(enum_cls: type[_EnumT], value: str, field_name: str) -> _EnumT:
     """Coerce ``value`` into ``enum_cls`` or raise a 400 with the valid options."""
     try:
         return enum_cls(value)
@@ -70,15 +70,15 @@ class ToolModel(BaseModel):
     category: str
     tier: str
     version: str
-    homepage_url: Optional[str] = None
-    docs_url: Optional[str] = None
-    tags: List[str]
+    homepage_url: str | None = None
+    docs_url: str | None = None
+    tags: list[str]
     owner_team: str
     is_active: bool
 
 
 class ToolListResponse(BaseModel):
-    tools: List[ToolModel]
+    tools: list[ToolModel]
     total: int
 
 
@@ -87,7 +87,7 @@ class ToolResponse(BaseModel):
 
 
 class ToolsSummaryResponse(BaseModel):
-    summary: Dict[str, int]
+    summary: dict[str, int]
     total: int
 
 
@@ -97,16 +97,16 @@ class ServiceModel(BaseModel):
     description: str
     tier: str
     version: str
-    api_base_url: Optional[str] = None
-    docs_url: Optional[str] = None
+    api_base_url: str | None = None
+    docs_url: str | None = None
     status: str
     owner_team: str
-    tags: List[str]
+    tags: list[str]
     registered_at: str
 
 
 class ServiceListResponse(BaseModel):
-    services: List[ServiceModel]
+    services: list[ServiceModel]
     total: int
 
 
@@ -116,7 +116,7 @@ class ServiceResponse(BaseModel):
 
 class PortalHealthResponse(BaseModel):
     total_services: int
-    status_counts: Dict[str, int]
+    status_counts: dict[str, int]
     fully_operational: bool
 
 
@@ -131,18 +131,18 @@ class RegisterToolRequest(BaseModel):
     category: str = "other"
     tier: str = "both"
     version: str = "latest"
-    homepage_url: Optional[str] = None
-    docs_url: Optional[str] = None
-    tags: List[str] = []
+    homepage_url: str | None = None
+    docs_url: str | None = None
+    tags: list[str] = []
     owner_team: str = ""
 
 
 @router.get("/tools", response_model=ToolListResponse)
 async def list_tools(
     request: Request,
-    category: Optional[str] = None,
-    tier: Optional[str] = None,
-    tag: Optional[str] = None,
+    category: str | None = None,
+    tier: str | None = None,
+    tag: str | None = None,
 ) -> ToolListResponse:
     """List platform tools from the tooling landscape."""
     landscape = _get_tool_landscape(request)
@@ -202,17 +202,17 @@ class RegisterServiceRequest(BaseModel):
     description: str = ""
     tier: str = "internal"
     version: str = "v1"
-    api_base_url: Optional[str] = None
-    docs_url: Optional[str] = None
+    api_base_url: str | None = None
+    docs_url: str | None = None
     owner_team: str = ""
-    tags: List[str] = []
+    tags: list[str] = []
 
 
 @router.get("/portal/services", response_model=ServiceListResponse)
 async def list_services(
     request: Request,
-    tier: Optional[str] = None,
-    tag: Optional[str] = None,
+    tier: str | None = None,
+    tag: str | None = None,
 ) -> ServiceListResponse:
     """List services registered in the developer portal."""
     portal = _get_developer_portal(request)
@@ -269,19 +269,19 @@ class KallySignalRequest(BaseModel):
     value: float
     threshold: float = 0.0
     severity: str = "info"
-    metadata: Dict[str, Any] = {}
+    metadata: dict[str, Any] = {}
 
 
 class KallyActionRequest(BaseModel):
     action: str = "analyse"
-    parameters: Dict[str, Any] = {}
+    parameters: dict[str, Any] = {}
 
 
 @router.post("/kally/signals")
-async def ingest_signal(body: KallySignalRequest, request: Request) -> Dict[str, Any]:
+async def ingest_signal(body: KallySignalRequest, request: Request) -> dict[str, Any]:
     """Ingest a feedback signal into the Kally closed-loop system."""
     kally = _get_kally_agent(request)
-    task: Dict[str, Any] = {
+    task: dict[str, Any] = {
         "action": "ingest",
         "source": body.source,
         "metric": body.metric,
@@ -294,21 +294,21 @@ async def ingest_signal(body: KallySignalRequest, request: Request) -> Dict[str,
 
 
 @router.post("/kally/analyse")
-async def kally_analyse(request: Request) -> Dict[str, Any]:
+async def kally_analyse(request: Request) -> dict[str, Any]:
     """Trigger a Kally closed-loop analysis cycle."""
     kally = _get_kally_agent(request)
     return await kally.process_task({"action": "analyse"})
 
 
 @router.get("/kally/report")
-async def kally_report(request: Request) -> Dict[str, Any]:
+async def kally_report(request: Request) -> dict[str, Any]:
     """Get the current Kally health report."""
     kally = _get_kally_agent(request)
     return await kally.process_task({"action": "report"})
 
 
 @router.post("/kally/reset")
-async def kally_reset(request: Request) -> Dict[str, Any]:
+async def kally_reset(request: Request) -> dict[str, Any]:
     """Reset the Kally signal buffer and action log."""
     kally = _get_kally_agent(request)
     return await kally.process_task({"action": "reset"})

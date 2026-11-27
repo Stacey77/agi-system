@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from src.agents.base_agent import AgentConfig, BaseAgent
 from src.cde.cde_environment import CDEResources, CDERuntime, CDEStatus
@@ -21,13 +21,13 @@ class CDEAgent(BaseAgent):
     def __init__(
         self,
         config: AgentConfig,
-        execution_agent: Optional[Any] = None,
-        cde_manager: Optional[CDEManager] = None,
+        execution_agent: Any | None = None,
+        cde_manager: CDEManager | None = None,
     ) -> None:
         super().__init__(config, execution_agent)
         self.cde_manager = cde_manager or CDEManager()
 
-    async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def process_task(self, task: dict[str, Any]) -> dict[str, Any]:
         """Dispatch a CDE management task."""
         action = task.get("action", "list")
         logger.info("CDEAgent action='%s'", action)
@@ -42,7 +42,7 @@ class CDEAgent(BaseAgent):
         }
         handler = dispatcher.get(action)
         if handler is None:
-            result: Dict[str, Any] = {
+            result: dict[str, Any] = {
                 "status": "error",
                 "error": f"Unknown action '{action}'",
             }
@@ -56,7 +56,7 @@ class CDEAgent(BaseAgent):
     # Action handlers
     # ------------------------------------------------------------------
 
-    async def _handle_create(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_create(self, task: dict[str, Any]) -> dict[str, Any]:
         runtime_str = task.get("runtime", "python")
         try:
             runtime = CDERuntime(runtime_str)
@@ -83,7 +83,7 @@ class CDEAgent(BaseAgent):
         )
         return {"status": "completed", "action": "create", "environment": env.to_dict()}
 
-    async def _handle_start(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_start(self, task: dict[str, Any]) -> dict[str, Any]:
         env_id = task.get("env_id", "")
         success = self.cde_manager.start_environment(env_id)
         return {
@@ -93,7 +93,7 @@ class CDEAgent(BaseAgent):
             "started": success,
         }
 
-    async def _handle_stop(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_stop(self, task: dict[str, Any]) -> dict[str, Any]:
         env_id = task.get("env_id", "")
         success = self.cde_manager.stop_environment(env_id)
         return {
@@ -103,7 +103,7 @@ class CDEAgent(BaseAgent):
             "stopped": success,
         }
 
-    async def _handle_delete(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_delete(self, task: dict[str, Any]) -> dict[str, Any]:
         env_id = task.get("env_id", "")
         success = self.cde_manager.delete_environment(env_id)
         return {
@@ -113,10 +113,10 @@ class CDEAgent(BaseAgent):
             "deleted": success,
         }
 
-    async def _handle_list(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_list(self, task: dict[str, Any]) -> dict[str, Any]:
         owner = task.get("owner")
         status_str = task.get("filter_status")
-        status_filter: Optional[CDEStatus] = None
+        status_filter: CDEStatus | None = None
         if status_str:
             try:
                 status_filter = CDEStatus(status_str)
@@ -130,7 +130,7 @@ class CDEAgent(BaseAgent):
             "total": len(envs),
         }
 
-    async def _handle_status(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_status(self, task: dict[str, Any]) -> dict[str, Any]:
         env_id = task.get("env_id", "")
         env = self.cde_manager.get_environment(env_id)
         if env is None:

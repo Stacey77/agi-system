@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class CDEStatus(str, Enum):
@@ -40,7 +40,7 @@ class CDEResources:
     storage_gb: float = 10.0
     gpu_count: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "cpu_cores": self.cpu_cores,
             "memory_gb": self.memory_gb,
@@ -60,20 +60,20 @@ class CDEEnvironment:
     status: CDEStatus = CDEStatus.PROVISIONING
     resources: CDEResources = field(default_factory=CDEResources)
     owner: str = ""
-    repository_url: Optional[str] = None
+    repository_url: str | None = None
     branch: str = "main"
-    env_vars: Dict[str, str] = field(default_factory=dict)
-    tags: List[str] = field(default_factory=list)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    env_vars: dict[str, str] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def transition_to(self, status: CDEStatus) -> None:
         """Transition the environment to a new status."""
         self.status = status
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "env_id": self.env_id,
             "name": self.name,

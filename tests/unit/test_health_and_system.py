@@ -9,7 +9,9 @@ class TestHealthEndpoints:
     @pytest.fixture(scope="class")
     def client(self):
         from fastapi.testclient import TestClient
+
         from src.api.main import create_app
+
         with TestClient(create_app()) as c:
             yield c
 
@@ -39,12 +41,26 @@ class TestHealthEndpoints:
         r = client.get("/health/detailed")
         assert r.json()["status"] in ("healthy", "degraded")
 
+    def test_detailed_health_does_not_expose_exception_details(self, client):
+        class FailingQueue:
+            def list_all(self):
+                raise RuntimeError("/private/internal/path")
+
+        client.app.state.task_queue = FailingQueue()
+        response = client.get("/health/detailed")
+
+        assert response.status_code == 200
+        assert response.json()["components"]["task_queue"]["error"] == "check failed"
+        assert "/private/internal/path" not in response.text
+
 
 class TestRequestIDMiddleware:
     @pytest.fixture(scope="class")
     def client(self):
         from fastapi.testclient import TestClient
+
         from src.api.main import create_app
+
         with TestClient(create_app()) as c:
             yield c
 
@@ -54,6 +70,7 @@ class TestRequestIDMiddleware:
 
     def test_request_id_is_uuid(self, client):
         import uuid
+
         r = client.get("/health")
         rid = r.headers.get("x-request-id", "")
         uuid.UUID(rid)  # raises if not valid UUID
@@ -72,7 +89,9 @@ class TestSystemInfo:
     @pytest.fixture(scope="class")
     def client(self):
         from fastapi.testclient import TestClient
+
         from src.api.main import create_app
+
         with TestClient(create_app()) as c:
             yield c
 

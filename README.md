@@ -127,6 +127,13 @@ agi-system/
 └── docs/                # Documentation
 ```
 
+## Documentation
+
+- [User Guides](docs/user-guides/README.md)
+- [API Reference](docs/api/README.md)
+- [Deployment](docs/deployment/README.md)
+- [Agentic Studio — AI Coding Assistants: Enterprise Market Landscape](docs/agentic-studio/market-landscape.md)
+
 ## Contributing
 
 1. Fork the repository

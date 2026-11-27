@@ -21,6 +21,7 @@ def _api_key_mock(role: str = "admin"):
 @pytest.fixture(scope="module")
 def client():
     from src.api.main import create_app
+
     app = create_app()
     with TestClient(app, raise_server_exceptions=True) as c:
         app.state.key_store = MagicMock()
@@ -37,28 +38,41 @@ H = {"X-API-Key": "sk-test"}
 # Crew templates
 # ---------------------------------------------------------------------------
 
+
 class TestCrewTemplates:
     def test_create_template(self, client):
-        resp = client.post("/api/v1/crew/templates", headers=H, json={
-            "name": "research_brief",
-            "description": "Research then write",
-            "agent_names": ["research_agent", "writing_agent"],
-            "max_iterations": 2,
-        })
+        resp = client.post(
+            "/api/v1/crew/templates",
+            headers=H,
+            json={
+                "name": "research_brief",
+                "description": "Research then write",
+                "agent_names": ["research_agent", "writing_agent"],
+                "max_iterations": 2,
+            },
+        )
         assert resp.status_code == 201
         data = resp.json()
         assert data["name"] == "research_brief"
         assert data["agent_names"] == ["research_agent", "writing_agent"]
 
     def test_create_duplicate_template_409(self, client):
-        client.post("/api/v1/crew/templates", headers=H, json={
-            "name": "dup_template",
-            "agent_names": ["research_agent"],
-        })
-        resp = client.post("/api/v1/crew/templates", headers=H, json={
-            "name": "dup_template",
-            "agent_names": ["research_agent"],
-        })
+        client.post(
+            "/api/v1/crew/templates",
+            headers=H,
+            json={
+                "name": "dup_template",
+                "agent_names": ["research_agent"],
+            },
+        )
+        resp = client.post(
+            "/api/v1/crew/templates",
+            headers=H,
+            json={
+                "name": "dup_template",
+                "agent_names": ["research_agent"],
+            },
+        )
         assert resp.status_code == 409
 
     def test_list_templates(self, client):
@@ -78,10 +92,14 @@ class TestCrewTemplates:
         assert resp.status_code == 404
 
     def test_delete_template(self, client):
-        client.post("/api/v1/crew/templates", headers=H, json={
-            "name": "to_delete",
-            "agent_names": ["review_agent"],
-        })
+        client.post(
+            "/api/v1/crew/templates",
+            headers=H,
+            json={
+                "name": "to_delete",
+                "agent_names": ["review_agent"],
+            },
+        )
         resp = client.delete("/api/v1/crew/templates/to_delete", headers=H)
         assert resp.status_code in (200, 204)
         resp2 = client.get("/api/v1/crew/templates/to_delete", headers=H)
@@ -92,41 +110,62 @@ class TestCrewTemplates:
 # Runtime agent registration
 # ---------------------------------------------------------------------------
 
+
 class TestRuntimeAgentRegistration:
     def test_create_agent(self, client):
-        resp = client.post("/api/v1/agents/", headers=H, json={
-            "name": "dynamic_agent",
-            "agent_type": "research",
-            "description": "Dynamically registered",
-            "capabilities": ["web_search"],
-        })
+        resp = client.post(
+            "/api/v1/agents/",
+            headers=H,
+            json={
+                "name": "dynamic_agent",
+                "agent_type": "research",
+                "description": "Dynamically registered",
+                "capabilities": ["web_search"],
+            },
+        )
         assert resp.status_code == 201
         data = resp.json()
         assert data["name"] == "dynamic_agent"
 
     def test_create_duplicate_agent_409(self, client):
-        client.post("/api/v1/agents/", headers=H, json={
-            "name": "dup_agent",
-            "agent_type": "analysis",
-        })
-        resp = client.post("/api/v1/agents/", headers=H, json={
-            "name": "dup_agent",
-            "agent_type": "analysis",
-        })
+        client.post(
+            "/api/v1/agents/",
+            headers=H,
+            json={
+                "name": "dup_agent",
+                "agent_type": "analysis",
+            },
+        )
+        resp = client.post(
+            "/api/v1/agents/",
+            headers=H,
+            json={
+                "name": "dup_agent",
+                "agent_type": "analysis",
+            },
+        )
         assert resp.status_code == 409
 
     def test_create_invalid_type_422(self, client):
-        resp = client.post("/api/v1/agents/", headers=H, json={
-            "name": "bad_agent",
-            "agent_type": "not_a_real_type",
-        })
+        resp = client.post(
+            "/api/v1/agents/",
+            headers=H,
+            json={
+                "name": "bad_agent",
+                "agent_type": "not_a_real_type",
+            },
+        )
         assert resp.status_code == 422
 
     def test_delete_agent(self, client):
-        client.post("/api/v1/agents/", headers=H, json={
-            "name": "agent_to_delete",
-            "agent_type": "review",
-        })
+        client.post(
+            "/api/v1/agents/",
+            headers=H,
+            json={
+                "name": "agent_to_delete",
+                "agent_type": "review",
+            },
+        )
         resp = client.delete("/api/v1/agents/agent_to_delete", headers=H)
         assert resp.status_code in (200, 204)
 
@@ -143,6 +182,7 @@ class TestRuntimeAgentRegistration:
 # Agent history endpoint
 # ---------------------------------------------------------------------------
 
+
 class TestAgentHistory:
     def test_history_shape(self, client):
         resp = client.get("/api/v1/agents/planning_agent/history", headers=H)
@@ -155,8 +195,9 @@ class TestAgentHistory:
         assert isinstance(data["records"], list)
 
     def test_history_limit(self, client):
-        resp = client.get("/api/v1/agents/planning_agent/history",
-                          headers=H, params={"limit": 5})
+        resp = client.get(
+            "/api/v1/agents/planning_agent/history", headers=H, params={"limit": 5}
+        )
         assert resp.status_code == 200
         assert len(resp.json()["records"]) <= 5
 
@@ -169,6 +210,7 @@ class TestAgentHistory:
 # ---------------------------------------------------------------------------
 # Token tracker wiring into agents
 # ---------------------------------------------------------------------------
+
 
 class TestTokenTrackerWiring:
     def test_factory_set_token_tracker(self):

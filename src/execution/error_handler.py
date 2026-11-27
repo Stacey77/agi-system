@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class ErrorAnalysis:
     severity: str  # low | medium | high | critical
     is_recoverable: bool
     root_cause: str
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -32,8 +32,8 @@ class RecoveryPlan:
     """Steps to recover from an error."""
 
     error_type: str
-    steps: List[str] = field(default_factory=list)
-    fallback: Optional[str] = None
+    steps: list[str] = field(default_factory=list)
+    fallback: str | None = None
     should_retry: bool = True
     retry_delay_seconds: int = 5
 
@@ -41,9 +41,7 @@ class RecoveryPlan:
 class ErrorHandler:
     """Classifies errors and generates recovery plans."""
 
-    def analyze_error(
-        self, error: Exception, task: Dict[str, Any]
-    ) -> ErrorAnalysis:
+    def analyze_error(self, error: Exception, task: dict[str, Any]) -> ErrorAnalysis:
         """Analyse *error* in the context of *task*."""
         error_msg = str(error).lower()
         error_type = self._classify(error_msg)
@@ -59,7 +57,7 @@ class ErrorHandler:
         )
 
     def create_recovery_plan(
-        self, task: Dict[str, Any], error: Exception
+        self, task: dict[str, Any], error: Exception
     ) -> RecoveryPlan:
         """Generate a recovery plan for *error*."""
         analysis = self.analyze_error(error, task)
@@ -89,9 +87,7 @@ class ErrorHandler:
                 return etype
         return "unknown"
 
-    def _assess_severity(
-        self, error_type: str, task: Dict[str, Any]
-    ) -> str:
+    def _assess_severity(self, error_type: str, task: dict[str, Any]) -> str:
         if error_type == "permission":
             return "high"
         if error_type == "network":
@@ -105,7 +101,7 @@ class ErrorHandler:
     # ------------------------------------------------------------------
 
     def _resource_recovery(
-        self, task: Dict[str, Any], analysis: ErrorAnalysis
+        self, task: dict[str, Any], analysis: ErrorAnalysis
     ) -> RecoveryPlan:
         return RecoveryPlan(
             error_type="resource_unavailable",
@@ -119,7 +115,7 @@ class ErrorHandler:
         )
 
     def _permission_recovery(
-        self, task: Dict[str, Any], analysis: ErrorAnalysis
+        self, task: dict[str, Any], analysis: ErrorAnalysis
     ) -> RecoveryPlan:
         return RecoveryPlan(
             error_type="permission_denied",
@@ -133,7 +129,7 @@ class ErrorHandler:
         )
 
     def _network_recovery(
-        self, task: Dict[str, Any], analysis: ErrorAnalysis
+        self, task: dict[str, Any], analysis: ErrorAnalysis
     ) -> RecoveryPlan:
         return RecoveryPlan(
             error_type="network_error",
@@ -147,7 +143,7 @@ class ErrorHandler:
         )
 
     def _data_recovery(
-        self, task: Dict[str, Any], analysis: ErrorAnalysis
+        self, task: dict[str, Any], analysis: ErrorAnalysis
     ) -> RecoveryPlan:
         return RecoveryPlan(
             error_type="data_inconsistency",
@@ -161,7 +157,7 @@ class ErrorHandler:
         )
 
     def _generic_recovery(
-        self, task: Dict[str, Any], analysis: ErrorAnalysis
+        self, task: dict[str, Any], analysis: ErrorAnalysis
     ) -> RecoveryPlan:
         return RecoveryPlan(
             error_type="unknown",

@@ -6,7 +6,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -16,27 +16,27 @@ class ProgressiveResult:
     """Result of a progressive execution."""
 
     success: bool
-    phases_completed: List[str] = field(default_factory=list)
-    phases_skipped: List[str] = field(default_factory=list)
+    phases_completed: list[str] = field(default_factory=list)
+    phases_skipped: list[str] = field(default_factory=list)
     total_duration: float = 0.0
-    error: Optional[str] = None
-    output: Dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    output: dict[str, Any] = field(default_factory=dict)
 
 
 class CheckpointManager:
     """Saves and loads execution checkpoints."""
 
     def __init__(self) -> None:
-        self._checkpoints: Dict[str, Dict[str, Any]] = {}
+        self._checkpoints: dict[str, dict[str, Any]] = {}
 
-    def save(self, phase_id: str, data: Dict[str, Any]) -> None:
+    def save(self, phase_id: str, data: dict[str, Any]) -> None:
         self._checkpoints[phase_id] = dict(data)
         logger.debug("Checkpoint saved for phase '%s'", phase_id)
 
-    def load(self, phase_id: str) -> Optional[Dict[str, Any]]:
+    def load(self, phase_id: str) -> dict[str, Any] | None:
         return self._checkpoints.get(phase_id)
 
-    def list_checkpoints(self) -> List[str]:
+    def list_checkpoints(self) -> list[str]:
         return list(self._checkpoints.keys())
 
 
@@ -46,7 +46,7 @@ class ProgressTracker:
     def __init__(self, total_phases: int) -> None:
         self._total = total_phases
         self._completed = 0
-        self._current: Optional[str] = None
+        self._current: str | None = None
 
     def start_phase(self, phase_id: str) -> None:
         self._current = phase_id
@@ -65,7 +65,7 @@ class ProgressTracker:
         return self._completed / self._total
 
     @property
-    def current_phase(self) -> Optional[str]:
+    def current_phase(self) -> str | None:
         return self._current
 
 
@@ -93,14 +93,14 @@ class ProgressiveExecutor:
         logger.info("ProgressiveExecutor stopped")
 
     async def execute_progressively(
-        self, complex_task: Dict[str, Any]
+        self, complex_task: dict[str, Any]
     ) -> ProgressiveResult:
         """Execute *complex_task* phase by phase.
 
         The task must contain a ``phases`` key with a list of phase
         dictionaries, each with at minimum a ``phase_id`` field.
         """
-        phases: List[Dict[str, Any]] = complex_task.get("phases", [])
+        phases: list[dict[str, Any]] = complex_task.get("phases", [])
         if not phases:
             # Derive phases from a flat task
             phases = [
@@ -109,14 +109,14 @@ class ProgressiveExecutor:
 
         tracker = ProgressTracker(len(phases))
         start_time = time.monotonic()
-        completed: List[str] = []
-        skipped: List[str] = []
-        output: Dict[str, Any] = {}
+        completed: list[str] = []
+        skipped: list[str] = []
+        output: dict[str, Any] = {}
         self._stopped = False
 
         for phase in phases:
             if self._stopped:
-                skipped.extend(p["phase_id"] for p in phases[len(completed):])
+                skipped.extend(p["phase_id"] for p in phases[len(completed) :])
                 break
 
             while self._paused and not self._stopped:
@@ -163,7 +163,7 @@ class ProgressiveExecutor:
     # Internal
     # ------------------------------------------------------------------
 
-    async def _execute_phase(self, phase: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_phase(self, phase: dict[str, Any]) -> dict[str, Any]:
         """Execute a single phase — override for real work."""
         await asyncio.sleep(0)  # yield control
         return {"phase_id": phase.get("phase_id"), "status": "completed"}

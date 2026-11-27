@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 
@@ -16,15 +16,15 @@ _BASE_DELAY = 1.0  # seconds; doubles each retry
 
 class WebhookDispatcher:
     def __init__(self) -> None:
-        self._webhooks: Dict[str, Dict[str, Any]] = {}
+        self._webhooks: dict[str, dict[str, Any]] = {}
 
-    def register(self, url: str, events: List[str]) -> str:
+    def register(self, url: str, events: list[str]) -> str:
         webhook_id = str(uuid.uuid4())
         self._webhooks[webhook_id] = {
             "id": webhook_id,
             "url": url,
             "events": events,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "last_error": None,
             "delivery_count": 0,
             "failure_count": 0,
@@ -37,10 +37,10 @@ class WebhookDispatcher:
         del self._webhooks[webhook_id]
         return True
 
-    def list_webhooks(self) -> List[Dict[str, Any]]:
+    def list_webhooks(self) -> list[dict[str, Any]]:
         return list(self._webhooks.values())
 
-    async def dispatch(self, event: str, payload: Dict[str, Any]) -> None:
+    async def dispatch(self, event: str, payload: dict[str, Any]) -> None:
         targets = [w for w in self._webhooks.values() if event in w["events"]]
         if not targets:
             return
@@ -50,9 +50,9 @@ class WebhookDispatcher:
             return_exceptions=True,
         )
 
-    async def _deliver(self, webhook: Dict[str, Any], body: Dict[str, Any]) -> None:
+    async def _deliver(self, webhook: dict[str, Any], body: dict[str, Any]) -> None:
         delay = _BASE_DELAY
-        last_exc: Optional[Exception] = None
+        last_exc: Exception | None = None
         async with httpx.AsyncClient(timeout=10.0) as client:
             for attempt in range(1, _MAX_RETRIES + 1):
                 try:
@@ -62,14 +62,21 @@ class WebhookDispatcher:
                     webhook["last_error"] = None
                     logger.debug(
                         "Webhook delivered (id=%s event=%s attempt=%d status=%d)",
-                        webhook["id"], body.get("event"), attempt, resp.status_code,
+                        webhook["id"],
+                        body.get("event"),
+                        attempt,
+                        resp.status_code,
                     )
                     return
                 except Exception as exc:  # noqa: BLE001
                     last_exc = exc
                     logger.warning(
                         "Webhook delivery attempt %d/%d failed (id=%s url=%s): %s",
-                        attempt, _MAX_RETRIES, webhook["id"], webhook["url"], exc,
+                        attempt,
+                        _MAX_RETRIES,
+                        webhook["id"],
+                        webhook["url"],
+                        exc,
                     )
                     if attempt < _MAX_RETRIES:
                         await asyncio.sleep(delay)
@@ -78,5 +85,7 @@ class WebhookDispatcher:
         webhook["last_error"] = str(last_exc)
         logger.error(
             "Webhook delivery permanently failed after %d attempts (id=%s url=%s)",
-            _MAX_RETRIES, webhook["id"], webhook["url"],
+            _MAX_RETRIES,
+            webhook["id"],
+            webhook["url"],
         )

@@ -6,14 +6,14 @@ import json
 import logging
 import sys
 import time
-from typing import Any, Dict
+from typing import Any
 
 
 class _JsonFormatter(logging.Formatter):
     """Emit one JSON object per log record."""
 
     def format(self, record: logging.LogRecord) -> str:
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(record.created)),
             "level": record.levelname,
             "logger": record.name,
@@ -22,10 +22,27 @@ class _JsonFormatter(logging.Formatter):
         if record.exc_info:
             payload["exc"] = self.formatException(record.exc_info)
         extra_skip = {
-            "name", "msg", "args", "levelname", "levelno", "pathname",
-            "filename", "module", "exc_info", "exc_text", "stack_info",
-            "lineno", "funcName", "created", "msecs", "relativeCreated",
-            "thread", "threadName", "processName", "process", "message",
+            "name",
+            "msg",
+            "args",
+            "levelname",
+            "levelno",
+            "pathname",
+            "filename",
+            "module",
+            "exc_info",
+            "exc_text",
+            "stack_info",
+            "lineno",
+            "funcName",
+            "created",
+            "msecs",
+            "relativeCreated",
+            "thread",
+            "threadName",
+            "processName",
+            "process",
+            "message",
             "taskName",
         }
         for key, val in record.__dict__.items():
