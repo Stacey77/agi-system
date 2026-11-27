@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from enum import Enum
+from typing import Any, TypeVar
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from src.agents.kally_agent import KallyAgent
 from src.platform.developer_portal import DeveloperPortal, PortalTier
 from src.platform.tool_landscape import ToolCategory, ToolLandscape, ToolTier
 
@@ -15,31 +17,107 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/platform", tags=["platform"])
 
+_EnumT = TypeVar("_EnumT", bound=Enum)
+
 
 # ------------------------------------------------------------------
-# Shared state helpers
+# Shared state / parsing helpers
 # ------------------------------------------------------------------
 
 
 def _get_tool_landscape(request: Request) -> ToolLandscape:
     landscape = getattr(request.app.state, "tool_landscape", None)
-    if landscape is None:
+    if not isinstance(landscape, ToolLandscape):
         raise HTTPException(status_code=503, detail="Tool landscape not initialised")
     return landscape
 
 
 def _get_developer_portal(request: Request) -> DeveloperPortal:
     portal = getattr(request.app.state, "developer_portal", None)
-    if portal is None:
+    if not isinstance(portal, DeveloperPortal):
         raise HTTPException(status_code=503, detail="Developer portal not initialised")
     return portal
 
 
-def _get_kally_agent(request: Request) -> Any:
+def _get_kally_agent(request: Request) -> KallyAgent:
     agent = getattr(request.app.state, "kally_agent", None)
-    if agent is None:
+    if not isinstance(agent, KallyAgent):
         raise HTTPException(status_code=503, detail="Kally AI agent not initialised")
     return agent
+
+
+def _parse_enum(enum_cls: type[_EnumT], value: str, field_name: str) -> _EnumT:
+    """Coerce ``value`` into ``enum_cls`` or raise a 400 with the valid options."""
+    try:
+        return enum_cls(value)
+    except ValueError:
+        valid = ", ".join(str(member.value) for member in enum_cls)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown {field_name} '{value}'. Valid values: {valid}",
+        ) from None
+
+
+# ------------------------------------------------------------------
+# Response models
+# ------------------------------------------------------------------
+
+
+class ToolModel(BaseModel):
+    tool_id: str
+    name: str
+    description: str
+    category: str
+    tier: str
+    version: str
+    homepage_url: str | None = None
+    docs_url: str | None = None
+    tags: list[str]
+    owner_team: str
+    is_active: bool
+
+
+class ToolListResponse(BaseModel):
+    tools: list[ToolModel]
+    total: int
+
+
+class ToolResponse(BaseModel):
+    tool: ToolModel
+
+
+class ToolsSummaryResponse(BaseModel):
+    summary: dict[str, int]
+    total: int
+
+
+class ServiceModel(BaseModel):
+    service_id: str
+    name: str
+    description: str
+    tier: str
+    version: str
+    api_base_url: str | None = None
+    docs_url: str | None = None
+    status: str
+    owner_team: str
+    tags: list[str]
+    registered_at: str
+
+
+class ServiceListResponse(BaseModel):
+    services: list[ServiceModel]
+    total: int
+
+
+class ServiceResponse(BaseModel):
+    service: ServiceModel
+
+
+class PortalHealthResponse(BaseModel):
+    total_services: int
+    status_counts: dict[str, int]
+    fully_operational: bool
 
 
 # ------------------------------------------------------------------
@@ -59,72 +137,39 @@ class RegisterToolRequest(BaseModel):
     owner_team: str = ""
 
 
-@router.get("/tools")
+@router.get("/tools", response_model=ToolListResponse)
 async def list_tools(
     request: Request,
     category: str | None = None,
     tier: str | None = None,
     tag: str | None = None,
-) -> dict[str, Any]:
+) -> ToolListResponse:
     """List platform tools from the tooling landscape."""
     landscape = _get_tool_landscape(request)
-    cat_filter: ToolCategory | None = None
-    tier_filter: ToolTier | None = None
-    if category:
-        try:
-            cat_filter = ToolCategory(category)
-        except ValueError:
-            raise HTTPException(
-                status_code=400, detail=f"Unknown category '{category}'"
-            )
-    if tier:
-        try:
-            tier_filter = ToolTier(tier)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Unknown tier '{tier}'")
+    cat_filter = _parse_enum(ToolCategory, category, "category") if category else None
+    tier_filter = _parse_enum(ToolTier, tier, "tier") if tier else None
     tools = landscape.list_tools(category=cat_filter, tier=tier_filter, tag=tag)
-    return {"tools": [t.to_dict() for t in tools], "total": len(tools)}
+    models = [ToolModel(**t.to_dict()) for t in tools]
+    return ToolListResponse(tools=models, total=len(models))
 
 
-@router.get("/tools/search")
-async def search_tools(request: Request, q: str) -> dict[str, Any]:
+@router.get("/tools/search", response_model=ToolListResponse)
+async def search_tools(request: Request, q: str) -> ToolListResponse:
     """Search tools by name, description, or tags."""
     landscape = _get_tool_landscape(request)
     tools = landscape.search(q)
-    return {"tools": [t.to_dict() for t in tools], "total": len(tools)}
+    models = [ToolModel(**t.to_dict()) for t in tools]
+    return ToolListResponse(tools=models, total=len(models))
 
 
-@router.get("/tools/summary")
-async def tools_summary(request: Request) -> dict[str, Any]:
+@router.get("/tools/summary", response_model=ToolsSummaryResponse)
+async def tools_summary(request: Request) -> ToolsSummaryResponse:
     """Return tool counts per category."""
     landscape = _get_tool_landscape(request)
-    return {"summary": landscape.categories_summary(), "total": landscape.total_count()}
-
-
-@router.post("/tools")
-async def register_tool(body: RegisterToolRequest, request: Request) -> dict[str, Any]:
-    """Register a new tool in the platform landscape."""
-    landscape = _get_tool_landscape(request)
-    try:
-        cat = ToolCategory(body.category)
-    except ValueError:
-        cat = ToolCategory.OTHER
-    try:
-        tier = ToolTier(body.tier)
-    except ValueError:
-        tier = ToolTier.BOTH
-    tool = landscape.register_tool(
-        name=body.name,
-        description=body.description,
-        category=cat,
-        tier=tier,
-        version=body.version,
-        homepage_url=body.homepage_url,
-        docs_url=body.docs_url,
-        tags=body.tags,
-        owner_team=body.owner_team,
+    return ToolsSummaryResponse(
+        summary=landscape.categories_summary(),
+        total=landscape.total_count(),
     )
-    return {"tool": tool.to_dict()}
 
 
 class UpdateToolRequest(BaseModel):
@@ -137,27 +182,47 @@ class UpdateToolRequest(BaseModel):
     is_active: bool | None = None
 
 
-@router.get("/tools/{tool_id}")
-async def get_tool(tool_id: str, request: Request) -> dict[str, Any]:
+@router.post("/tools", response_model=ToolResponse)
+async def register_tool(body: RegisterToolRequest, request: Request) -> ToolResponse:
+    """Register a new tool in the platform landscape."""
+    landscape = _get_tool_landscape(request)
+    cat = _parse_enum(ToolCategory, body.category, "category")
+    tier = _parse_enum(ToolTier, body.tier, "tier")
+    tool = landscape.register_tool(
+        name=body.name,
+        description=body.description,
+        category=cat,
+        tier=tier,
+        version=body.version,
+        homepage_url=body.homepage_url,
+        docs_url=body.docs_url,
+        tags=body.tags,
+        owner_team=body.owner_team,
+    )
+    return ToolResponse(tool=ToolModel(**tool.to_dict()))
+
+
+@router.get("/tools/{tool_id}", response_model=ToolResponse)
+async def get_tool(tool_id: str, request: Request) -> ToolResponse:
     """Get a single tool by tool_id."""
     landscape = _get_tool_landscape(request)
     tool = landscape.get_tool(tool_id)
     if tool is None:
         raise HTTPException(status_code=404, detail=f"Tool '{tool_id}' not found")
-    return {"tool": tool.to_dict()}
+    return ToolResponse(tool=ToolModel(**tool.to_dict()))
 
 
-@router.patch("/tools/{tool_id}")
+@router.patch("/tools/{tool_id}", response_model=ToolResponse)
 async def update_tool(
     tool_id: str, body: UpdateToolRequest, request: Request
-) -> dict[str, Any]:
+) -> ToolResponse:
     """Partially update a tool's metadata."""
     landscape = _get_tool_landscape(request)
     fields = {k: v for k, v in body.model_dump().items() if v is not None}
     tool = landscape.update_tool(tool_id, **fields)
     if tool is None:
         raise HTTPException(status_code=404, detail=f"Tool '{tool_id}' not found")
-    return {"tool": tool.to_dict()}
+    return ToolResponse(tool=ToolModel(**tool.to_dict()))
 
 
 @router.delete("/tools/{tool_id}")
@@ -186,49 +251,43 @@ class RegisterServiceRequest(BaseModel):
     tags: list[str] = []
 
 
-@router.get("/portal/services")
+@router.get("/portal/services", response_model=ServiceListResponse)
 async def list_services(
     request: Request,
     tier: str | None = None,
     tag: str | None = None,
-) -> dict[str, Any]:
+) -> ServiceListResponse:
     """List services registered in the developer portal."""
     portal = _get_developer_portal(request)
-    tier_filter: PortalTier | None = None
-    if tier:
-        try:
-            tier_filter = PortalTier(tier)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Unknown tier '{tier}'")
+    tier_filter = _parse_enum(PortalTier, tier, "tier") if tier else None
     services = portal.list_services(tier=tier_filter, tag=tag)
-    return {"services": [s.to_dict() for s in services], "total": len(services)}
+    models = [ServiceModel(**s.to_dict()) for s in services]
+    return ServiceListResponse(services=models, total=len(models))
 
 
-@router.get("/portal/services/search")
-async def search_services(request: Request, q: str) -> dict[str, Any]:
+@router.get("/portal/services/search", response_model=ServiceListResponse)
+async def search_services(request: Request, q: str) -> ServiceListResponse:
     """Search services by name, description, or tags."""
     portal = _get_developer_portal(request)
     services = portal.search(q)
-    return {"services": [s.to_dict() for s in services], "total": len(services)}
+    models = [ServiceModel(**s.to_dict()) for s in services]
+    return ServiceListResponse(services=models, total=len(models))
 
 
-@router.get("/portal/health")
-async def portal_health(request: Request) -> dict[str, Any]:
+@router.get("/portal/health", response_model=PortalHealthResponse)
+async def portal_health(request: Request) -> PortalHealthResponse:
     """Return a health dashboard for all registered services."""
     portal = _get_developer_portal(request)
-    return portal.health_dashboard()
+    return PortalHealthResponse(**portal.health_dashboard())
 
 
-@router.post("/portal/services")
+@router.post("/portal/services", response_model=ServiceResponse)
 async def register_service(
     body: RegisterServiceRequest, request: Request
-) -> dict[str, Any]:
+) -> ServiceResponse:
     """Register a new service in the developer portal."""
     portal = _get_developer_portal(request)
-    try:
-        tier = PortalTier(body.tier)
-    except ValueError:
-        tier = PortalTier.INTERNAL
+    tier = _parse_enum(PortalTier, body.tier, "tier")
     svc = portal.register_service(
         name=body.name,
         description=body.description,
@@ -239,7 +298,7 @@ async def register_service(
         owner_team=body.owner_team,
         tags=body.tags,
     )
-    return {"service": svc.to_dict()}
+    return ServiceResponse(service=ServiceModel(**svc.to_dict()))
 
 
 # ------------------------------------------------------------------
@@ -265,7 +324,7 @@ class KallyActionRequest(BaseModel):
 async def ingest_signal(body: KallySignalRequest, request: Request) -> dict[str, Any]:
     """Ingest a feedback signal into the Kally closed-loop system."""
     kally = _get_kally_agent(request)
-    task = {
+    task: dict[str, Any] = {
         "action": "ingest",
         "source": body.source,
         "metric": body.metric,
