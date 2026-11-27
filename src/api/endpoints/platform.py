@@ -172,6 +172,16 @@ async def tools_summary(request: Request) -> ToolsSummaryResponse:
     )
 
 
+class UpdateToolRequest(BaseModel):
+    description: str | None = None
+    version: str | None = None
+    homepage_url: str | None = None
+    docs_url: str | None = None
+    tags: list[str] | None = None
+    owner_team: str | None = None
+    is_active: bool | None = None
+
+
 @router.post("/tools", response_model=ToolResponse)
 async def register_tool(body: RegisterToolRequest, request: Request) -> ToolResponse:
     """Register a new tool in the platform landscape."""
@@ -190,6 +200,39 @@ async def register_tool(body: RegisterToolRequest, request: Request) -> ToolResp
         owner_team=body.owner_team,
     )
     return ToolResponse(tool=ToolModel(**tool.to_dict()))
+
+
+@router.get("/tools/{tool_id}", response_model=ToolResponse)
+async def get_tool(tool_id: str, request: Request) -> ToolResponse:
+    """Get a single tool by tool_id."""
+    landscape = _get_tool_landscape(request)
+    tool = landscape.get_tool(tool_id)
+    if tool is None:
+        raise HTTPException(status_code=404, detail=f"Tool '{tool_id}' not found")
+    return ToolResponse(tool=ToolModel(**tool.to_dict()))
+
+
+@router.patch("/tools/{tool_id}", response_model=ToolResponse)
+async def update_tool(
+    tool_id: str, body: UpdateToolRequest, request: Request
+) -> ToolResponse:
+    """Partially update a tool's metadata."""
+    landscape = _get_tool_landscape(request)
+    fields = {k: v for k, v in body.model_dump().items() if v is not None}
+    tool = landscape.update_tool(tool_id, **fields)
+    if tool is None:
+        raise HTTPException(status_code=404, detail=f"Tool '{tool_id}' not found")
+    return ToolResponse(tool=ToolModel(**tool.to_dict()))
+
+
+@router.delete("/tools/{tool_id}")
+async def delete_tool(tool_id: str, request: Request) -> dict[str, str]:
+    """Permanently remove a tool from the landscape."""
+    landscape = _get_tool_landscape(request)
+    removed = landscape.remove_tool(tool_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"Tool '{tool_id}' not found")
+    return {"message": f"Tool '{tool_id}' removed"}
 
 
 # ------------------------------------------------------------------
